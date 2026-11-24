@@ -17,7 +17,7 @@ internal sealed class TestFolder : IDisposable
 {
     public TestFolder()
     {
-        Path = System.IO.Path.Combine(System.IO.Path.GetTempPath(), "cf-tests-" + Guid.NewGuid().ToString("N"));
+        Path = System.IO.Path.Combine(TestPaths.Temp, "cf-tests-" + Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(Path);
     }
 
@@ -175,25 +175,81 @@ internal sealed class RecordingProgress : IProgress<UpdateProgress>
 }
 
 /// <summary>
-/// A folder with a file in it that cannot be deleted while the folder is read-only (Linux, macOS); writable again when
-/// disposed, so the test's folder can be deleted.
+/// Reports each stage to a function the test gives, on the thread that installs and before the installer goes on: the test can
+/// cancel at the very moment it chooses, with no waiting on time.
 /// </summary>
-[System.Runtime.Versioning.UnsupportedOSPlatform("windows")]
-internal sealed class ReadOnlyFolder : IDisposable
+internal sealed class ReactingProgress : IProgress<UpdateProgress>
 {
-    private readonly string _path;
+    private readonly Action<UpdateProgress> _react;
 
-    public ReadOnlyFolder(string path)
+    public ReactingProgress(Action<UpdateProgress> react)
     {
-        _path = path;
-        Directory.CreateDirectory(path);
-        File.WriteAllText(System.IO.Path.Combine(path, "left over"), "left over");
-        File.SetUnixFileMode(path, UnixFileMode.UserRead | UnixFileMode.UserExecute);
+        _react = react;
     }
 
-    public void Dispose()
+    public void Report(UpdateProgress value)
     {
-        File.SetUnixFileMode(_path, UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute);
+        _react(value);
+    }
+}
+
+/// <summary>
+/// A data folder that is the one the test gives.
+/// </summary>
+internal sealed class FixedDataFolder : IDataFolder
+{
+    public FixedDataFolder(string rootFolder)
+    {
+        RootFolder = rootFolder;
+    }
+
+    public string RootFolder { get; }
+}
+
+/// <summary>
+/// The real checker and the real installer over a feed in a folder, as <see cref="ReleaseUpdater" /> puts them together, with one
+/// difference: the test names the package (its format too), where the updater takes the one for the system it runs on.
+/// </summary>
+internal sealed class FeedUpdater : IUpdater
+{
+    private readonly HttpClient _http;
+    private readonly string _packageName;
+    private readonly InstallLocation _location;
+    private readonly string _trustedKey;
+
+    public FeedUpdater(LocalFeed feed, string packageName, InstallLocation location, string? trustedKey = null)
+    {
+        _http = feed.CreateClient();
+        _packageName = packageName;
+        _location = location;
+        _trustedKey = trustedKey ?? TestSigning.PublicKey;
+    }
+
+    public Version CurrentVersion { get; } = new Version(1, 0, 0, 0);
+
+    public Task<UpdateCheckResult> CheckAsync(CancellationToken cancellationToken)
+    {
+        return new UpdateChecker(_http, LocalFeed.FeedUri, CurrentVersion, _packageName).CheckAsync(cancellationToken);
+    }
+
+    public string? FindProblem(ReleaseInfo release)
+    {
+        return release.CanInstall ? null : "No download the program can install by itself.";
+    }
+
+    public Task InstallAsync(ReleaseInfo release, IProgress<UpdateProgress>? progress, UpdateCancellation? cancellation)
+    {
+        return new UpdateInstaller(_http, release, _location, CurrentVersion, progress, cancellation) { TrustedKey = _trustedKey }.RunAsync();
+    }
+
+    public Task CleanUpAsync(int attempts)
+    {
+        return UpdateInstaller.CleanUpAsync(_location.Folder, attempts);
+    }
+
+    public ProcessStartInfo CreateStartInfo(string? argument)
+    {
+        return _location.CreateStartInfo(argument);
     }
 }
 
@@ -423,11 +479,30 @@ internal static class ReleaseFixtures
     }
 
     /// <summary>
-    /// A real updater over a feed and an install, trusting the test key.
+    /// Every file under the folder, by its path from the folder with forward slashes, with its bytes: what a folder holds, to
+    /// compare before and after.
     /// </summary>
-    public static ReleaseUpdater CreateUpdater(LocalFeed feed, InstallLocation install, string currentVersion = "1.0.0.0")
+    public static Dictionary<string, string> Snapshot(string folder)
     {
-        return new ReleaseUpdater(feed.CreateClient(), LocalFeed.FeedUri, Version.Parse(currentVersion), install, TestSigning.PublicKey);
+        var files = new Dictionary<string, string>(StringComparer.Ordinal);
+        foreach(var file in Directory.EnumerateFiles(folder, "*", SearchOption.AllDirectories))
+            files[Path.GetRelativePath(folder, file).Replace(Path.DirectorySeparatorChar, '/')] = Convert.ToHexString(HashOf(file));
+
+        return files;
+    }
+
+    private static byte[] HashOf(string file)
+    {
+        // a file that another copy holds exclusively (its lock) cannot be read: it counts as one of its own
+        try
+        {
+            using(var stream = new FileStream(file, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete))
+                return SHA256.HashData(stream);
+        }
+        catch(IOException)
+        {
+            return Encoding.UTF8.GetBytes("held open");
+        }
     }
 
     public static List<string> ListFolder(string folder)
@@ -438,10 +513,5 @@ internal static class ReleaseFixtures
 
         names.Sort(StringComparer.Ordinal);
         return names;
-    }
-
-    public static string RuntimePackageName(PackageKind kind)
-    {
-        return UpdateChecker.GetPackageName(System.Runtime.InteropServices.RuntimeInformation.RuntimeIdentifier, kind) ?? "none.zip";
     }
 }

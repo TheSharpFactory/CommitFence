@@ -27,15 +27,19 @@ internal static partial class EditorConfigParser
         string? section = null;
         string? commentAbove = null;
         var lineNumber = 0;
+        var headerLine = 0;
         foreach(var raw in text.Split('\n'))
         {
             lineNumber++;
             var line = raw.TrimEnd('\r');
             var header = SectionHeader().Match(line);
             if(header.Success)
+            {
                 section = header.Groups[1].Value.Trim();
+                headerLine = lineNumber;
+            }
 
-            var setting = header.Success ? null : ReadSetting(section, line, commentAbove, lineNumber);
+            var setting = header.Success ? null : ReadSetting(section, line, commentAbove, lineNumber, headerLine);
             if(setting != null)
                 settings.Add(setting);
 
@@ -51,7 +55,7 @@ internal static partial class EditorConfigParser
         return trimmed.StartsWith('#') || trimmed.StartsWith(';');
     }
 
-    private static EditorConfigSetting? ReadSetting(string? section, string line, string? commentAbove, int lineNumber)
+    private static EditorConfigSetting? ReadSetting(string? section, string line, string? commentAbove, int lineNumber, int headerLine)
     {
         if(section == null || IsComment(line))
             return null;
@@ -65,8 +69,8 @@ internal static partial class EditorConfigParser
         var value = property.Groups[2].Value;
         var commentStart = value.AsSpan().IndexOfAny(_commentMarks);
         if(commentStart < 0)
-            return new EditorConfigSetting(section, id, value, null, commentAbove, lineNumber);
+            return new EditorConfigSetting(section, id, value, null, commentAbove, lineNumber, headerLine);
 
-        return new EditorConfigSetting(section, id, value.Substring(0, commentStart).TrimEnd(), value.Substring(commentStart + 1).Trim(), commentAbove, lineNumber);
+        return new EditorConfigSetting(section, id, value.Substring(0, commentStart).TrimEnd(), value.Substring(commentStart + 1).Trim(), commentAbove, lineNumber, headerLine);
     }
 }

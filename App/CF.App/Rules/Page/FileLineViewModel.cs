@@ -28,6 +28,19 @@ internal sealed partial class FileLineViewModel : ObservableObject
     [ObservableProperty]
     public partial bool IsPresent { get; set; }
 
+    public bool IsHeaderOrGap
+    {
+        get { return !HasNumber || Text.TrimStart().StartsWith('['); }
+    }
+
+    public bool HasNumber
+    {
+        get
+        {
+            return Number > 0;
+        }
+    }
+
     public bool IsComment
     {
         get

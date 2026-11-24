@@ -18,5 +18,8 @@ internal enum EffectKind
     /// <summary>
     /// The off sign: the rule is not in force.
     /// </summary>
-    Off
+    Off,
+
+    /// <summary>The file has no main setting.</summary>
+    Unset
 }

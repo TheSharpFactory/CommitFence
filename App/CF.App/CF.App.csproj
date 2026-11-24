@@ -17,10 +17,10 @@
     <PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.2" />
   </ItemGroup>
 
-  <!-- the check program (Tools/CF.App.Check) opens the real window headless, so it sees what the app keeps internal -->
+  <!-- the tests see what the app keeps internal -->
   <ItemGroup>
-    <InternalsVisibleTo Include="CF.App.Check" />
     <InternalsVisibleTo Include="CF.Tests" />
+    <InternalsVisibleTo Include="CF.App.Tests" />
   </ItemGroup>
 
   <ItemGroup>

@@ -11,4 +11,10 @@
     <ProjectReference Include="..\CF.Meaning\CF.Meaning.csproj" ReferenceOutputAssembly="false" OutputItemType="Content" CopyToOutputDirectory="PreserveNewest" TargetPath="analyzers\CF.Meaning.dll" />
   </ItemGroup>
 
+  <ItemGroup>
+    <!-- the tests reach the internal types -->
+    <InternalsVisibleTo Include="CF.Tests" />
+    <InternalsVisibleTo Include="CF.App.Tests" />
+  </ItemGroup>
+
 </Project>

@@ -19,8 +19,28 @@ internal sealed partial class FileSettingRowViewModel : ObservableObject
     }
 
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(SpokenName))]
+    [NotifyPropertyChangedFor(nameof(SpokenName), nameof(ShowsCurrentLabel))]
     public partial bool IsCurrent { get; set; }
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasTag), nameof(ShowsCurrentLabel), nameof(SpokenName))]
+    public partial string Tag { get; set; } = string.Empty;
+
+    public bool HasTag
+    {
+        get
+        {
+            return Tag.Length > 0;
+        }
+    }
+
+    public bool ShowsCurrentLabel
+    {
+        get
+        {
+            return IsCurrent && !HasTag;
+        }
+    }
 
     public string Words { get; }
 
@@ -58,7 +78,7 @@ internal sealed partial class FileSettingRowViewModel : ObservableObject
     {
         get
         {
-            return $"{Words}: {EffectWord}. {Push}{(IsCurrent ? " In the file now." : string.Empty)}";
+            return $"{Words}: {EffectWord}. {Push}{(HasTag ? " " + Tag : IsCurrent ? " In the file now." : string.Empty)}";
         }
     }
 }

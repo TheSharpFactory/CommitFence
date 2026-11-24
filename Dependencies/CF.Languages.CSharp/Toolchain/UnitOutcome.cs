@@ -39,6 +39,14 @@ internal sealed class UnitOutcome
         return new UnitOutcome(Succeeded, Status, Reason, more.Concat(Findings).ToList(), Facts);
     }
 
+    /// <summary>
+    /// The same outcome with a reason: how it is covered, in words, although it succeeded.
+    /// </summary>
+    public UnitOutcome WithReason(string reason)
+    {
+        return new UnitOutcome(Succeeded, Status, reason, Findings, Facts);
+    }
+
     public static UnitOutcome Fine(IReadOnlyList<Finding> findings, UnitFacts? facts)
     {
         return new UnitOutcome(true, CoverageStatus.Reviewed, string.Empty, findings, facts);

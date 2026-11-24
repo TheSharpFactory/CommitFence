@@ -12,6 +12,27 @@
        column and the panel of the push's files, which stays in view; under 1304 it is one column of at most 760 with the panel
        as one line. A folder is not reviewed yet: its segment is drawn and disabled. -->
   <UserControl.Styles>
+    <Style Selector="Run.scope.pattern">
+      <Setter Property="FontFamily" Value="Cascadia Mono, Consolas, Menlo, DejaVu Sans Mono, monospace"/>
+    </Style>
+
+    <Style Selector="review|ReviewView Border.pagerow">
+      <Setter Property="Padding" Value="32,0,20,0"/>
+    </Style>
+    <Style Selector="review|ReviewView.onepane Border.pagerow">
+      <Setter Property="Padding" Value="24,0,12,0"/>
+    </Style>
+    <Style Selector="review|ReviewView Border.pageframe">
+      <Setter Property="MaxWidth" Value="1292"/>
+    </Style>
+    <Style Selector="review|ReviewView Border.pagecolumn">
+      <Setter Property="MaxWidth" Value="1292"/>
+      <Setter Property="Padding" Value="0,0,372,0"/>
+    </Style>
+    <Style Selector="review|ReviewView.onepane Border.pagecolumn">
+      <Setter Property="MaxWidth" Value="760"/>
+      <Setter Property="Padding" Value="0"/>
+    </Style>
 
     <Style Selector="review|ReviewView Button.fileline">
       <Setter Property="Height" Value="44"/>
@@ -296,307 +317,373 @@
       </StackPanel>
     </Panel>
 
-    <ScrollViewer Name="Scroller" Grid.Row="2" HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Visible" AllowAutoHide="False"
-                  IsVisible="{Binding !ShowsEmptyBlock}">
-      <Border Name="Sheet" Padding="32,24,32,32">
-        <Grid Name="Frame" ColumnDefinitions="*,32,340" HorizontalAlignment="Stretch" MaxWidth="1292">
+    <!-- The page: one recycling list of four kinds of entry, as the list of rules is. The head holds the banner, the verdict, the panel in
+         one pane, the reasons, the clean files of a push and the line above the files; then each file's line, each finding, and the tail.
+         Every entry stands in the one frame of the sheet. sides 32 (24 under 1304 wide), the frame at most 1292 wide (760 in one pane) and
+         in the middle, the main column taking what the panel's column (340 and 32) leaves. Padding 24 above the head and 32 under the tail. -->
+    <Panel Grid.Row="2" IsVisible="{Binding !ShowsEmptyBlock}">
+      <ItemsControl Name="Rows" ItemsSource="{Binding Items}" Padding="0,24,0,32">
+        <ItemsControl.Template>
+          <ControlTemplate>
+            <ScrollViewer HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Visible" AllowAutoHide="False">
+              <ItemsPresenter ItemsPanel="{TemplateBinding ItemsPanel}" Margin="{TemplateBinding Padding}"/>
+            </ScrollViewer>
+          </ControlTemplate>
+        </ItemsControl.Template>
+        <ItemsControl.ItemsPanel>
+          <ItemsPanelTemplate>
+            <VirtualizingStackPanel/>
+          </ItemsPanelTemplate>
+        </ItemsControl.ItemsPanel>
+        <ItemsControl.DataTemplates>
 
-          <!-- The panel comes first in the document so that the keyboard reaches it before "Open all" and the files. In two
-               panes it stands in the second column and stays in view while the sheet scrolls. -->
-          <review:FilesPanel Name="SidePanel" Grid.Column="2" VerticalAlignment="Top" DataContext="{Binding}"/>
+          <DataTemplate DataType="review:ReviewHeadViewModel" x:DataType="review:ReviewHeadViewModel">
+            <Border Classes="pagerow">
+              <Border Classes="pagecolumn">
+                <StackPanel DataContext="{Binding Model}" x:DataType="review:ReviewViewModel" Spacing="0">
 
-          <StackPanel Name="Main" Grid.Column="0" Spacing="0">
+                  <!-- A problem that concerns the whole page: the settings file cannot be read. -->
+                  <Border IsVisible="{Binding HasBanner}" Background="{DynamicResource warn-tint}" CornerRadius="12" Padding="16,12" Margin="0,0,0,16">
+                    <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="10">
+                      <parts:EffectMark Classes="warn" Kind="Warn" Width="16" Height="16" VerticalAlignment="Top" Margin="0,2,0,0"/>
+                      <TextBlock Grid.Column="1" Theme="{StaticResource type-body}" TextWrapping="Wrap" VerticalAlignment="Center" Text="{Binding BannerText}"/>
+                      <Button Grid.Column="2" Classes="cf quiet small" Command="{Binding OpenSettingsFileCommand}" AutomationProperties.Name="Open the file">
+                        <TextBlock Theme="{StaticResource type-meta-strong}" Text="Open the file"/>
+                      </Button>
+                    </Grid>
+                  </Border>
 
-            <!-- A problem that concerns the whole page: the settings file cannot be read. -->
-            <Border IsVisible="{Binding HasBanner}" Background="{DynamicResource warn-tint}" CornerRadius="12" Padding="16,12" Margin="0,0,0,16">
-              <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="10">
-                <parts:EffectMark Classes="warn" Kind="Warn" Width="16" Height="16" VerticalAlignment="Top" Margin="0,2,0,0"/>
-                <TextBlock Grid.Column="1" Theme="{StaticResource type-body}" TextWrapping="Wrap" VerticalAlignment="Center" Text="{Binding BannerText}"/>
-                <Button Grid.Column="2" Classes="cf quiet small" Command="{Binding OpenSettingsFileCommand}" AutomationProperties.Name="Open the file">
-                  <TextBlock Theme="{StaticResource type-meta-strong}" Text="Open the file"/>
-                </Button>
-              </Grid>
-            </Border>
-
-            <!-- The verdict. -->
-            <StackPanel Name="VerdictBlock" DataContext="{Binding Verdict}" x:DataType="review:VerdictViewModel">
-              <Grid ColumnDefinitions="Auto,*" MinHeight="44">
-                <Border IsVisible="{Binding HasBadge}" Classes="badge" Classes.refused="{Binding IsRefused}" Classes.allowed="{Binding IsAllowed}"
-                        Classes.incomplete="{Binding IsIncomplete}" Classes.running="{Binding IsRunning}" Classes.folder="{Binding IsFolderFindings}" VerticalAlignment="Top" Margin="0,0,14,0">
-                  <Panel>
-                    <parts:Icon Data="{StaticResource i-x}" Width="24" Height="24" StrokeThickness="2.4" Stroke="{DynamicResource on-block}"
-                                IsVisible="{Binding IsRefused}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                    <parts:Icon Data="{StaticResource i-check}" Width="24" Height="24" StrokeThickness="2.4" Stroke="{DynamicResource page}"
-                                IsVisible="{Binding IsAllowed}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                    <parts:Icon Data="{StaticResource i-folder}" Width="24" Height="24" StrokeThickness="1.8" Stroke="{DynamicResource on-solid}"
-                                IsVisible="{Binding IsFolderFindings}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                    <parts:Icon Data="M8 4v5M8 11.9v.1" Width="24" Height="24" StrokeThickness="2.4" Stroke="{DynamicResource on-solid}"
-                                IsVisible="{Binding IsIncomplete}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                    <parts:TurningRing Width="24" Height="24" IsVisible="{Binding IsRunning}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                  </Panel>
-                </Border>
-                <StackPanel Grid.Column="1" VerticalAlignment="Center">
-                  <WrapPanel Orientation="Horizontal">
-                    <TextBlock Name="Heading" Theme="{StaticResource type-verdict}" Margin="0,0,10,0" Text="{Binding Heading}"/>
-                    <TextBlock Name="HeadingTail" Theme="{StaticResource type-verdict}" TextTrimming="PrefixCharacterEllipsis" MaxWidth="560"
-                               IsVisible="{Binding HasTail}" Text="{Binding HeadingTail}"/>
-                  </WrapPanel>
-                  <TextBlock Theme="{StaticResource type-lead}" Foreground="{DynamicResource ink-2}" TextWrapping="Wrap" Margin="0,8,0,0"
-                             IsVisible="{Binding HasLead}" Text="{Binding Lead}"/>
-                </StackPanel>
-              </Grid>
-
-              <ItemsControl ItemsSource="{Binding Counts}" IsVisible="{Binding HasCounts}" Margin="0,16,0,0">
-                <ItemsControl.ItemsPanel>
-                  <ItemsPanelTemplate>
-                    <WrapPanel Orientation="Horizontal"/>
-                  </ItemsPanelTemplate>
-                </ItemsControl.ItemsPanel>
-                <ItemsControl.ItemTemplate>
-                  <DataTemplate DataType="review:CountPieceViewModel" x:DataType="review:CountPieceViewModel">
-                    <Panel Margin="0,0,8,8">
-                      <Border Classes="piece block" IsVisible="{Binding IsBlock}">
-                        <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
-                          <parts:EffectMark Kind="Block" Width="17" Height="17" Shape="{DynamicResource on-block}" Sign="{DynamicResource block}"/>
-                          <TextBlock Theme="{StaticResource type-count}" Foreground="{DynamicResource on-block}" VerticalAlignment="Center" Text="{Binding Text}"/>
-                        </StackPanel>
+                  <!-- The verdict. -->
+                  <StackPanel Name="VerdictBlock" DataContext="{Binding Verdict}" x:DataType="review:VerdictViewModel">
+                    <Grid ColumnDefinitions="Auto,*,Auto" MinHeight="44">
+                      <Border IsVisible="{Binding HasBadge}" Classes="badge" Classes.refused="{Binding IsRefused}" Classes.allowed="{Binding IsAllowed}"
+                              Classes.incomplete="{Binding IsIncomplete}" Classes.running="{Binding IsRunning}" Classes.folder="{Binding IsFolderFindings}" VerticalAlignment="Top" Margin="0,0,14,0">
+                        <Panel>
+                          <parts:Icon Data="{StaticResource i-x}" Width="24" Height="24" StrokeThickness="2.4" Stroke="{DynamicResource on-block}"
+                                      IsVisible="{Binding IsRefused}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                          <parts:Icon Data="{StaticResource i-check}" Width="24" Height="24" StrokeThickness="2.4" Stroke="{DynamicResource page}"
+                                      IsVisible="{Binding IsAllowed}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                          <parts:Icon Data="{StaticResource i-folder}" Width="24" Height="24" StrokeThickness="1.8" Stroke="{DynamicResource on-solid}"
+                                      IsVisible="{Binding IsFolderFindings}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                          <parts:Icon Data="M8 4v5M8 11.9v.1" Width="24" Height="24" StrokeThickness="2.4" Stroke="{DynamicResource on-solid}"
+                                      IsVisible="{Binding IsIncomplete}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                          <parts:TurningRing Width="24" Height="24" IsVisible="{Binding IsRunning}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Panel>
                       </Border>
-                      <Border Classes="piece allow" IsVisible="{Binding IsAllow}">
-                        <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
-                          <parts:Icon Data="{StaticResource i-check}" Width="17" Height="17" StrokeThickness="2" Stroke="{DynamicResource page}" VerticalAlignment="Center"/>
-                          <TextBlock Theme="{StaticResource type-count}" Foreground="{DynamicResource page}" VerticalAlignment="Center" Text="{Binding Text}"/>
-                        </StackPanel>
-                      </Border>
-                      <Border Classes="piece warn" IsVisible="{Binding IsWarn}">
-                        <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
-                          <parts:EffectMark Kind="Warn" Width="17" Height="17" Shape="{DynamicResource on-warn}" Sign="{DynamicResource warn}"/>
-                          <TextBlock Theme="{StaticResource type-count}" Foreground="{DynamicResource on-warn}" VerticalAlignment="Center" Text="{Binding Text}"/>
-                        </StackPanel>
-                      </Border>
-                      <Border Classes="piece" Background="{DynamicResource hover}" Padding="12,0,4,0" IsVisible="{Binding IsFilter}">
-                        <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
-                          <TextBlock Theme="{StaticResource type-body}" FontWeight="500" VerticalAlignment="Center" Text="Only"/>
-                          <TextBlock Theme="{StaticResource code-strong}" VerticalAlignment="Center" Text="{Binding Text}"/>
-                          <Button Classes="clearfilter" Command="{Binding Clear}" AutomationProperties.Name="{Binding ClearName}"/>
-                        </StackPanel>
-                      </Border>
-                      <TextBlock IsVisible="{Binding IsPlain}" Theme="{StaticResource type-lead}" Foreground="{DynamicResource ink-2}"
-                                 TextWrapping="Wrap" VerticalAlignment="Center" Text="{Binding Text}"/>
-                    </Panel>
-                  </DataTemplate>
-                </ItemsControl.ItemTemplate>
-              </ItemsControl>
+                      <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                        <WrapPanel Orientation="Horizontal">
+                          <TextBlock Name="Heading" Theme="{StaticResource type-verdict}" Margin="0,0,10,0" Text="{Binding Heading}"/>
+                          <TextBlock Name="HeadingTail" Theme="{StaticResource type-verdict}" TextTrimming="PrefixCharacterEllipsis" MaxWidth="560"
+                                     IsVisible="{Binding HasTail}" Text="{Binding HeadingTail}"/>
+                        </WrapPanel>
+                        <TextBlock Theme="{StaticResource type-lead}" Foreground="{DynamicResource ink-2}" TextWrapping="Wrap" Margin="0,8,0,0"
+                                   IsVisible="{Binding HasLead}" Text="{Binding Lead}"/>
+                      </StackPanel>
+                      <review:CopyButton Grid.Column="2" Margin="14,0,0,0" VerticalAlignment="Center" HorizontalAlignment="Right"
+                                         DataContext="{Binding $parent[review:ReviewView].((review:ReviewViewModel)DataContext).CopyAll}"
+                                         IsVisible="{Binding $parent[review:ReviewView].((review:ReviewViewModel)DataContext).CanCopyAll}"/>
+                    </Grid>
 
-              <ItemsControl ItemsSource="{Binding Facts}" IsVisible="{Binding HasFacts}" Margin="0,6,0,0">
-                <ItemsControl.ItemsPanel>
-                  <ItemsPanelTemplate>
-                    <StackPanel Orientation="Horizontal" Spacing="20"/>
-                  </ItemsPanelTemplate>
-                </ItemsControl.ItemsPanel>
-                <ItemsControl.ItemTemplate>
-                  <DataTemplate DataType="review:FactViewModel" x:DataType="review:FactViewModel">
-                    <StackPanel Orientation="Horizontal" Spacing="6">
-                      <parts:Icon Data="{StaticResource i-branch}" Width="15" Height="15" Stroke="{DynamicResource ink-3}" IsVisible="{Binding IsCommits}"/>
-                      <parts:Icon Data="{StaticResource i-file}" Width="15" Height="15" Stroke="{DynamicResource ink-3}" IsVisible="{Binding IsFiles}"/>
-                      <parts:Icon Data="{StaticResource i-time}" Width="15" Height="15" Stroke="{DynamicResource ink-3}" IsVisible="{Binding IsTime}"/>
-                      <TextBlock Theme="{StaticResource type-body}" Foreground="{DynamicResource ink-2}" FontFeatures="+tnum"
-                                 TextTrimming="CharacterEllipsis" VerticalAlignment="Center" Text="{Binding Text}"/>
+                    <ItemsControl ItemsSource="{Binding Counts}" IsVisible="{Binding HasCounts}" Margin="0,16,0,0">
+                      <ItemsControl.ItemsPanel>
+                        <ItemsPanelTemplate>
+                          <WrapPanel Orientation="Horizontal"/>
+                        </ItemsPanelTemplate>
+                      </ItemsControl.ItemsPanel>
+                      <ItemsControl.ItemTemplate>
+                        <DataTemplate DataType="review:CountPieceViewModel" x:DataType="review:CountPieceViewModel">
+                          <Panel Margin="0,0,8,8">
+                            <Border Classes="piece block" IsVisible="{Binding IsBlock}">
+                              <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                                <parts:EffectMark Kind="Block" Width="17" Height="17" Shape="{DynamicResource on-block}" Sign="{DynamicResource block}"/>
+                                <TextBlock Theme="{StaticResource type-count}" Foreground="{DynamicResource on-block}" VerticalAlignment="Center" Text="{Binding Text}"/>
+                              </StackPanel>
+                            </Border>
+                            <Border Classes="piece allow" IsVisible="{Binding IsAllow}">
+                              <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                                <parts:Icon Data="{StaticResource i-check}" Width="17" Height="17" StrokeThickness="2" Stroke="{DynamicResource page}" VerticalAlignment="Center"/>
+                                <TextBlock Theme="{StaticResource type-count}" Foreground="{DynamicResource page}" VerticalAlignment="Center" Text="{Binding Text}"/>
+                              </StackPanel>
+                            </Border>
+                            <Border Classes="piece warn" IsVisible="{Binding IsWarn}">
+                              <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                                <parts:EffectMark Kind="Warn" Width="17" Height="17" Shape="{DynamicResource on-warn}" Sign="{DynamicResource warn}"/>
+                                <TextBlock Theme="{StaticResource type-count}" Foreground="{DynamicResource on-warn}" VerticalAlignment="Center" Text="{Binding Text}"/>
+                              </StackPanel>
+                            </Border>
+                            <Border Classes="piece" Background="{DynamicResource hover}" Padding="12,0,4,0" IsVisible="{Binding IsFilter}">
+                              <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                                <TextBlock Theme="{StaticResource type-body}" FontWeight="500" VerticalAlignment="Center" Text="Only"/>
+                                <TextBlock Theme="{StaticResource code-strong}" VerticalAlignment="Center" Text="{Binding Text}"/>
+                                <Button Classes="clearfilter" Command="{Binding Clear}" AutomationProperties.Name="{Binding ClearName}"/>
+                              </StackPanel>
+                            </Border>
+                            <TextBlock IsVisible="{Binding IsPlain}" Theme="{StaticResource type-lead}" Foreground="{DynamicResource ink-2}"
+                                       TextWrapping="Wrap" VerticalAlignment="Center" Text="{Binding Text}"/>
+                          </Panel>
+                        </DataTemplate>
+                      </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+
+                    <ItemsControl ItemsSource="{Binding Facts}" IsVisible="{Binding HasFacts}" Margin="0,6,0,0">
+                      <ItemsControl.ItemsPanel>
+                        <ItemsPanelTemplate>
+                          <StackPanel Orientation="Horizontal" Spacing="20"/>
+                        </ItemsPanelTemplate>
+                      </ItemsControl.ItemsPanel>
+                      <ItemsControl.ItemTemplate>
+                        <DataTemplate DataType="review:FactViewModel" x:DataType="review:FactViewModel">
+                          <StackPanel Orientation="Horizontal" Spacing="6">
+                            <parts:Icon Data="{StaticResource i-branch}" Width="15" Height="15" Stroke="{DynamicResource ink-3}" IsVisible="{Binding IsCommits}"/>
+                            <parts:Icon Data="{StaticResource i-file}" Width="15" Height="15" Stroke="{DynamicResource ink-3}" IsVisible="{Binding IsFiles}"/>
+                            <parts:Icon Data="{StaticResource i-time}" Width="15" Height="15" Stroke="{DynamicResource ink-3}" IsVisible="{Binding IsTime}"/>
+                            <TextBlock Theme="{StaticResource type-body}" Foreground="{DynamicResource ink-2}" FontFeatures="+tnum"
+                                       TextTrimming="CharacterEllipsis" VerticalAlignment="Center" Text="{Binding Text}"/>
+                          </StackPanel>
+                        </DataTemplate>
+                      </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+
+                    <Border IsVisible="{Binding LeavesOutUncommitted}" Background="{DynamicResource side}" CornerRadius="10" MinHeight="36" Padding="12,8,14,8" Margin="0,14,0,0">
+                      <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                        <parts:Icon Data="{StaticResource i-info}" Width="16" Height="16" Stroke="{DynamicResource ink-2}" VerticalAlignment="Center"/>
+                        <TextBlock Theme="{StaticResource type-body}" FontWeight="500" TextWrapping="Wrap" VerticalAlignment="Center"
+                                   Text="Uncommitted changes are not part of this review."/>
+                      </StackPanel>
+                    </Border>
+                  </StackPanel>
+
+                  <!-- In one pane the panel is one line under the verdict. -->
+                  <review:FilesPanel Margin="0,20,0,0" IsVisible="{Binding IsOnePane}" DataContext="{Binding}"/>
+
+                  <!-- An incomplete review: the reasons, in the form of findings; the tool's own message opens. -->
+                  <StackPanel IsVisible="{Binding HasReasons}" Margin="0,20,0,0">
+                    <TextBlock Theme="{StaticResource type-meta}" Foreground="{DynamicResource ink-2}" VerticalAlignment="Center" MinHeight="36" Margin="8,0,0,0"
+                               Text="{Binding ReasonsLine}"/>
+                    <ItemsControl ItemsSource="{Binding ReasonsShown}">
+                      <ItemsControl.ItemTemplate>
+                        <DataTemplate DataType="review:ReasonViewModel" x:DataType="review:ReasonViewModel">
+                          <Border BorderBrush="{DynamicResource line}" BorderThickness="0,1,0,0">
+                            <StackPanel>
+                              <Button Classes="findinghead" IsVisible="{Binding HasMessage}" Command="{Binding ToggleCommand}" AutomationProperties.Name="{Binding SpokenName}">
+                                <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="12">
+                                  <parts:Icon Data="{StaticResource i-off}" Width="14" Height="14" Stroke="{DynamicResource off}" VerticalAlignment="Top" Margin="0,-2,0,0"/>
+                                  <StackPanel Grid.Column="1" Spacing="2">
+                                    <TextBlock Theme="{StaticResource type-body-strong}" TextWrapping="Wrap" Text="{Binding Failed}"/>
+                                    <TextBlock Theme="{StaticResource code}" Foreground="{DynamicResource ink-2}" TextWrapping="Wrap" Text="{Binding About}"/>
+                                  </StackPanel>
+                                  <parts:Icon Grid.Column="2" Classes="chevron" Classes.open="{Binding IsOpen}" Data="{StaticResource i-right}" Width="16" Height="16"
+                                              Stroke="{DynamicResource ink-3}" VerticalAlignment="Top"/>
+                                </Grid>
+                              </Button>
+                              <Grid IsVisible="{Binding HasNoMessage}" ColumnDefinitions="Auto,*" ColumnSpacing="12" Margin="8,11,12,11" AutomationProperties.Name="{Binding SpokenName}">
+                                <parts:Icon Data="{StaticResource i-off}" Width="14" Height="14" Stroke="{DynamicResource off}" VerticalAlignment="Top" Margin="0,-2,0,0"/>
+                                <StackPanel Grid.Column="1" Spacing="2">
+                                  <TextBlock Theme="{StaticResource type-body-strong}" TextWrapping="Wrap" Text="{Binding Failed}"/>
+                                  <TextBlock Theme="{StaticResource code}" Foreground="{DynamicResource ink-2}" TextWrapping="Wrap" Text="{Binding About}"/>
+                                </StackPanel>
+                              </Grid>
+                              <StackPanel Classes="reasonbody" IsVisible="{Binding IsOpen}">
+                                <Border Background="{DynamicResource page}" BorderBrush="{DynamicResource line}" BorderThickness="1" CornerRadius="12" Padding="12,10" ClipToBounds="True">
+                                  <ScrollViewer MaxHeight="200" HorizontalScrollBarVisibility="Disabled">
+                                    <SelectableTextBlock Theme="{StaticResource code}" TextWrapping="Wrap" Text="{Binding Message}"/>
+                                  </ScrollViewer>
+                                </Border>
+                              </StackPanel>
+                            </StackPanel>
+                          </Border>
+                        </DataTemplate>
+                      </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                    <Border BorderBrush="{DynamicResource line}" BorderThickness="0,1,0,0"/>
+                    <Button Classes="cf outlined small" HorizontalAlignment="Right" Margin="0,12,0,0" IsVisible="{Binding CanShowAllReasons}"
+                            Command="{Binding ShowAllReasonsCommand}" AutomationProperties.Name="{Binding ShowAllReasonsText}">
+                      <TextBlock Theme="{StaticResource type-meta-strong}" Text="{Binding ShowAllReasonsText}"/>
+                    </Button>
+                  </StackPanel>
+
+                  <!-- A clean push: the files it holds, each with a tick. They are not buttons. -->
+                  <StackPanel IsVisible="{Binding HasCleanPush}" Margin="0,20,0,0">
+                    <TextBlock Theme="{StaticResource type-meta}" Foreground="{DynamicResource ink-2}" VerticalAlignment="Center" MinHeight="36" Margin="8,0,0,0"
+                               Text="{Binding CleanPushLine}"/>
+                    <ItemsControl ItemsSource="{Binding CleanPushFiles}">
+                      <ItemsControl.ItemTemplate>
+                        <DataTemplate DataType="sys:String" x:DataType="sys:String">
+                          <Border BorderBrush="{DynamicResource line}" BorderThickness="0,1,0,0">
+                            <Grid ColumnDefinitions="Auto,Auto,*" ColumnSpacing="10" Height="44" Margin="8,0,12,0">
+                              <parts:Icon Data="{StaticResource i-check}" Width="16" Height="16" Stroke="{DynamicResource req-ink}" VerticalAlignment="Center"/>
+                              <parts:Icon Grid.Column="1" Data="{StaticResource i-file}" Width="16" Height="16" Stroke="{DynamicResource ink-3}" VerticalAlignment="Center"/>
+                              <TextBlock Grid.Column="2" Theme="{StaticResource code}" TextTrimming="PrefixCharacterEllipsis" VerticalAlignment="Center" Text="{Binding}"/>
+                            </Grid>
+                          </Border>
+                        </DataTemplate>
+                      </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                    <Border BorderBrush="{DynamicResource line}" BorderThickness="0,1,0,0"/>
+                    <StackPanel Orientation="Horizontal" Spacing="8" Margin="8,16,0,0" IsVisible="{Binding HasCleanPushMore}">
+                      <parts:Icon Data="{StaticResource i-check}" Width="15" Height="15" Stroke="{DynamicResource req-ink}"/>
+                      <TextBlock Theme="{StaticResource type-body}" Foreground="{DynamicResource ink-2}" Text="{Binding CleanPushMore}"/>
                     </StackPanel>
-                  </DataTemplate>
-                </ItemsControl.ItemTemplate>
-              </ItemsControl>
+                  </StackPanel>
 
-              <Border IsVisible="{Binding LeavesOutUncommitted}" Background="{DynamicResource side}" CornerRadius="10" MinHeight="36" Padding="12,8,14,8" Margin="0,14,0,0">
-                <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
-                  <parts:Icon Data="{StaticResource i-info}" Width="16" Height="16" Stroke="{DynamicResource ink-2}" VerticalAlignment="Center"/>
-                  <TextBlock Theme="{StaticResource type-body}" FontWeight="500" TextWrapping="Wrap" VerticalAlignment="Center"
-                             Text="Uncommitted changes are not part of this review."/>
+                  <!-- The files with their findings: the line above them. -->
+                  <StackPanel IsVisible="{Binding HasFiles}" Margin="0,20,0,0">
+                    <Grid ColumnDefinitions="*,Auto" MinHeight="36" Margin="8,0,0,4">
+                      <TextBlock Theme="{StaticResource type-meta}" Foreground="{DynamicResource ink-2}" VerticalAlignment="Center" Text="{Binding FilesLine}"/>
+                      <Button Name="OpenAllButton" Grid.Column="1" Classes="cf quiet small" Command="{Binding ToggleAllCommand}" AutomationProperties.Name="{Binding OpenAllText}">
+                        <TextBlock Theme="{StaticResource type-meta-strong}" Text="{Binding OpenAllText}"/>
+                      </Button>
+                    </Grid>
+                  </StackPanel>
                 </StackPanel>
               </Border>
-            </StackPanel>
+            </Border>
+          </DataTemplate>
 
-            <!-- In one pane the panel is one line under the verdict. -->
-            <review:FilesPanel Name="InlinePanel" Margin="0,20,0,0" DataContext="{Binding}"/>
-
-            <!-- An incomplete review: the reasons, in the form of findings; the tool's own message opens. -->
-            <StackPanel IsVisible="{Binding HasReasons}" Margin="0,20,0,0">
-              <TextBlock Theme="{StaticResource type-meta}" Foreground="{DynamicResource ink-2}" VerticalAlignment="Center" MinHeight="36" Margin="8,0,0,0"
-                         Text="{Binding ReasonsLine}"/>
-              <ItemsControl ItemsSource="{Binding ReasonsShown}">
-                <ItemsControl.ItemTemplate>
-                  <DataTemplate DataType="review:ReasonViewModel" x:DataType="review:ReasonViewModel">
-                    <Border BorderBrush="{DynamicResource line}" BorderThickness="0,1,0,0">
-                      <StackPanel>
-                        <Button Classes="findinghead" IsVisible="{Binding HasMessage}" Command="{Binding ToggleCommand}" AutomationProperties.Name="{Binding SpokenName}">
-                          <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="12">
-                            <parts:Icon Data="{StaticResource i-off}" Width="14" Height="14" Stroke="{DynamicResource off}" VerticalAlignment="Top" Margin="0,-2,0,0"/>
-                            <StackPanel Grid.Column="1" Spacing="2">
-                              <TextBlock Theme="{StaticResource type-body-strong}" TextWrapping="Wrap" Text="{Binding Failed}"/>
-                              <TextBlock Theme="{StaticResource code}" Foreground="{DynamicResource ink-2}" TextWrapping="Wrap" Text="{Binding About}"/>
-                            </StackPanel>
-                            <parts:Icon Grid.Column="2" Classes="chevron" Classes.open="{Binding IsOpen}" Data="{StaticResource i-right}" Width="16" Height="16"
-                                        Stroke="{DynamicResource ink-3}" VerticalAlignment="Top"/>
-                          </Grid>
-                        </Button>
-                        <Grid IsVisible="{Binding HasNoMessage}" ColumnDefinitions="Auto,*" ColumnSpacing="12" Margin="8,11,12,11" AutomationProperties.Name="{Binding SpokenName}">
-                          <parts:Icon Data="{StaticResource i-off}" Width="14" Height="14" Stroke="{DynamicResource off}" VerticalAlignment="Top" Margin="0,-2,0,0"/>
-                          <StackPanel Grid.Column="1" Spacing="2">
-                            <TextBlock Theme="{StaticResource type-body-strong}" TextWrapping="Wrap" Text="{Binding Failed}"/>
-                            <TextBlock Theme="{StaticResource code}" Foreground="{DynamicResource ink-2}" TextWrapping="Wrap" Text="{Binding About}"/>
-                          </StackPanel>
-                        </Grid>
-                        <StackPanel Classes="reasonbody" IsVisible="{Binding IsOpen}">
-                          <Border Background="{DynamicResource page}" BorderBrush="{DynamicResource line}" BorderThickness="1" CornerRadius="12" Padding="12,10" ClipToBounds="True">
-                            <ScrollViewer MaxHeight="200" HorizontalScrollBarVisibility="Disabled">
-                              <SelectableTextBlock Theme="{StaticResource code}" TextWrapping="Wrap" Text="{Binding Message}"/>
-                            </ScrollViewer>
-                          </Border>
+          <!-- A file's line. -->
+          <DataTemplate DataType="review:FileGroupViewModel" x:DataType="review:FileGroupViewModel">
+            <Border Classes="pagerow">
+              <Border Classes="pagecolumn">
+                <Border BorderBrush="{DynamicResource line}" BorderThickness="0,1,0,0">
+                  <Button Classes="fileline" Command="{Binding ToggleCommand}" AutomationProperties.Name="{Binding SpokenName}">
+                    <Grid ColumnDefinitions="Auto,Auto,*,Auto" ColumnSpacing="10">
+                      <parts:Icon Classes="chevron" Classes.open="{Binding IsOpen}" Data="{StaticResource i-right}" Width="16" Height="16" Stroke="{DynamicResource ink-3}"/>
+                      <parts:Icon Grid.Column="1" Data="{StaticResource i-file}" Width="16" Height="16" Stroke="{DynamicResource ink-3}"/>
+                      <TextBlock Grid.Column="2" Theme="{StaticResource code-strong}" TextTrimming="PrefixCharacterEllipsis"
+                                 VerticalAlignment="Center" ToolTip.Tip="{Binding Path}" Text="{Binding Path}"/>
+                      <StackPanel Grid.Column="3" Orientation="Horizontal" Spacing="14" VerticalAlignment="Center">
+                        <StackPanel Orientation="Horizontal" Spacing="5" MinWidth="34">
+                          <parts:EffectMark Classes="block" Kind="Block" Width="14" Height="14" IsVisible="{Binding HasBlock}"/>
+                          <TextBlock Theme="{StaticResource type-meta-strong}" FontFeatures="+tnum" IsVisible="{Binding HasBlock}" Text="{Binding BlockText}"/>
+                        </StackPanel>
+                        <StackPanel Orientation="Horizontal" Spacing="5" MinWidth="34">
+                          <parts:EffectMark Classes="warn" Kind="Warn" Width="14" Height="14" IsVisible="{Binding HasWarn}"/>
+                          <TextBlock Theme="{StaticResource type-meta-strong}" FontFeatures="+tnum" IsVisible="{Binding HasWarn}" Text="{Binding WarnText}"/>
                         </StackPanel>
                       </StackPanel>
-                    </Border>
-                  </DataTemplate>
-                </ItemsControl.ItemTemplate>
-              </ItemsControl>
-              <Border BorderBrush="{DynamicResource line}" BorderThickness="0,1,0,0"/>
-              <Button Classes="cf outlined small" HorizontalAlignment="Right" Margin="0,12,0,0" IsVisible="{Binding CanShowAllReasons}"
-                      Command="{Binding ShowAllReasonsCommand}" AutomationProperties.Name="{Binding ShowAllReasonsText}">
-                <TextBlock Theme="{StaticResource type-meta-strong}" Text="{Binding ShowAllReasonsText}"/>
-              </Button>
-            </StackPanel>
+                    </Grid>
+                  </Button>
+                </Border>
+              </Border>
+            </Border>
+          </DataTemplate>
 
-            <!-- A clean push: the files it holds, each with a tick. They are not buttons. -->
-            <StackPanel IsVisible="{Binding HasCleanPush}" Margin="0,20,0,0">
-              <TextBlock Theme="{StaticResource type-meta}" Foreground="{DynamicResource ink-2}" VerticalAlignment="Center" MinHeight="36" Margin="8,0,0,0"
-                         Text="{Binding CleanPushLine}"/>
-              <ItemsControl ItemsSource="{Binding CleanPushFiles}">
-                <ItemsControl.ItemTemplate>
-                  <DataTemplate DataType="sys:String" x:DataType="sys:String">
-                    <Border BorderBrush="{DynamicResource line}" BorderThickness="0,1,0,0">
-                      <Grid ColumnDefinitions="Auto,Auto,*" ColumnSpacing="10" Height="44" Margin="8,0,12,0">
-                        <parts:Icon Data="{StaticResource i-check}" Width="16" Height="16" Stroke="{DynamicResource req-ink}" VerticalAlignment="Center"/>
-                        <parts:Icon Grid.Column="1" Data="{StaticResource i-file}" Width="16" Height="16" Stroke="{DynamicResource ink-3}" VerticalAlignment="Center"/>
-                        <TextBlock Grid.Column="2" Theme="{StaticResource code}" TextTrimming="PrefixCharacterEllipsis" VerticalAlignment="Center" Text="{Binding}"/>
+          <!-- A finding, under its file's line. -->
+          <DataTemplate DataType="review:FindingViewModel" x:DataType="review:FindingViewModel">
+            <Border Classes="pagerow">
+              <Border Classes="pagecolumn">
+                <Border Margin="26,0,0,0" BorderBrush="{DynamicResource line}" BorderThickness="0,1,0,0">
+                  <StackPanel>
+                    <Button Classes="findinghead" Command="{Binding ToggleCommand}" AutomationProperties.Name="{Binding SpokenName}">
+                      <Grid ColumnDefinitions="Auto,*,Auto,Auto" ColumnSpacing="12">
+                        <StackPanel Orientation="Horizontal" Spacing="6" VerticalAlignment="Top" Margin="0,-2,0,0" Height="24" Width="{Binding EffectWidth}">
+                          <parts:EffectMark Classes="block" Kind="Block" Width="14" Height="14" IsVisible="{Binding IsBlock}" VerticalAlignment="Center"/>
+                          <parts:EffectMark Classes="warn" Kind="Warn" Width="14" Height="14" IsVisible="{Binding IsWarn}" VerticalAlignment="Center"/>
+                          <TextBlock Theme="{StaticResource type-effect}" VerticalAlignment="Center" Text="{Binding EffectWord}"/>
+                        </StackPanel>
+                        <StackPanel Grid.Column="1" Spacing="2">
+                          <TextBlock Theme="{StaticResource type-body-strong}" TextWrapping="Wrap" Text="{Binding Message}"/>
+                          <WrapPanel Orientation="Horizontal">
+                            <TextBlock Theme="{StaticResource code}" Foreground="{DynamicResource ink-2}" Margin="0,0,8,0" Text="{Binding RuleId}"/>
+                            <TextBlock Theme="{StaticResource type-meta}" Foreground="{DynamicResource ink-2}" TextWrapping="Wrap"
+                                       IsVisible="{Binding HasTitle}" Text="{Binding Title}"/>
+                          </WrapPanel>
+                        </StackPanel>
+                        <TextBlock Grid.Column="2" Theme="{StaticResource code}" Foreground="{DynamicResource ink-2}" VerticalAlignment="Top"
+                                   IsVisible="{Binding HasLine}" Text="{Binding LineText}"/>
+                        <parts:Icon Grid.Column="3" Classes="chevron" Classes.open="{Binding IsOpen}" Data="{StaticResource i-right}" Width="16" Height="16"
+                                    Stroke="{DynamicResource ink-3}" VerticalAlignment="Top"/>
                       </Grid>
-                    </Border>
-                  </DataTemplate>
-                </ItemsControl.ItemTemplate>
-              </ItemsControl>
-              <Border BorderBrush="{DynamicResource line}" BorderThickness="0,1,0,0"/>
-              <StackPanel Orientation="Horizontal" Spacing="8" Margin="8,16,0,0" IsVisible="{Binding HasCleanPushMore}">
-                <parts:Icon Data="{StaticResource i-check}" Width="15" Height="15" Stroke="{DynamicResource req-ink}"/>
-                <TextBlock Theme="{StaticResource type-body}" Foreground="{DynamicResource ink-2}" Text="{Binding CleanPushMore}"/>
-              </StackPanel>
-            </StackPanel>
-
-            <!-- The files with their findings. -->
-            <StackPanel IsVisible="{Binding HasFiles}" Margin="0,20,0,0">
-              <Grid ColumnDefinitions="*,Auto" MinHeight="36" Margin="8,0,0,4">
-                <TextBlock Theme="{StaticResource type-meta}" Foreground="{DynamicResource ink-2}" VerticalAlignment="Center" Text="{Binding FilesLine}"/>
-                <Button Name="OpenAllButton" Grid.Column="1" Classes="cf quiet small" Command="{Binding ToggleAllCommand}" AutomationProperties.Name="{Binding OpenAllText}">
-                  <TextBlock Theme="{StaticResource type-meta-strong}" Text="{Binding OpenAllText}"/>
-                </Button>
-              </Grid>
-              <ItemsControl Name="Files" ItemsSource="{Binding FileGroups}">
-                <ItemsControl.ItemTemplate>
-                  <DataTemplate DataType="review:FileGroupViewModel" x:DataType="review:FileGroupViewModel">
-                    <Border BorderBrush="{DynamicResource line}" BorderThickness="0,1,0,0">
-                      <StackPanel>
-                        <Button Classes="fileline" Command="{Binding ToggleCommand}" AutomationProperties.Name="{Binding SpokenName}">
-                          <Grid ColumnDefinitions="Auto,Auto,*,Auto" ColumnSpacing="10">
-                            <parts:Icon Classes="chevron" Classes.open="{Binding IsOpen}" Data="{StaticResource i-right}" Width="16" Height="16" Stroke="{DynamicResource ink-3}"/>
-                            <parts:Icon Grid.Column="1" Data="{StaticResource i-file}" Width="16" Height="16" Stroke="{DynamicResource ink-3}"/>
-                            <TextBlock Grid.Column="2" Theme="{StaticResource code-strong}" TextTrimming="PrefixCharacterEllipsis"
-                                       VerticalAlignment="Center" ToolTip.Tip="{Binding Path}" Text="{Binding Path}"/>
-                            <StackPanel Grid.Column="3" Orientation="Horizontal" Spacing="14" VerticalAlignment="Center">
-                              <StackPanel Orientation="Horizontal" Spacing="5" MinWidth="34">
-                                <parts:EffectMark Classes="block" Kind="Block" Width="14" Height="14" IsVisible="{Binding HasBlock}"/>
-                                <TextBlock Theme="{StaticResource type-meta-strong}" FontFeatures="+tnum" IsVisible="{Binding HasBlock}" Text="{Binding BlockText}"/>
-                              </StackPanel>
-                              <StackPanel Orientation="Horizontal" Spacing="5" MinWidth="34">
-                                <parts:EffectMark Classes="warn" Kind="Warn" Width="14" Height="14" IsVisible="{Binding HasWarn}"/>
-                                <TextBlock Theme="{StaticResource type-meta-strong}" FontFeatures="+tnum" IsVisible="{Binding HasWarn}" Text="{Binding WarnText}"/>
-                              </StackPanel>
-                            </StackPanel>
-                          </Grid>
-                        </Button>
-                        <ItemsControl ItemsSource="{Binding Findings}" IsVisible="{Binding IsOpen}">
+                    </Button>
+                    <StackPanel Classes="findingbody" Classes.folder="{Binding IsFolderReview}" IsVisible="{Binding IsOpen}">
+                      <TextBlock Theme="{StaticResource type-body}" Foreground="{DynamicResource ink-2}" TextWrapping="Wrap" AutomationProperties.Name="{Binding SourceLine}">
+                        <Run Text="{Binding SourcePrefix}"/><Run Classes="scope" Classes.pattern="{Binding IsScoped}" Text="{Binding SourceScope}"/><Run Text="{Binding SourceSuffix}"/>
+                      </TextBlock>
+                      <review:SentencePieces Pieces="{Binding Sentence}" IsVisible="{Binding HasSentence}" Margin="0,8,0,0"/>
+                      <Border IsVisible="{Binding HasCode}" Margin="0,12,0,0" CornerRadius="12" BorderThickness="1" BorderBrush="{DynamicResource line}"
+                              Padding="0,8" ClipToBounds="True" Background="{DynamicResource page}">
+                        <ItemsControl ItemsSource="{Binding Lines}">
                           <ItemsControl.ItemTemplate>
-                            <DataTemplate DataType="review:FindingViewModel" x:DataType="review:FindingViewModel">
-                              <Border Margin="26,0,0,0" BorderBrush="{DynamicResource line}" BorderThickness="0,1,0,0">
-                                <StackPanel>
-                                  <Button Classes="findinghead" Command="{Binding ToggleCommand}" AutomationProperties.Name="{Binding SpokenName}">
-                                    <Grid ColumnDefinitions="Auto,*,Auto,Auto" ColumnSpacing="12">
-                                      <StackPanel Orientation="Horizontal" Spacing="6" VerticalAlignment="Top" Margin="0,-2,0,0" Height="24" Width="{Binding EffectWidth}">
-                                        <parts:EffectMark Classes="block" Kind="Block" Width="14" Height="14" IsVisible="{Binding IsBlock}" VerticalAlignment="Center"/>
-                                        <parts:EffectMark Classes="warn" Kind="Warn" Width="14" Height="14" IsVisible="{Binding IsWarn}" VerticalAlignment="Center"/>
-                                        <TextBlock Theme="{StaticResource type-effect}" VerticalAlignment="Center" Text="{Binding EffectWord}"/>
-                                      </StackPanel>
-                                      <StackPanel Grid.Column="1" Spacing="2">
-                                        <TextBlock Theme="{StaticResource type-body-strong}" TextWrapping="Wrap" Text="{Binding Message}"/>
-                                        <WrapPanel Orientation="Horizontal">
-                                          <TextBlock Theme="{StaticResource code}" Foreground="{DynamicResource ink-2}" Margin="0,0,8,0" Text="{Binding RuleId}"/>
-                                          <TextBlock Theme="{StaticResource type-meta}" Foreground="{DynamicResource ink-2}" TextWrapping="Wrap"
-                                                     IsVisible="{Binding HasTitle}" Text="{Binding Title}"/>
-                                        </WrapPanel>
-                                      </StackPanel>
-                                      <TextBlock Grid.Column="2" Theme="{StaticResource code}" Foreground="{DynamicResource ink-2}" VerticalAlignment="Top"
-                                                 IsVisible="{Binding HasLine}" Text="{Binding LineText}"/>
-                                      <parts:Icon Grid.Column="3" Classes="chevron" Classes.open="{Binding IsOpen}" Data="{StaticResource i-right}" Width="16" Height="16"
-                                                  Stroke="{DynamicResource ink-3}" VerticalAlignment="Top"/>
-                                    </Grid>
-                                  </Button>
-                                  <StackPanel Classes="findingbody" Classes.folder="{Binding IsFolderReview}" IsVisible="{Binding IsOpen}">
-                                    <TextBlock Theme="{StaticResource type-body}" Foreground="{DynamicResource ink-2}" TextWrapping="Wrap" Text="{Binding SourceLine}"/>
-                                    <review:SentencePieces Pieces="{Binding Sentence}" IsVisible="{Binding HasSentence}" Margin="0,8,0,0"/>
-                                    <Border IsVisible="{Binding HasCode}" Margin="0,12,0,0" CornerRadius="12" BorderThickness="1" BorderBrush="{DynamicResource line}"
-                                            Padding="0,8" ClipToBounds="True" Background="{DynamicResource page}">
-                                      <ItemsControl ItemsSource="{Binding Lines}">
-                                        <ItemsControl.ItemTemplate>
-                                          <DataTemplate DataType="review:CodeLineViewModel" x:DataType="review:CodeLineViewModel">
-                                            <Panel Height="20">
-                                              <Border Background="{DynamicResource diff-del}" IsVisible="{Binding IsBreaking}"/>
-                                              <Border Background="{DynamicResource block}" Width="3" HorizontalAlignment="Left" IsVisible="{Binding IsBreaking}"/>
-                                              <Grid ColumnDefinitions="44,14,*">
-                                                <TextBlock Theme="{StaticResource code}" Foreground="{DynamicResource ink-3}" TextAlignment="Right" Text="{Binding Number}"/>
-                                                <TextBlock Grid.Column="2" Theme="{StaticResource code}" TextWrapping="NoWrap" review:CodeText.Segments="{Binding Segments}"/>
-                                              </Grid>
-                                            </Panel>
-                                          </DataTemplate>
-                                        </ItemsControl.ItemTemplate>
-                                      </ItemsControl>
-                                    </Border>
-                                    <Button Classes="cf outlined" HorizontalAlignment="Right" Margin="0,16,0,0" IsVisible="{Binding CanOpenRule}"
-                                            Command="{Binding OpenRuleCommand}" AutomationProperties.Name="Open the rule">
-                                      <StackPanel Orientation="Horizontal" Spacing="8">
-                                        <parts:Icon Data="{StaticResource i-rules}" Width="16" Height="16" Stroke="{Binding $parent[Button].Foreground}"/>
-                                        <TextBlock Theme="{StaticResource type-body-strong}" Text="Open the rule"/>
-                                      </StackPanel>
-                                    </Button>
-                                  </StackPanel>
-                                </StackPanel>
-                              </Border>
-                            </DataTemplate>
-                          </ItemsControl.ItemTemplate>
-                        </ItemsControl>
-                      </StackPanel>
+                            <DataTemplate DataType="review:CodeLineViewModel" x:DataType="review:CodeLineViewModel">
+                              <Panel Height="20">
+                                <Border Background="{DynamicResource diff-del}" IsVisible="{Binding IsBreaking}"/>
+                                <Border Background="{DynamicResource block}" Width="3" HorizontalAlignment="Left" IsVisible="{Binding IsBreaking}"/>
+                                <Grid ColumnDefinitions="44,14,*">
+                                  <TextBlock Theme="{StaticResource code}" Foreground="{DynamicResource ink-3}" TextAlignment="Right" Text="{Binding Number}"/>
+                                  <TextBlock Grid.Column="2" Theme="{StaticResource code}" TextWrapping="NoWrap" review:CodeText.Segments="{Binding Segments}"/>
+                              </Grid>
+                            </Panel>
+                          </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                      </ItemsControl>
                     </Border>
-                  </DataTemplate>
-                </ItemsControl.ItemTemplate>
-              </ItemsControl>
-              <Border BorderBrush="{DynamicResource line}" BorderThickness="0,1,0,0"/>
-            </StackPanel>
+                    <Grid ColumnDefinitions="Auto,*" Margin="0,16,0,0" IsVisible="{Binding !HasSetting}">
+                      <review:CopyButton DataContext="{Binding Copy}" HorizontalAlignment="Left"/>
+                        <Button Grid.Column="1" Classes="cf outlined" HorizontalAlignment="Right" IsVisible="{Binding CanOpenRule}"
+                              Command="{Binding OpenRuleCommand}" AutomationProperties.Name="Open the rule">
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                          <parts:Icon Data="{StaticResource i-rules}" Width="16" Height="16" Stroke="{Binding $parent[Button].Foreground}"/>
+                          <TextBlock Theme="{StaticResource type-body-strong}" Text="Open the rule"/>
+                        </StackPanel>
+                      </Button>
+                    </Grid>
+                    <WrapPanel IsVisible="{Binding HasSetting}" Margin="0,16,0,0" ItemSpacing="8" LineSpacing="8">
+                      <StackPanel Orientation="Horizontal" Spacing="8">
+                        <TextBlock IsVisible="{Binding HasSetting}" VerticalAlignment="Center" Theme="{StaticResource type-meta}" Foreground="{DynamicResource ink-2}" Text="No automatic fix."/>
+                        <review:CopyButton DataContext="{Binding Copy}"/>
+                      </StackPanel>
+                      <StackPanel Orientation="Horizontal" Spacing="8">
+                        <Button Classes="cf outlined" Command="{Binding OpenLineCommand}" IsVisible="{Binding HasSetting}" AutomationProperties.Name="{Binding OpenLineText}">
+                          <StackPanel Orientation="Horizontal" Spacing="8">
+                            <parts:Icon Data="{StaticResource i-open}" Width="16" Height="16" Stroke="{Binding $parent[Button].Foreground}"/>
+                            <TextBlock Theme="{StaticResource type-body-strong}" Text="{Binding OpenLineText}"/>
+                          </StackPanel>
+                        </Button>
+                        <Button Classes="cf outlined" HorizontalAlignment="Right" IsVisible="{Binding CanOpenRule}"
+                              Command="{Binding OpenRuleCommand}" AutomationProperties.Name="Open the rule">
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                          <parts:Icon Data="{StaticResource i-rules}" Width="16" Height="16" Stroke="{Binding $parent[Button].Foreground}"/>
+                          <TextBlock Theme="{StaticResource type-body-strong}" Text="Open the rule"/>
+                        </StackPanel>
+                      </Button>
+                      </StackPanel>
+                    </WrapPanel>
+                  </StackPanel>
+                </StackPanel>
+              </Border>
+              </Border>
+            </Border>
+          </DataTemplate>
 
-            <!-- A folder review: the files without findings, after the list. -->
-            <StackPanel Name="CleanFiles" Orientation="Horizontal" Spacing="8" Margin="8,16,0,0" IsVisible="{Binding HasFolderClean}">
-              <parts:Icon Data="{StaticResource i-check}" Width="15" Height="15" Stroke="{DynamicResource req-ink}" VerticalAlignment="Top" Margin="0,2,0,0"/>
-              <TextBlock Theme="{StaticResource type-body}" Foreground="{DynamicResource ink-2}" TextWrapping="Wrap" Text="{Binding FolderCleanLead}"/>
-              <TextBlock Theme="{StaticResource code}" Foreground="{DynamicResource ink-2}" TextWrapping="Wrap" VerticalAlignment="Center" Text="{Binding FolderCleanNames}"/>
-            </StackPanel>
+          <!-- The tail: the line that closes the files, then a folder review's files without findings. -->
+          <DataTemplate DataType="review:ReviewTailViewModel" x:DataType="review:ReviewTailViewModel">
+            <Border Classes="pagerow">
+              <Border Classes="pagecolumn">
+                <StackPanel DataContext="{Binding Model}" x:DataType="review:ReviewViewModel">
+                  <Border IsVisible="{Binding HasFiles}" BorderBrush="{DynamicResource line}" BorderThickness="0,1,0,0"/>
 
-          </StackPanel>
-        </Grid>
+                  <!-- A folder review: the files without findings, after the list. -->
+                  <StackPanel Orientation="Horizontal" Spacing="8" Margin="8,16,0,0" IsVisible="{Binding HasFolderClean}">
+                    <parts:Icon Data="{StaticResource i-check}" Width="15" Height="15" Stroke="{DynamicResource req-ink}" VerticalAlignment="Top" Margin="0,2,0,0"/>
+                    <TextBlock Theme="{StaticResource type-body}" Foreground="{DynamicResource ink-2}" TextWrapping="Wrap" Text="{Binding FolderCleanLead}"/>
+                    <TextBlock Theme="{StaticResource code}" Foreground="{DynamicResource ink-2}" TextWrapping="Wrap" VerticalAlignment="Center" Text="{Binding FolderCleanNames}"/>
+                  </StackPanel>
+                </StackPanel>
+              </Border>
+            </Border>
+          </DataTemplate>
+
+        </ItemsControl.DataTemplates>
+      </ItemsControl>
+
+      <!-- The panel stands over the page, in the frame's second column, and keeps its place 24 under the review bar while the page scrolls;
+           the view moves it up when the page ends. In one pane it is in the head instead. -->
+      <Border Classes="pagerow" VerticalAlignment="Top" Margin="0,24,12,0" IsVisible="{Binding !IsOnePane}">
+        <Border Classes="pageframe">
+          <review:FilesPanel Name="SidePanel" HorizontalAlignment="Right" Width="340" DataContext="{Binding}"/>
+        </Border>
       </Border>
-    </ScrollViewer>
+    </Panel>
 
   </Grid>
 

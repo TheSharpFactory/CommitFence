@@ -302,9 +302,16 @@ internal sealed partial class UpdatesViewModel : ObservableObject
         using(var cancellation = new UpdateCancellation())
         {
             _installCancellation = cancellation;
+
+            // Progress posts its reports to this thread, so one can arrive after the install has returned: it must change nothing
+            var ended = false;
             try
             {
-                var progress = new Progress<UpdateProgress>(OnInstallProgress);
+                var progress = new Progress<UpdateProgress>(report =>
+                {
+                    if(!ended)
+                        OnInstallProgress(report);
+                });
                 await Task.Run(() => _updater.InstallAsync(release, progress, cancellation));
             }
             catch(OperationCanceledException) when(cancellation.IsCancelled)
@@ -319,10 +326,14 @@ internal sealed partial class UpdatesViewModel : ObservableObject
             }
             finally
             {
+                ended = true;
                 _installCancellation = null;
             }
         }
 
+        // what a finished install means is set here, whether or not the "replacing" report ever arrived: the files are replaced and
+        // Cancel is gone
+        IsReplacing = true;
         StatusText = $"Version {release.Version} is installed. Restarting…";
         if(StartAndExit != null && StartAndExit(_updater.CreateStartInfo(_folderPath)))
             return;

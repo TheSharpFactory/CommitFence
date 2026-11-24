@@ -77,6 +77,7 @@ of the push.
 | `commitfence review --base <revision> [--head <revision>]` | Reviews a range of commits |
 | `commitfence review --files <path>...` | Reviews the named files |
 | `commitfence review --all [<folder or project file>]` | Reviews the whole of a folder, as of the last commit |
+| `commitfence review ... --format prompt` | Prints what was found as a prompt to hand to an AI coding agent, in place of the usual report |
 | `commitfence update [--check]` | Installs the newest release; `--check` only says whether there is one |
 | `commitfence --version`, `--help` | The version and the usage |
 
@@ -136,13 +137,8 @@ dotnet run --project App/CF.Cli -- --version
 dotnet test CF.slnx
 ```
 
-Requires the .NET 11 SDK. CI builds and runs the tests on Windows, Linux and macOS on every push. Further checks are
-shell scripts, run against a published command line:
-
-```
-pwsh Tools/publish.ps1 -Output <folder>
-bash Tools/check-all.sh <folder>/commitfence.exe
-```
+Requires the .NET 11 SDK. The tests are xUnit; a few of them run real git and a real build, so they need `git` on the
+`PATH`. CI builds and runs them on Windows, Linux and macOS on every push.
 
 ## Repository
 
@@ -155,8 +151,8 @@ bash Tools/check-all.sh <folder>/commitfence.exe
 | `Dependencies/CF.Languages.CSharp` | C#: the catalog, the syntax and the build with Roslyn |
 | `Dependencies/CF.Meaning` | The analyzer the team's compiler loads to learn what the code means |
 | `Dependencies/CF.Composition` | Puts the parts together for both programs |
-| `Tests/CF.Tests` | The unit tests (xUnit) |
-| `Tools/` | Further checks (`checks/`, `smoke.sh`, `check-all.sh`) and the check program of the app |
+| `Tests/CF.Tests` | The tests of the review, the rules, the build and the updater (xUnit) |
+| `Tests/CF.App.Tests` | The tests of the app, run without a display (xUnit, Avalonia headless) |
 | `.github/` | CI and the release workflow |
 
 ## Releases

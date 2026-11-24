@@ -35,18 +35,7 @@ internal sealed class RuleCatalog
     /// </summary>
     public static string Words(string name)
     {
-        var words = new StringBuilder();
-        foreach(var letter in name)
-        {
-            if(letter == '-')
-                words.Append(' ');
-            else if(char.IsUpper(letter))
-                words.Append(' ').Append(char.ToLowerInvariant(letter));
-            else
-                words.Append(letter);
-        }
-
-        return words.ToString();
+        return RuleWords.Of(name);
     }
 
     /// <summary>

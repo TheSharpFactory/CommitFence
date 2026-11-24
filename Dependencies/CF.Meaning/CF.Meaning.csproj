@@ -12,4 +12,9 @@
     <PackageReference Include="Microsoft.CodeAnalysis.CSharp" Version="4.8.0" PrivateAssets="all" />
   </ItemGroup>
 
+  <ItemGroup>
+    <!-- the tests reach the internal types -->
+    <InternalsVisibleTo Include="CF.Tests" />
+  </ItemGroup>
+
 </Project>

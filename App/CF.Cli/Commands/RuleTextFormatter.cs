@@ -51,18 +51,9 @@ internal static class RuleTextFormatter
         if(conditions.Count == 0)
             return;
 
-        AppendLine(builder, label, FormatCondition(conditions[0]));
+        AppendLine(builder, label, RuleSentence.Condition(conditions[0]));
         for(var index = 1; index < conditions.Count; index++)
-            AppendLine(builder, string.Empty, FormatCondition(conditions[index]));
-    }
-
-    private static string FormatCondition(RuleCondition condition)
-    {
-        var values = string.Join(", ", condition.ExpectedValues);
-        if(condition.Comparison == Comparison.IsOneOf)
-            return $"{condition.PropertyName} is one of {values}";
-
-        return $"{condition.PropertyName} is {values}";
+            AppendLine(builder, string.Empty, RuleSentence.Condition(conditions[index]));
     }
 
     private static void AppendLine(StringBuilder builder, string label, string text)

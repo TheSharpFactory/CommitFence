@@ -1,7 +1,7 @@
+using Avalonia.Threading;
 using CF.Core.Code;
 using CF.Core.Findings;
 using CF.Core.Rules;
-using Avalonia.Threading;
 
 namespace CF.App.Rules;
 
@@ -72,12 +72,20 @@ internal sealed partial class RulesViewModel
             if(_fileRows.TryGetValue(rule.Id, out var row))
                 row.Update(rule);
             else
-                _fileRows[rule.Id] = new FileRuleRowViewModel(rule, OpenEditorConfig);
+                _fileRows[rule.Id] = new FileRuleRowViewModel(rule, OpenEditorConfigLine);
         }
 
         if(SelectedItem is FileRuleRowViewModel selected && _fileRows.TryGetValue(selected.Id, out var current))
             FilePage.Show(current.Rule);
     }
+
+    private void OpenEditorConfigLine(int line)
+    {
+        var folder = Path.GetDirectoryName(_folder.SettingsPath) ?? string.Empty;
+        OpenLineRequested?.Invoke(Path.Combine(folder, _fileName ?? _fileGroupName), line);
+    }
+
+    public event Action<string, int>? OpenLineRequested;
 
     private void OpenEditorConfig()
     {
@@ -126,12 +134,13 @@ internal sealed partial class RulesViewModel
 
     private static bool PassesFile(RuleFilter filter, FileRule rule)
     {
+        var place = rule.Main ?? (rule.Exceptions.Count > 0 ? rule.Exceptions[0] : null);
         return filter switch
         {
             RuleFilter.All => true,
-            RuleFilter.Blocks => rule.State == FileRuleState.On && rule.Severity == Severity.Block,
-            RuleFilter.Warns => rule.State == FileRuleState.On && rule.Severity == Severity.Warn,
-            RuleFilter.Off => rule.State == FileRuleState.Off,
+            RuleFilter.Blocks => place?.State == FileRuleState.On && place.Severity == Severity.Block,
+            RuleFilter.Warns => place?.State == FileRuleState.On && place.Severity == Severity.Warn,
+            RuleFilter.Off => place?.State == FileRuleState.Off,
             _ => throw new ArgumentOutOfRangeException(nameof(filter), filter, null)
         };
     }

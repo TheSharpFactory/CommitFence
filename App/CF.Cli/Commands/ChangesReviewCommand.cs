@@ -1,6 +1,7 @@
 using CF.Cli.Console;
 using CF.Core.Changes;
 using CF.Core.Review;
+using CF.Core.Rules.Settings;
 using CF.Core.Services;
 
 namespace CF.Cli.Commands;
@@ -13,19 +14,23 @@ internal sealed class ChangesReviewCommand
 {
     private readonly IProductInfoService _productInfo;
     private readonly IReviewService _reviewService;
+    private readonly IRuleService _ruleService;
     private readonly TextReader _input;
     private readonly TextWriter _output;
+    private readonly TextWriter _error;
     private readonly string _currentFolder;
     private readonly string _programFolder;
     private readonly string? _settingsPath;
     private readonly ReviewArguments _arguments;
 
-    public ChangesReviewCommand(IProductInfoService productInfo, IReviewService reviewService, CommandEnvironment environment, string? settingsPath, ReviewArguments arguments)
+    public ChangesReviewCommand(IProductInfoService productInfo, IReviewService reviewService, IRuleService ruleService, CommandEnvironment environment, string? settingsPath, ReviewArguments arguments)
     {
         _productInfo = productInfo;
         _reviewService = reviewService;
+        _ruleService = ruleService;
         _input = environment.Input;
         _output = environment.Output;
+        _error = environment.Error;
         _currentFolder = environment.CurrentFolder;
         _programFolder = environment.ProgramFolder;
         _settingsPath = settingsPath;
@@ -34,15 +39,25 @@ internal sealed class ChangesReviewCommand
 
     public ExitCode Run()
     {
-        _output.WriteLine($"{_productInfo.Name} {_productInfo.Version} ({_programFolder})");
+        if(!_arguments.AsPrompt)
+            _output.WriteLine($"{_productInfo.Name} {_productInfo.Version} ({_programFolder})");
+
         var scope = CreateScope();
         if(scope == null)
             return ExitCode.BadSettingsOrUsage;
 
         var result = _reviewService.ReviewChanges(_currentFolder, scope, _settingsPath);
-        new PlainTextReporter(_output, countByRule: _arguments.Mode == ReviewMode.All).Write(result);
+        Report(result);
 
         return result.ExitCode;
+    }
+
+    private void Report(ReviewResult result)
+    {
+        if(_arguments.AsPrompt)
+            new PromptReporter(_output, _ruleService, _settingsPath ?? Path.GetFullPath(SettingsFileName.Default, _currentFolder)).Write(result);
+        else
+            new PlainTextReporter(_output, countByRule: _arguments.Mode == ReviewMode.All).Write(result);
     }
 
     private ReviewScope? CreateScope()
@@ -66,7 +81,7 @@ internal sealed class ChangesReviewCommand
     {
         var answer = _reviewService.FindPushScope(_currentFolder);
         if(!answer.HasPush)
-            _output.WriteLine("No push to review: " + answer.Reason);
+            (_arguments.AsPrompt ? _error : _output).WriteLine("No push to review: " + answer.Reason);
 
         return answer.Scope;
     }

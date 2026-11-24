@@ -11,15 +11,81 @@ public sealed class FileRule
     /// Creates a rule of a file.
     /// </summary>
     public FileRule(string id, string? title, string setting, FileRuleState state, Severity? severity, string file, int line, IReadOnlyList<FileLine>? lines = null)
+        : this(id, title, file, "C#", new FileRulePlace("*.cs", setting, state, severity, line, lines ?? [], _ => true), [])
+    {
+    }
+
+    /// <summary>Creates a scoped rule from the places that set it.</summary>
+    public FileRule(string id, string? title, string file, string language, FileRulePlace? main, IReadOnlyList<FileRulePlace> exceptions)
     {
         Id = id;
         Title = title;
-        Setting = setting;
-        State = state;
-        Severity = severity;
         File = file;
-        Line = line;
-        Lines = lines ?? new List<FileLine>();
+        Language = language;
+        Main = main;
+        Exceptions = exceptions;
+    }
+
+    /// <summary>The language as shown to the reader.</summary>
+    public string Language { get; }
+
+    /// <summary>The last setting for the language as a whole.</summary>
+    public FileRulePlace? Main { get; }
+
+    /// <summary>The narrower settings in file order.</summary>
+    public IReadOnlyList<FileRulePlace> Exceptions { get; }
+
+    /// <summary>All places in source order.</summary>
+    public IEnumerable<FileRulePlace> Places
+    {
+        get
+        {
+            return Main == null ? Exceptions : Exceptions.Prepend(Main);
+        }
+    }
+
+    /// <summary>Finds the setting for a repository-relative path.</summary>
+    public FileRulePlace? ForPath(string path)
+    {
+        var relative = path.Replace('\\', '/');
+        return Exceptions.LastOrDefault(place => place.Matches(relative)) ?? (Main?.Matches(relative) == true ? Main : null);
+    }
+
+    /// <summary>The scope of a place in this rule.</summary>
+    public string Scope(FileRulePlace place)
+    {
+        return place == Main ? $"all {Language} files" : place.Pattern;
+    }
+
+    /// <summary>The number of scoped overrides in words.</summary>
+    public string ExceptionCount
+    {
+        get
+        {
+            return $"{Exceptions.Count} {(Exceptions.Count == 1 ? "exception" : "exceptions")}";
+        }
+    }
+
+    /// <summary>Groups narrower settings in the order used by the effect filter.</summary>
+    public IEnumerable<IGrouping<string, FileRulePlace>> ExceptionGroups()
+    {
+        return Exceptions.GroupBy(place => place.Effect).OrderBy(group => group.Key switch { "Blocks" => 0, "Warns" => 1, _ => 2 });
+    }
+
+    /// <summary>One list line for an effect with all its locations.</summary>
+    public static string DescribeGroup(IGrouping<string, FileRulePlace> group)
+    {
+        var parts = group.Select(place => $"{place.Pattern}, line {place.Line}").ToList();
+        if(parts.Count > 1)
+            parts[^1] = "and " + parts[^1];
+
+        return $"{group.Key} for {string.Join(", ", parts)}";
+    }
+
+    /// <summary>The exception summaries shared by the list views.</summary>
+    public IEnumerable<string> ExceptionLines()
+    {
+        return ExceptionGroups().Select(DescribeGroup);
     }
 
     /// <summary>
@@ -35,17 +101,35 @@ public sealed class FileRule
     /// <summary>
     /// The setting as the file writes it, without a comment.
     /// </summary>
-    public string Setting { get; }
+    public string Setting
+    {
+        get
+        {
+            return Main?.Setting ?? string.Empty;
+        }
+    }
 
     /// <summary>
     /// Whether the build applies the rule.
     /// </summary>
-    public FileRuleState State { get; }
+    public FileRuleState State
+    {
+        get
+        {
+            return Main?.State ?? FileRuleState.OwnDefault;
+        }
+    }
 
     /// <summary>
     /// What a breach does to a push when the rule is on: block or warn. Nothing when the rule is not on.
     /// </summary>
-    public Severity? Severity { get; }
+    public Severity? Severity
+    {
+        get
+        {
+            return Main?.Severity;
+        }
+    }
 
     /// <summary>
     /// The file that sets the rule, as people name it.
@@ -55,11 +139,22 @@ public sealed class FileRule
     /// <summary>
     /// The line of the file, counted from 1.
     /// </summary>
-    public int Line { get; }
+    public int? Line
+    {
+        get
+        {
+            return Main?.Line;
+        }
+    }
 
     /// <summary>
-    /// The lines of the file around the one that sets the rule, that line included: up to three before and three after.
-    /// Empty when the language does not hand them.
+    /// The quoted source lines of the main setting, if present.
     /// </summary>
-    public IReadOnlyList<FileLine> Lines { get; }
+    public IReadOnlyList<FileLine> Lines
+    {
+        get
+        {
+            return Main?.Lines ?? [];
+        }
+    }
 }

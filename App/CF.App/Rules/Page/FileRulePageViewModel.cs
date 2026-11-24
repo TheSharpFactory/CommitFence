@@ -2,7 +2,6 @@ using CF.App.Parts;
 using CF.Core.Code;
 using CF.Core.Findings;
 using CommunityToolkit.Mvvm.ComponentModel;
-using CommunityToolkit.Mvvm.Input;
 
 namespace CF.App.Rules.Page;
 
@@ -15,14 +14,11 @@ internal sealed partial class FileRulePageViewModel : ObservableObject
 {
     private const string _fileName = ".editorconfig";
 
-    private const int _linePlaces = 7;
+    private readonly Action<int> _openFile;
 
-    private readonly Action _openFile;
-
-    public FileRulePageViewModel(Action openFile)
+    public FileRulePageViewModel(Action<int> openFile)
     {
         _openFile = openFile;
-        Lines = Enumerable.Range(0, _linePlaces).Select(_ => new FileLineViewModel()).ToList();
         Settings = new List<FileSettingRowViewModel>
         {
             new FileSettingRowViewModel("error", EffectKind.Block, "Blocks", "The push is refused."),
@@ -32,7 +28,7 @@ internal sealed partial class FileRulePageViewModel : ObservableObject
     }
 
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(Id), nameof(Title), nameof(HasTitle), nameof(StateWord), nameof(StateSpokenName), nameof(StateToolTip), nameof(LineHeadText), nameof(OpenAtLineText), nameof(LinesSpokenName))]
+    [NotifyPropertyChangedFor(nameof(Id), nameof(Title), nameof(HasTitle), nameof(StateWord), nameof(StateSpokenName), nameof(StateToolTip), nameof(LineHeadText), nameof(LinesSpokenName))]
     public partial FileRule? Rule { get; set; }
 
     /// <summary>
@@ -69,7 +65,7 @@ internal sealed partial class FileRulePageViewModel : ObservableObject
     {
         get
         {
-            return Describe(Rule?.State);
+            return Rule?.Main?.Effect ?? "Not set";
         }
     }
 
@@ -77,7 +73,58 @@ internal sealed partial class FileRulePageViewModel : ObservableObject
     {
         get
         {
-            return StateWord + ", set in the file";
+            return StateWord + StateSuffix;
+        }
+    }
+
+    public EffectKind Kind
+    {
+        get
+        {
+            return Rule?.Main == null ? EffectKind.Unset : PlaceKind(Rule.Main);
+        }
+    }
+
+    public static EffectKind PlaceKind(FileRulePlace place)
+    {
+        return place.Severity switch
+        {
+            Severity.Block => EffectKind.Block,
+            Severity.Warn => EffectKind.Warn,
+            _ => EffectKind.Off
+        };
+    }
+
+    public bool IsBlock
+    {
+        get
+        {
+            return Kind == EffectKind.Block;
+        }
+    }
+
+    public bool IsWarn
+    {
+        get
+        {
+            return Kind == EffectKind.Warn;
+        }
+    }
+
+    public bool IsOff
+    {
+        get
+        {
+            return !IsBlock && !IsWarn;
+        }
+    }
+
+    public string StateSuffix
+    {
+        get
+        {
+            var count = Rule?.Exceptions.Count > 0 ? ", " + Rule.ExceptionCount : string.Empty;
+            return $" for all {Rule?.Language} files{count}" + (Rule?.Main == null ? " in the file" : ", set in the file");
         }
     }
 
@@ -85,11 +132,17 @@ internal sealed partial class FileRulePageViewModel : ObservableObject
     {
         get
         {
-            if(Rule == null)
-                return string.Empty;
+            if(Rule?.Main == null)
+                return StateSpokenName;
 
-            var word = Rule.State == FileRuleState.On ? "On" : Rule.State == FileRuleState.Off ? "Off" : "Set";
-            return $"{word} in {_fileName}: {Rule.Setting}, on line {Rule.Line}. Change it in the file.";
+            var lines = Rule.Exceptions.Select(place => place.Line.ToString()).ToList();
+            var exceptions = lines.Count switch
+            {
+                0 => string.Empty,
+                1 => $" Line {lines[0]} sets it differently for some files.",
+                _ => $" Lines {string.Join(", ", lines.SkipLast(1))} and {lines[^1]} set it differently for some files."
+            };
+            return $"{StateWord} for all {Rule.Language} files: {Rule.Setting}, on line {Rule.Line} of {_fileName}.{exceptions} Change it in the file.";
         }
     }
 
@@ -97,30 +150,47 @@ internal sealed partial class FileRulePageViewModel : ObservableObject
     {
         get
         {
-            return Rule == null ? string.Empty : $"line {Rule.Line} sets this rule";
+            if(!HasExceptions && Rule?.Line is int line)
+                return $"line {line} sets this rule";
+
+            var count = Places.Count;
+            var scope = Rule?.Main == null ? ", for some files only" : string.Empty;
+            var order = count > 1 ? " A later line overrides an earlier one." : string.Empty;
+            return $"{count} {(count == 1 ? "line sets" : "lines set")} this rule{scope}.{order}";
         }
     }
 
-    public string OpenAtLineText
+    public bool HasExceptions
     {
-        get
-        {
-            return Rule == null ? string.Empty : $"Open at line {Rule.Line}";
-        }
+        get { return Rule?.Exceptions.Count > 0; }
+    }
+
+    public FilePlaceViewModel? FirstPlace
+    {
+        get { return Places.Count > 0 ? Places[0] : null; }
     }
 
     public string LinesSpokenName
     {
         get
         {
-            return Rule == null ? string.Empty : $"Lines of {_fileName} round line {Rule.Line}, which sets this rule";
+            var order = Places.Count > 1 ? " A later line overrides an earlier one." : string.Empty;
+            return $"Lines of {_fileName} that set this rule, {Places.Count} {(Places.Count == 1 ? "place" : "places")}.{order}";
         }
     }
 
     /// <summary>
     /// The places for the lines of the file round the rule's. They are made once.
     /// </summary>
-    public IReadOnlyList<FileLineViewModel> Lines { get; }
+    public IReadOnlyList<FileLineViewModel> Lines
+    {
+        get
+        {
+            return Places.Count > 0 ? Places[0].Lines : [];
+        }
+    }
+
+    public IReadOnlyList<FilePlaceViewModel> Places { get; private set; } = [];
 
     /// <summary>
     /// The three rows of the table. They are made once.
@@ -132,29 +202,19 @@ internal sealed partial class FileRulePageViewModel : ObservableObject
     /// </summary>
     public void Show(FileRule rule)
     {
+        Places = rule.Places.Select(place => new FilePlaceViewModel(rule, place, _openFile)).ToList();
         Rule = rule;
-        for(var index = 0; index < Lines.Count; index++)
-            Lines[index].Take(index < rule.Lines.Count ? rule.Lines[index] : null, index < rule.Lines.Count && rule.Lines[index].Number == rule.Line);
-
         for(var index = 0; index < Settings.Count; index++)
-            Settings[index].IsCurrent = IsCurrent(rule, index);
-    }
+        {
+            var row = Settings[index];
+            row.IsCurrent = IsCurrent(rule, index);
+            var patterns = rule.Exceptions.Where(place => place.Effect == row.EffectWord).Select(place => place.Pattern).ToList();
+            row.Tag = row.IsCurrent && rule.Exceptions.Count > 0 ? $"For all {rule.Language} files" : string.Empty;
+            if(patterns.Count > 0)
+                row.Tag += (row.IsCurrent ? ", and for " : "For ") + string.Join(", ", patterns);
+        }
 
-    [RelayCommand]
-    private void OpenFile()
-    {
-        _openFile();
-    }
-
-    private static string Describe(FileRuleState? state)
-    {
-        if(state == FileRuleState.On)
-            return "On";
-
-        if(state == FileRuleState.Off)
-            return "Off";
-
-        return state == FileRuleState.OwnDefault ? "default" : "not understood";
+        OnPropertyChanged(string.Empty);
     }
 
     private static bool IsCurrent(FileRule rule, int index)

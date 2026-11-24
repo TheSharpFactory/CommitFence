@@ -1,4 +1,6 @@
+using CF.Core.Code;
 using CF.Core.Findings;
+using CF.Core.Prompts;
 
 namespace CF.App.Review;
 
@@ -10,13 +12,17 @@ internal sealed class RuleInfo
 {
     private static readonly List<SentencePieceViewModel> _noSentence = new List<SentencePieceViewModel>();
 
-    public RuleInfo(FindingSource source, string title, bool canOpen, IReadOnlyList<SentencePieceViewModel>? sentence)
+    public RuleInfo(FindingSource source, string title, bool canOpen, IReadOnlyList<SentencePieceViewModel>? sentence, PromptRule? prompt = null, FileRule? fileRule = null)
     {
+        FileRule = fileRule;
         Source = source;
         Title = title;
         CanOpen = canOpen;
         Sentence = sentence ?? _noSentence;
+        Prompt = prompt;
     }
+
+    public FileRule? FileRule { get; }
 
     public FindingSource Source { get; }
 
@@ -28,6 +34,11 @@ internal sealed class RuleInfo
     public bool CanOpen { get; }
 
     public IReadOnlyList<SentencePieceViewModel> Sentence { get; }
+
+    /// <summary>
+    /// What the prompt for a finding of this rule says about the rule, when the rule is known.
+    /// </summary>
+    public PromptRule? Prompt { get; }
 
     /// <summary>
     /// Where the rule comes from, in the words that begin the plain line of a finding (no full stop: the line goes on).

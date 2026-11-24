@@ -1,3 +1,4 @@
+using CF.Core.Code;
 using CF.Core.Ports;
 
 namespace CF.Languages.CSharp.EditorConfig;
@@ -24,7 +25,17 @@ internal sealed class CSharpFileSet
     /// </summary>
     public bool Matches(SectionPattern pattern)
     {
-        return pattern.Matches(_probe) || _paths.Value.Any(pattern.Matches);
+        return NamesAll(pattern) || _paths.Value.Any(pattern.Matches);
+    }
+
+    public static bool NamesAll(SectionPattern pattern)
+    {
+        return pattern.Matches(_probe) && pattern.Matches("a/b/File.cs");
+    }
+
+    public bool Overlaps(SectionPattern pattern, IEnumerable<FileRulePlace> earlier)
+    {
+        return _paths.Value.Any(path => pattern.Matches(path) && earlier.Any(place => place.Matches(path)));
     }
 
     private static List<string> Find(IFileSystem fileSystem, string repositoryFolder)

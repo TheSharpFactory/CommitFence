@@ -11,6 +11,7 @@
 
   <ItemGroup>
     <InternalsVisibleTo Include="CF.Tests" />
+    <InternalsVisibleTo Include="CF.App.Tests" />
   </ItemGroup>
 
   <ItemGroup>

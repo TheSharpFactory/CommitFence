@@ -7,7 +7,8 @@ namespace CF.Languages.CSharp.Toolchain;
 /// not, plus what those need built first.
 /// </summary>
 /// <remarks>
-/// Kept evidence between reviews does not exist yet, so all of them are compiled in each review.
+/// Only the units that own changed files are always compiled again; the others may be answered from what their last
+/// compile kept, when it still holds.
 /// </remarks>
 internal static class ChangeSelector
 {
@@ -64,7 +65,7 @@ internal static class ChangeSelector
         var notCovered = new List<string>();
         var seeds = FindSeeds(graph, treeFolder, changedFiles, notCovered);
 
-        return CreatePlan(graph, Close(seeds.Values, graph.DependentsOf), notCovered);
+        return CreatePlan(graph, Close(seeds.Values, graph.DependentsOf), seeds.Keys.ToHashSet(), notCovered);
     }
 
     /// <summary>
@@ -77,7 +78,7 @@ internal static class ChangeSelector
         var notCovered = new List<string>();
         var seeds = FindSeeds(graph, treeFolder, files.Where(file => !IsImportableFile(file.Path)).ToList(), notCovered);
 
-        return CreatePlan(graph, seeds, notCovered);
+        return CreatePlan(graph, seeds, new HashSet<string>(), notCovered);
     }
 
     private static Dictionary<string, ProjectUnit> FindSeeds(UnitGraph graph, string treeFolder, IReadOnlyList<ChangedFile> files, List<string> notCovered)
@@ -93,10 +94,10 @@ internal static class ChangeSelector
         return seeds;
     }
 
-    private static BuildPlan CreatePlan(UnitGraph graph, Dictionary<string, ProjectUnit> reviewed, List<string> notCovered)
+    private static BuildPlan CreatePlan(UnitGraph graph, Dictionary<string, ProjectUnit> reviewed, IReadOnlySet<string> ownerKeys, List<string> notCovered)
     {
         var needed = Close(reviewed.Values, graph.PrerequisitesOf);
-        return new BuildPlan(reviewed.Keys.ToHashSet(), OrderForBuild(needed.Values, graph), notCovered);
+        return new BuildPlan(reviewed.Keys.ToHashSet(), ownerKeys, OrderForBuild(needed.Values, graph), notCovered);
     }
 
     private static void AddSeeds(UnitGraph graph, string treeFolder, ChangedFile file, Dictionary<string, ProjectUnit> seeds, List<string> notCovered)
@@ -192,7 +193,7 @@ internal static class ChangeSelector
         var seeds = graph.Units.Where(unit => wanted.Contains(unit.PartKeyIn(treeFolder))).ToDictionary(unit => unit.Key);
         var needed = Close(seeds.Values, graph.PrerequisitesOf);
 
-        return new BuildPlan(seeds.Keys.ToHashSet(), OrderForBuild(needed.Values, graph), new List<string>());
+        return new BuildPlan(seeds.Keys.ToHashSet(), new HashSet<string>(), OrderForBuild(needed.Values, graph), new List<string>());
     }
 
     private static void Visit(ProjectUnit unit, Dictionary<string, ProjectUnit> members, UnitGraph graph, HashSet<string> visited, List<ProjectUnit> ordered)

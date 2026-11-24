@@ -29,6 +29,11 @@ internal sealed class ReviewArguments
 
     public string Target { get; private init; } = string.Empty;
 
+    /// <summary>
+    /// Whether the review is printed as a prompt for an AI coding agent (--format prompt) in place of the usual report.
+    /// </summary>
+    public bool AsPrompt { get; internal set; }
+
     public static ReviewArgumentsResult Parse(string[] args)
     {
         return new ReviewArgumentsReader(args).Read();

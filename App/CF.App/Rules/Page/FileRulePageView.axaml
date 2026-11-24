@@ -30,7 +30,7 @@
     <Style Selector="local|FileRulePageView.onepane Button.back">
       <Setter Property="IsVisible" Value="True"/>
     </Style>
-    <Style Selector="Border.fileline.current">
+    <Style Selector="Border.fileline.current.band">
       <Setter Property="Background" Value="{DynamicResource hover}"/>
     </Style>
     <Style Selector="Border.fileline Border.bar">
@@ -43,7 +43,10 @@
       <Setter Property="Foreground" Value="{DynamicResource ink-3}"/>
     </Style>
     <Style Selector="Border.fileline TextBlock.text">
-      <Setter Property="Foreground" Value="{DynamicResource ink}"/>
+      <Setter Property="Foreground" Value="{DynamicResource ink-3}"/>
+    </Style>
+    <Style Selector="Border.fileline TextBlock.text.context">
+      <Setter Property="Foreground" Value="{DynamicResource ink-2}"/>
     </Style>
     <Style Selector="Border.fileline TextBlock.text.comment">
       <Setter Property="Foreground" Value="{DynamicResource code-comment}"/>
@@ -53,7 +56,17 @@
       <Setter Property="Foreground" Value="{DynamicResource ink}"/>
     </Style>
     <Style Selector="Border.fileline.current TextBlock.text">
+      <Setter Property="Foreground" Value="{DynamicResource ink}"/>
       <Setter Property="FontWeight" Value="SemiBold"/>
+    </Style>
+    <Style Selector="Run.pattern">
+      <Setter Property="FontFamily" Value="Cascadia Mono, Consolas, Menlo, DejaVu Sans Mono, monospace"/>
+      <Setter Property="FontWeight" Value="SemiBold"/>
+      <Setter Property="Foreground" Value="{DynamicResource ink}"/>
+    </Style>
+    <Style Selector="Border.setting.current TextBlock.tag">
+      <Setter Property="FontWeight" Value="SemiBold"/>
+      <Setter Property="Foreground" Value="{DynamicResource ink}"/>
     </Style>
     <Style Selector="Border.setting.current">
       <Setter Property="Background" Value="{DynamicResource hover}"/>
@@ -74,7 +87,7 @@
       <StackPanel Classes="content" Name="SheetContent" MaxWidth="900">
 
         <!-- The first row: the tag and the id at the left, the state as a sentence at the right. No switch. -->
-        <Grid ColumnDefinitions="Auto,*" MinHeight="36">
+        <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto" MinHeight="36">
           <StackPanel Orientation="Horizontal" Spacing="10" VerticalAlignment="Center">
             <Button Name="BackButton" Classes="cf quiet back" Padding="8,0,12,0"
                     Command="{Binding $parent[rules:RulesView].((rules:RulesViewModel)DataContext).BackCommand}"
@@ -92,11 +105,11 @@
             </Border>
             <TextBlock Name="IdText" Theme="{StaticResource code-strong}" VerticalAlignment="Center" Text="{Binding Id}"/>
           </StackPanel>
-          <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="6" HorizontalAlignment="Right" VerticalAlignment="Center"
+          <StackPanel Name="StatePanel" Grid.Column="1" Orientation="Horizontal" Spacing="6" HorizontalAlignment="Right" VerticalAlignment="Center"
                       ToolTip.Tip="{Binding StateToolTip}" AutomationProperties.Name="{Binding StateSpokenName}">
-            <parts:Icon Data="{StaticResource i-lock-line}" Width="14" Height="14" Stroke="{DynamicResource ink-3}"/>
+            <parts:EffectMark Kind="{Binding Kind}" Classes.block="{Binding IsBlock}" Classes.warn="{Binding IsWarn}" Classes.off="{Binding IsOff}" Width="14" Height="14"/>
             <TextBlock Theme="{StaticResource type-body}" Foreground="{DynamicResource ink-2}">
-              <Run Text="{Binding StateWord}" FontWeight="SemiBold" Foreground="{DynamicResource ink}"/><Run Text=", set in the file"/>
+              <Run Text="{Binding StateWord}" FontWeight="SemiBold" Foreground="{DynamicResource ink}"/><Run Text="{Binding StateSuffix}"/>
             </TextBlock>
           </StackPanel>
         </Grid>
@@ -118,29 +131,52 @@
                   <TextBlock Theme="{StaticResource type-meta}" Foreground="{DynamicResource ink-2}" VerticalAlignment="Center"
                              Text="{Binding LineHeadText}"/>
                 </StackPanel>
-                <Button Name="OpenAtLine" Grid.Column="1" Classes="cf outlined small" Command="{Binding OpenFileCommand}"
-                        AutomationProperties.Name="{Binding OpenAtLineText}">
+                <Button Grid.Column="1" IsVisible="{Binding !HasExceptions}" Classes="cf outlined small" Command="{Binding FirstPlace.OpenCommand}"
+                        AutomationProperties.Name="{Binding FirstPlace.ButtonName}">
                   <StackPanel Orientation="Horizontal" Spacing="6">
                     <parts:Icon Data="{StaticResource i-open}" Width="14" Height="14" Stroke="{Binding $parent[Button].Foreground}"/>
-                    <TextBlock Theme="{StaticResource type-meta-strong}" Text="{Binding OpenAtLineText}"/>
+                    <TextBlock Theme="{StaticResource type-meta-strong}" Text="{Binding FirstPlace.ButtonText}"/>
                   </StackPanel>
                 </Button>
               </Grid>
             </Border>
-            <ItemsControl Margin="0,8" ItemsSource="{Binding Lines}">
+            <ItemsControl ItemsSource="{Binding Places}">
               <ItemsControl.ItemTemplate>
-                <DataTemplate DataType="local:FileLineViewModel" x:DataType="local:FileLineViewModel">
-                  <Border Classes="fileline" Classes.current="{Binding IsCurrent}" Height="20" IsVisible="{Binding IsPresent}" AutomationProperties.Name="{Binding SpokenName}">
-                    <Panel>
-                      <Border Classes="bar" Width="4" CornerRadius="2" HorizontalAlignment="Left" Background="{DynamicResource here}"/>
-                      <Grid ColumnDefinitions="52,16,*">
-                        <TextBlock Grid.Column="0" Classes="number" Theme="{StaticResource code}"
-                                   HorizontalAlignment="Right" Text="{Binding Number}"/>
-                        <TextBlock Grid.Column="2" Classes="text" Classes.comment="{Binding IsComment}" Theme="{StaticResource code}"
-                                   TextWrapping="NoWrap" TextTrimming="CharacterEllipsis"
-                                   Text="{Binding Text}"/>
+                <DataTemplate x:DataType="local:FilePlaceViewModel">
+                  <Border BorderBrush="{DynamicResource line}" BorderThickness="0,0,0,1" AutomationProperties.Name="{Binding SpokenName}">
+                    <StackPanel>
+                      <Grid IsVisible="{Binding ShowsHeading}" ColumnDefinitions="14,*,Auto" ColumnSpacing="6" MinHeight="44" Margin="16,0,8,0">
+                        <parts:EffectMark Kind="{Binding Kind}" Classes.block="{Binding IsBlock}" Classes.warn="{Binding IsWarn}" Classes.off="{Binding IsOff}" Width="14" Height="14"/>
+                        <TextBlock Grid.Column="1" VerticalAlignment="Center" TextWrapping="Wrap" Foreground="{DynamicResource ink-2}" Theme="{StaticResource type-body}">
+                          <Run Text="{Binding Effect}" FontWeight="Medium" Foreground="{DynamicResource ink}"/><Run Text=" for "/><Run Classes.pattern="{Binding IsException}" Text="{Binding Scope}"/>
+                        </TextBlock>
+                        <Button Grid.Column="2" Classes="cf outlined small" Command="{Binding OpenCommand}"
+                                AutomationProperties.Name="{Binding ButtonName}">
+                          <StackPanel Orientation="Horizontal" Spacing="6">
+                            <parts:Icon Data="{StaticResource i-open}" Width="14" Height="14" Stroke="{Binding $parent[Button].Foreground}"/>
+                            <TextBlock Theme="{StaticResource type-meta-strong}" Text="{Binding ButtonText}"/>
+                          </StackPanel>
+                        </Button>
                       </Grid>
-                    </Panel>
+                      <ItemsControl Margin="0,0,0,10" ItemsSource="{Binding Lines}">
+                        <ItemsControl.ItemTemplate>
+                          <DataTemplate DataType="local:FileLineViewModel" x:DataType="local:FileLineViewModel">
+                            <Border Classes="fileline" Classes.current="{Binding IsCurrent}" Classes.band="{Binding $parent[ItemsControl].((local:FilePlaceViewModel)DataContext).IsException}" Height="20" IsVisible="{Binding IsPresent}" AutomationProperties.Name="{Binding SpokenName}">
+                              <Panel>
+                                <Border Classes="bar" Width="4" CornerRadius="2" HorizontalAlignment="Left" Background="{DynamicResource here}"/>
+                                <Grid ColumnDefinitions="52,16,*">
+                                  <TextBlock Grid.Column="0" Classes="number" Theme="{StaticResource code}"
+                                             HorizontalAlignment="Right" IsVisible="{Binding HasNumber}" Text="{Binding Number}"/>
+                                  <TextBlock Grid.Column="2" Classes="text" Classes.context="{Binding IsHeaderOrGap}" Classes.comment="{Binding IsComment}" Theme="{StaticResource code}"
+                                             TextWrapping="NoWrap" TextTrimming="CharacterEllipsis"
+                                             Text="{Binding Text}"/>
+                                </Grid>
+                              </Panel>
+                            </Border>
+                          </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                      </ItemsControl>
+                    </StackPanel>
                   </Border>
                 </DataTemplate>
               </ItemsControl.ItemTemplate>
@@ -153,7 +189,7 @@
         <ItemsControl ItemsSource="{Binding Settings}">
           <ItemsControl.ItemTemplate>
             <DataTemplate DataType="local:FileSettingRowViewModel" x:DataType="local:FileSettingRowViewModel">
-              <Border Classes="setting" Classes.current="{Binding IsCurrent}" Height="40" BorderBrush="{DynamicResource line}"
+              <Border Classes="setting" Classes.current="{Binding IsCurrent}" MinHeight="40" BorderBrush="{DynamicResource line}"
                       BorderThickness="0,1,0,0" AutomationProperties.Name="{Binding SpokenName}">
                 <Panel>
                   <Border Classes="bar" Width="4" CornerRadius="2" Margin="0,8" HorizontalAlignment="Left"
@@ -166,10 +202,12 @@
                                         Kind="{Binding Kind}" Width="14" Height="14"/>
                       <TextBlock Theme="{StaticResource type-effect}" Text="{Binding EffectWord}"/>
                     </StackPanel>
-                    <TextBlock Grid.Column="2" Theme="{StaticResource type-body}" Foreground="{DynamicResource ink-2}"
-                               TextTrimming="CharacterEllipsis" Text="{Binding Push}"/>
+                    <StackPanel Grid.Column="2" Margin="0,8" Spacing="2">
+                      <TextBlock Theme="{StaticResource type-body}" Foreground="{DynamicResource ink-2}" TextWrapping="Wrap" Text="{Binding Push}"/>
+                      <TextBlock Theme="{StaticResource type-meta}" Foreground="{DynamicResource ink-2}" Classes="tag" TextWrapping="Wrap" IsVisible="{Binding HasTag}" Text="{Binding Tag}"/>
+                    </StackPanel>
                     <TextBlock Grid.Column="3" Theme="{StaticResource type-meta-strong}" Foreground="{DynamicResource ink}"
-                               IsVisible="{Binding IsCurrent}" Text="In the file now"/>
+                               IsVisible="{Binding ShowsCurrentLabel}" Text="In the file now"/>
                   </Grid>
                 </Panel>
               </Border>

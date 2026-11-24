@@ -14,7 +14,9 @@ namespace CF.Languages.CSharp.Toolchain;
 /// compiler writes its log to the path this review chose. A unit under review is made to compile again by removing its
 /// compiler output; without that the build may skip the compile and write no log. A log counts only when it did not
 /// exist before this build and, for a unit under review, only when the closing entry of our analyzer in it matches the
-/// facts it holds.
+/// facts it holds. A unit under review that owns no changed file is left to the build: when the build skips the compile,
+/// the log kept from its last compile stands in for the missing one, but only when it is keyed to exactly what that
+/// compile read; otherwise the unit is compiled again.
 /// </remarks>
 internal sealed class UnitBuilder
 {
@@ -27,11 +29,15 @@ internal sealed class UnitBuilder
     private readonly string _logFolder;
     private readonly string _targetsPath;
     private readonly string _meaningPath;
+    private readonly EvidenceKey _evidenceKey;
+    private readonly KeptEvidence _keptEvidence;
     private readonly bool _isWholeReview;
     private int _built;
 
-    public UnitBuilder(IFileSystem fileSystem, DotnetTool dotnet, string treeFolder, string logFolder, string targetsPath, string meaningPath, bool isWholeReview)
+    public UnitBuilder(IFileSystem fileSystem, DotnetTool dotnet, string treeFolder, string logFolder, string targetsPath, string meaningPath, EvidenceKey evidenceKey, KeptEvidence keptEvidence, bool isWholeReview)
     {
+        _evidenceKey = evidenceKey;
+        _keptEvidence = keptEvidence;
         _isWholeReview = isWholeReview;
         _fileSystem = fileSystem;
         _dotnet = dotnet;
@@ -52,33 +58,101 @@ internal sealed class UnitBuilder
     /// error, the unit is built once more with exactly those rules let through, and that second build, with its own
     /// fresh log, is the evidence. The rule findings of the first log are added to it.
     /// </remarks>
-    public UnitOutcome Build(ProjectUnit unit, bool underReview)
+    public UnitOutcome Build(ProjectUnit unit, bool underReview, bool ownsChange)
     {
-        var first = BuildOnce(unit, underReview, new List<string>());
+        var mayUseKept = underReview && !ownsChange && _keptEvidence.Has(unit.PartKeyIn(_treeFolder));
+        var first = BuildOnce(unit, underReview, new List<string>(), !mayUseKept);
         if(first.Refusal != null)
             return first.Refusal;
 
+        if(mayUseKept && WasSkipped(first))
+        {
+            var kept = JudgeKept(unit, first);
+            if(kept.Succeeded)
+                return kept;
+
+            first = BuildOnce(unit, underReview, new List<string>(), true);
+            if(first.Refusal != null)
+                return first.Refusal;
+        }
+
         var ruleIds = first.Failed ? _ruleErrorScanner.FindRuleErrorIds(first.LogPath) : new List<string>();
         if(ruleIds.Count == 0)
-            return Judge(unit, underReview, first);
+            return KeepWhenSucceeded(unit, first, Judge(unit, underReview, first));
 
         // the first log is read before the second build starts: what it found is kept in memory, not read again later
         var firstRuleFindings = ReadPlacedFindingsOf(first.LogPath, unit, ruleIds);
-        var second = BuildOnce(unit, underReview, ruleIds);
+        var second = BuildOnce(unit, underReview, ruleIds, true);
         if(second.Refusal != null)
             return second.Refusal;
 
         return Judge(unit, underReview, second).WithMoreFindings(firstRuleFindings);
     }
 
-    private BuildAttempt BuildOnce(ProjectUnit unit, bool underReview, IReadOnlyList<string> letThrough)
+    /// <summary>
+    /// Whether the build ended well without writing a log. That alone proves nothing: what the compile read is told by
+    /// the manifest the build wrote, and the kept log is used only when its key is made from that.
+    /// </summary>
+    private bool WasSkipped(BuildAttempt attempt)
+    {
+        return attempt.Result != null && !attempt.Result.TimedOut && attempt.Result.ExitCode == 0 && !_fileSystem.FileExists(attempt.LogPath);
+    }
+
+    private string? KeyOf(ProjectUnit unit, BuildAttempt attempt)
+    {
+        return _evidenceKey.Create(unit, ManifestPathOf(attempt.LogPath));
+    }
+
+    private static string ManifestPathOf(string logPath)
+    {
+        return Path.ChangeExtension(logPath, ".manifest");
+    }
+
+    private UnitOutcome JudgeKept(ProjectUnit unit, BuildAttempt attempt)
+    {
+        var key = KeyOf(unit, attempt);
+        var keptLogPath = key == null ? null : _keptEvidence.Find(unit.PartKeyIn(_treeFolder), key);
+        if(keptLogPath == null)
+            return UnitOutcome.NoEvidence("no log was kept for exactly what this compile reads");
+
+        var outcome = JudgeReviewed(unit, new ProcessResult(0, string.Empty, string.Empty), keptLogPath);
+        return outcome.Succeeded ? outcome.WithReason("taken from the result kept from its last compile, which read exactly what it reads now, so it was not compiled again") : outcome;
+    }
+
+    /// <summary>
+    /// Keeps the log of a compile that succeeded and whose closing entry matched its facts. Keeping is only a saving: a
+    /// file that cannot be written never fails a review.
+    /// </summary>
+    private UnitOutcome KeepWhenSucceeded(ProjectUnit unit, BuildAttempt attempt, UnitOutcome outcome)
+    {
+        if(!outcome.Succeeded || outcome.Facts == null)
+            return outcome;
+
+        try
+        {
+            var key = KeyOf(unit, attempt);
+            if(key != null)
+                _keptEvidence.Save(unit.PartKeyIn(_treeFolder), key, attempt.LogPath);
+        }
+        catch(Exception exception) when(exception is IOException || exception is UnauthorizedAccessException)
+        {
+            // the next review compiles again
+        }
+
+        return outcome;
+    }
+
+    private BuildAttempt BuildOnce(ProjectUnit unit, bool underReview, IReadOnlyList<string> letThrough, bool removeOutput)
     {
         _built++;
         var logPath = ToolchainPaths.Combine(_logFolder, $"{_built:000}-{Path.GetFileNameWithoutExtension(unit.Project.Path)}.{unit.Framework}.sarif");
         if(_fileSystem.FileExists(logPath))
             return BuildAttempt.Refused(UnitOutcome.NoEvidence("a log already existed at the path chosen for it, so it cannot count as evidence from this review"));
 
-        if(underReview && unit.IntermediateAssembly.Length > 0)
+        if(_fileSystem.FileExists(ManifestPathOf(logPath)))
+            return BuildAttempt.Refused(UnitOutcome.NoEvidence("a manifest already existed at the path chosen for it, so it cannot count as evidence from this review"));
+
+        if(underReview && removeOutput && unit.IntermediateAssembly.Length > 0)
         {
             if(!ToolchainPaths.IsUnder(ToolchainPaths.Normalize(_treeFolder), unit.IntermediateAssembly))
                 return BuildAttempt.Refused(UnitOutcome.NoEvidence("its project settings put the compiler output outside the private copy (" + unit.IntermediateAssembly + "), and nothing outside the copy is ever removed"));
@@ -88,7 +162,28 @@ internal sealed class UnitBuilder
 
         var result = _dotnet.Run(_treeFolder, CreateArguments(unit, logPath, letThrough), DotnetTimeLimits.Build);
 
-        return BuildAttempt.Ran(result, logPath);
+        return ForgetKeptWhenCompiled(unit, logPath) ?? BuildAttempt.Ran(result, logPath);
+    }
+
+    /// <summary>
+    /// A compile that ran, under review or not, overtakes what was kept for the unit: the kept log is removed before
+    /// anything else, so that a kept log always belongs to the newest compile. One that cannot be removed could be
+    /// mistaken for this compile by a later review, so the unit then has no evidence.
+    /// </summary>
+    private BuildAttempt? ForgetKeptWhenCompiled(ProjectUnit unit, string logPath)
+    {
+        if(!_fileSystem.FileExists(logPath))
+            return null;
+
+        try
+        {
+            _keptEvidence.Remove(unit.PartKeyIn(_treeFolder));
+            return null;
+        }
+        catch(Exception exception) when(exception is IOException || exception is UnauthorizedAccessException)
+        {
+            return BuildAttempt.Refused(UnitOutcome.NoEvidence("the result kept from its earlier compile could not be removed, so a later review could take it for this one: " + exception.Message));
+        }
     }
 
     private UnitOutcome Judge(ProjectUnit unit, bool underReview, BuildAttempt attempt)
@@ -118,6 +213,7 @@ internal sealed class UnitBuilder
         arguments.Add(BuildProperty.Argument("CustomAfterDirectoryBuildTargets", _targetsPath));
         arguments.Add(BuildProperty.Argument("CommitFenceLog", logPath));
         arguments.Add(BuildProperty.Argument("CommitFenceMeaning", _meaningPath));
+        arguments.Add(BuildProperty.Argument("CommitFenceManifest", ManifestPathOf(logPath)));
         if(unit.RepositoryAfterTargets.Length > 0)
             arguments.Add(BuildProperty.Argument("CommitFenceRepositoryTargets", unit.RepositoryAfterTargets));
 
@@ -146,9 +242,14 @@ internal sealed class UnitBuilder
         try
         {
             var run = _sarifReader.Read(logPath);
-            return Conclude(unit, result, _findingBuilder.Build(run, unit), run);
+            var findings = _findingBuilder.Build(run, unit);
+            var unplaced = findings.FirstOrDefault(finding => finding.File != null && Path.IsPathRooted(finding.File));
+            if(unplaced != null)
+                return UnitOutcome.NoEvidence($"the compiler reported {unplaced.RuleId} at {unplaced.File}, which is not inside the private copy ({_treeFolder}), so the finding cannot be placed in the repository and the log cannot be relied on");
+
+            return Conclude(unit, result, findings, run);
         }
-        catch(Exception exception) when(exception is JsonException || exception is IOException)
+        catch(Exception exception) when(exception is JsonException || exception is IOException || exception is UnauthorizedAccessException)
         {
             return UnitOutcome.NoEvidence("its log cannot be read: " + exception.Message);
         }

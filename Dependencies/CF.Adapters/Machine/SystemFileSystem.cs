@@ -8,6 +8,8 @@ namespace CF.Adapters.Machine;
 /// </summary>
 public sealed class SystemFileSystem : IFileSystem
 {
+    private const int _maxLinkDepth = 16;
+
     private static readonly UTF8Encoding _utf8WithoutMark = new UTF8Encoding(false);
 
     /// <inheritdoc />
@@ -89,6 +91,50 @@ public sealed class SystemFileSystem : IFileSystem
             var name = Path.GetFileName(child);
             if(!skippedFolderNames.Contains(name, StringComparer.OrdinalIgnoreCase))
                 Collect(child, extension, skippedFolderNames, found);
+        }
+    }
+
+    /// <inheritdoc />
+    public string ResolveRealPath(string path)
+    {
+        return ResolveRealPath(Path.GetFullPath(path), 0);
+    }
+
+    private static string ResolveRealPath(string fullPath, int depth)
+    {
+        // a link that points back at itself ends here, with the path as it is
+        if(OperatingSystem.IsWindows() || depth > _maxLinkDepth)
+            return fullPath;
+
+        var current = Path.GetPathRoot(fullPath) ?? string.Empty;
+        var parts = fullPath.Substring(current.Length).Split(Path.DirectorySeparatorChar, StringSplitOptions.RemoveEmptyEntries);
+        for(var index = 0; index < parts.Length; index++)
+        {
+            var next = Path.Combine(current, parts[index]);
+            var target = FindLinkTarget(next);
+            if(target == null)
+            {
+                current = next;
+                continue;
+            }
+
+            var rest = string.Join(Path.DirectorySeparatorChar, parts.Skip(index + 1));
+            return ResolveRealPath(Path.GetFullPath(Path.Combine(target, rest)), depth + 1);
+        }
+
+        return current;
+    }
+
+    private static string? FindLinkTarget(string path)
+    {
+        try
+        {
+            FileSystemInfo entry = Directory.Exists(path) ? new DirectoryInfo(path) : new FileInfo(path);
+            return entry.LinkTarget == null ? null : entry.ResolveLinkTarget(true)?.FullName;
+        }
+        catch(IOException)
+        {
+            return null;
         }
     }
 }

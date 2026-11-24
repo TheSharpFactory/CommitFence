@@ -6,7 +6,7 @@ namespace CF.App.Review;
 /// <summary>
 /// A file with findings, as one line with its tally that folds its findings.
 /// </summary>
-internal sealed partial class FileGroupViewModel : ObservableObject
+internal sealed partial class FileGroupViewModel : ReviewListItemViewModel
 {
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(SpokenName))]

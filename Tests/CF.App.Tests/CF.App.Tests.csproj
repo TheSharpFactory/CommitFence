@@ -1,0 +1,28 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <IsPackable>false</IsPackable>
+    <RootNamespace>CF.App.Tests</RootNamespace>
+    <!-- a test class has to be public, and the tests need no XML comment on each -->
+    <NoWarn>$(NoWarn);CS1591</NoWarn>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="18.11.0" />
+    <PackageReference Include="xunit.v3" Version="3.2.2" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="4.0.1" />
+    <PackageReference Include="Avalonia.Headless.XUnit" Version="12.1.6" />
+    <PackageReference Include="Avalonia.Skia" Version="12.1.6" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\App\CF.Cli\CF.Cli.csproj" />
+    <ProjectReference Include="..\..\App\CF.App\CF.App.csproj" />
+    <ProjectReference Include="..\..\Dependencies\CF.Composition\CF.Composition.csproj" />
+    <ProjectReference Include="..\..\Dependencies\CF.Core\CF.Core.csproj" />
+    <ProjectReference Include="..\..\Dependencies\CF.Adapters\CF.Adapters.csproj" />
+    <ProjectReference Include="..\..\Dependencies\CF.Languages.CSharp\CF.Languages.CSharp.csproj" />
+  </ItemGroup>
+
+</Project>

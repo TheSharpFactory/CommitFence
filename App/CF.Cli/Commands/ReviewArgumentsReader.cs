@@ -14,13 +14,16 @@ internal sealed class ReviewArgumentsReader
     private const string _baseOption = "--base";
     private const string _allOption = "--all";
     private const string _headOption = "--head";
+    private const string _formatOption = "--format";
+    private const string _textFormat = "text";
+    private const string _promptFormat = "prompt";
     private const string _prePushHook = "pre-push";
     private const string _defaultHead = "HEAD";
     private const int _hookValueCount = 3;
 
     private static readonly string[] _forms = { _filesOption, _stagedOption, _hookOption, _pushOption, _baseOption, _allOption };
 
-    private static readonly string[] _optionsWithValue = { _settingsOption, _baseOption, _headOption };
+    private static readonly string[] _optionsWithValue = { _settingsOption, _baseOption, _headOption, _formatOption };
 
     private readonly string[] _args;
     private int _position;
@@ -40,7 +43,11 @@ internal sealed class ReviewArgumentsReader
                 return ReviewArgumentsResult.Wrong(error);
         }
 
-        return Decide(given);
+        var decided = Decide(given);
+        if(decided.Arguments != null)
+            decided.Arguments.AsPrompt = given.Values.TryGetValue(_formatOption, out var format) && format == _promptFormat;
+
+        return decided;
     }
 
     private string? ReadCurrent(GivenArguments given)
@@ -89,6 +96,9 @@ internal sealed class ReviewArgumentsReader
 
     private static ReviewArgumentsResult Decide(GivenArguments given)
     {
+        if(given.Values.TryGetValue(_formatOption, out var format) && format != _textFormat && format != _promptFormat)
+            return ReviewArgumentsResult.Wrong($"--format knows two words: {_textFormat}, the default, and {_promptFormat}; '{format}' is not one of them.");
+
         var besideAll = FindWhatStandsBesideAll(given);
         if(besideAll != null)
             return ReviewArgumentsResult.Wrong(besideAll);

@@ -47,6 +47,13 @@
   </UserControl.DataTemplates>
 
   <UserControl.Styles>
+    <Style Selector="Grid#RowRoot">
+      <Setter Property="Margin" Value="12"/>
+    </Style>
+    <Style Selector="Grid#RowRoot.scoped">
+      <Setter Property="Margin" Value="12,12,12,8"/>
+    </Style>
+
 
     <!-- The container of every entry of the list: a row, a heading or a line of words. Rest: no background; under the pointer
          hover; pressed line; selected page with the raised shadow and a bar of here. The ring is a line of 2 inside the edge. -->
@@ -446,11 +453,9 @@
                 </Grid>
               </DataTemplate>
 
-              <!-- The row of a rule that .editorconfig sets: id, title, the file's setting as a fact (the mark and the word of its
-                   effect, or "Off in the file"), and the line of the file that sets it as a link. No control changes the rule:
-                   no arrow, no menu, no switch. The row has no second line, so it is 12 above and 12 below. -->
+              <!-- File rows grow to fit the narrower settings beneath the title. -->
               <DataTemplate DataType="local:FileRuleRowViewModel" x:DataType="local:FileRuleRowViewModel">
-                <Grid Name="RowRoot" Margin="12" ColumnDefinitions="56,*,96,64,Auto" AutomationProperties.Name="{Binding SpokenName}">
+                <Grid Name="RowRoot" Classes.scoped="{Binding HasExceptions}" RowDefinitions="Auto,Auto" ColumnDefinitions="56,*,96,64,Auto" AutomationProperties.Name="{Binding SpokenName}">
 
                   <TextBlock Grid.Column="0" Theme="{StaticResource code}" TextWrapping="NoWrap">
                     <Run Text="{Binding IdFamily}" FontWeight="SemiBold"/><Run Text="{Binding IdNumber}" Foreground="{DynamicResource ink-2}"/>
@@ -467,16 +472,44 @@
                     <TextBlock Theme="{StaticResource type-effect}" Text="{Binding EffectWord}"/>
                   </StackPanel>
 
-                  <StackPanel Grid.Column="2" Grid.ColumnSpan="2" Orientation="Horizontal" Spacing="6" Margin="16,3,0,0"
+                  <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="6" Margin="16,3,0,0"
                               VerticalAlignment="Top" IsVisible="{Binding IsOffInFile}" ToolTip.Tip="{Binding OffToolTip}">
                     <parts:EffectMark Classes="off" Kind="Off" Width="14" Height="14"/>
                     <TextBlock Theme="{StaticResource type-meta}" Foreground="{DynamicResource ink-2}" VerticalAlignment="Center"
-                               Text="Off in the file"/>
+                               Text="Off"/>
                   </StackPanel>
 
                   <TextBlock Grid.Column="2" Theme="{StaticResource type-meta}" Foreground="{DynamicResource ink-2}"
                              Margin="16,1,0,0" VerticalAlignment="Top" TextTrimming="CharacterEllipsis"
                              IsVisible="{Binding ShowsStateWord}" Text="{Binding StateWord}" ToolTip.Tip="{Binding StateToolTip}"/>
+
+                  <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="6" Margin="16,3,0,0"
+                              VerticalAlignment="Top" IsVisible="{Binding IsUnset}" ToolTip.Tip="{Binding UnsetTip}">
+                    <parts:EffectMark Classes="off" Kind="Unset" Width="14" Height="14"/>
+                    <TextBlock Theme="{StaticResource type-meta}" Foreground="{DynamicResource ink-2}" Text="Not set"/>
+                  </StackPanel>
+                  <ItemsControl Grid.Row="1" Grid.Column="1" Margin="12,4,0,0" IsVisible="{Binding HasExceptions}" ItemsSource="{Binding ExceptionLines}">
+                    <ItemsControl.ItemTemplate>
+                      <DataTemplate x:DataType="local:ExceptionLine">
+                        <Grid ColumnDefinitions="13,*" ColumnSpacing="5">
+                          <parts:EffectMark Kind="{Binding Kind}" Width="13" Height="13" Margin="0,3.5,0,0" VerticalAlignment="Top"
+                                            Shape="{DynamicResource ink-3}" Sign="{DynamicResource page}"/>
+                          <ItemsControl Grid.Column="1" ItemsSource="{Binding Parts}">
+                            <ItemsControl.ItemsPanel>
+                              <ItemsPanelTemplate><WrapPanel ItemSpacing="4"/></ItemsPanelTemplate>
+                            </ItemsControl.ItemsPanel>
+                            <ItemsControl.ItemTemplate>
+                              <DataTemplate x:DataType="local:ExceptionLocation">
+                                <TextBlock Theme="{StaticResource type-meta}" LineHeight="20" TextWrapping="Wrap" Foreground="{DynamicResource ink-2}">
+                                  <Run FontWeight="Medium" Text="{Binding Effect}"/><Run Text="{Binding Join}"/><Run FontFamily="Cascadia Mono, Consolas, Menlo, DejaVu Sans Mono, monospace" Text="{Binding Pattern}"/><Run Foreground="{DynamicResource ink-3}" Text="{Binding Location}"/>
+                                </TextBlock>
+                              </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                          </ItemsControl>
+                        </Grid>
+                      </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                  </ItemsControl>
 
                   <Button Grid.Column="3" Classes="linelink" Classes.ring="{Binding RingOnLine}" Width="72" Height="36"
                           HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,-8,0,-8"

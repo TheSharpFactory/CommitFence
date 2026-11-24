@@ -61,6 +61,11 @@ internal sealed class UpdateInstaller
     public TimeSpan ReviewsWaitLimit { get; set; } = TimeSpan.FromMinutes(2);
 
     /// <summary>
+    /// For tests: answers true for the name of a file whose move into place must fail. Nothing sets it in the program.
+    /// </summary>
+    internal Func<string, bool>? FailsMoveOf { get; set; }
+
+    /// <summary>
     /// Runs every step; throws UpdateException with a message for the user when one fails.
     /// </summary>
     public async Task RunAsync()
@@ -391,6 +396,9 @@ internal sealed class UpdateInstaller
                 }
 
                 done.Add(step);
+                if(FailsMoveOf != null && FailsMoveOf(name))
+                    throw new IOException($"{name} could not be moved.");
+
                 MoveEntry(step.NewPath, step.TargetPath);
                 step.MovedNew = true;
             }

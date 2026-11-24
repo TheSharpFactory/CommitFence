@@ -20,7 +20,8 @@ internal sealed partial class ReviewView : UserControl
     private const double _oneColumnMost = 760;
     private const double _twoColumnsMost = 1292;
     private const double _sheetTop = 24;
-    private const double _scrollBar = 12;
+    private const double _sheetBottom = 32;
+    private const double _wheelStep = 50;
     private const double _folderButtonLeast = 180;
     private const double _folderButtonMost = 320;
     private const double _blockMiddleAt = 0.4;
@@ -33,10 +34,12 @@ internal sealed partial class ReviewView : UserControl
         InitializeComponent();
         DataContextChanged += OnDataContextChanged;
         SizeChanged += (_, e) => ApplyLayout(e.NewSize.Width + _railWidth);
-        Scroller.ScrollChanged += (_, _) => KeepPanelInView();
+        Rows.AddHandler(ScrollViewer.ScrollChangedEvent, OnRowsScrolled);
+        SidePanel.SizeChanged += (_, _) => KeepPanelInView();
+        SidePanel.PointerWheelChanged += OnPanelWheel;
         EmptyBlock.SizeChanged += (_, _) => PlaceEmptyBlock();
         EmptyBlockBody.SizeChanged += (_, _) => PlaceEmptyBlock();
-        Files.AddHandler(KeyDownEvent, OnFileKeyDown, RoutingStrategies.Bubble);
+        Rows.AddHandler(KeyDownEvent, OnFileKeyDown, RoutingStrategies.Bubble);
         AddHandler(KeyDownEvent, OnEscape, RoutingStrategies.Bubble);
     }
 
@@ -73,14 +76,19 @@ internal sealed partial class ReviewView : UserControl
         {
             _model.FileRevealRequested -= OnFileRevealRequested;
             _model.OpenFileRequested -= OnOpenFileRequested;
+            _model.OpenLineRequested -= OnOpenLineRequested;
             _model.ChooseRequested -= OnChooseRequested;
         }
 
         _model = DataContext as ReviewViewModel;
         if(_model != null)
+            _model.Clipboard = new TopLevelClipboard(this);
+
+        if(_model != null)
         {
             _model.FileRevealRequested += OnFileRevealRequested;
             _model.OpenFileRequested += OnOpenFileRequested;
+            _model.OpenLineRequested += OnOpenLineRequested;
             _model.ChooseRequested += OnChooseRequested;
             _ = _model.RefreshAsync();
         }
@@ -96,16 +104,9 @@ internal sealed partial class ReviewView : UserControl
             _model.IsOnePane = !twoPanes;
 
         var side = twoPanes ? 32.0 : 24.0;
-        // the scroll bar of 12 stands in the right side, so that the columns stand where the layout expects them
-        Sheet.Padding = new Thickness(side, _sheetTop, side - _scrollBar, 32);
         ((Border)Bar.Parent!).Padding = new Thickness(side, 4, side, 12);
-        Frame.MaxWidth = twoPanes ? _twoColumnsMost : _oneColumnMost;
         Bar.MaxWidth = twoPanes ? _twoColumnsMost : _oneColumnMost;
-        Frame.ColumnDefinitions[1].Width = twoPanes ? new GridLength(32) : new GridLength(0);
-        Frame.ColumnDefinitions[2].Width = twoPanes ? new GridLength(340) : new GridLength(0);
         PlaceFolderButton(twoPanes);
-        SidePanel.IsVisible = twoPanes;
-        InlinePanel.IsVisible = !twoPanes;
     }
 
     /// <summary>
@@ -127,14 +128,48 @@ internal sealed partial class ReviewView : UserControl
         FolderButton.Margin = twoPanes ? new Thickness(0) : new Thickness(0, 8, 0, 0);
     }
 
+    /// <summary>
+    /// The scroll viewer of the list of rows: the first one under it (the ones in its rows come after).
+    /// </summary>
+    private ScrollViewer? Scroller
+    {
+        get
+        {
+            return field ??= Rows.GetVisualDescendants().OfType<ScrollViewer>().FirstOrDefault();
+        }
+    }
+
+    private void OnRowsScrolled(object? sender, ScrollChangedEventArgs e)
+    {
+        if(ReferenceEquals(e.Source, Scroller))
+            KeepPanelInView();
+    }
+
+    /// <summary>
+    /// The panel stands over the page, not in it: it keeps its place until the page's end comes up under it, and then it goes up with
+    /// the page (and so a panel higher than the room it has is seen to its end).
+    /// </summary>
     private void KeepPanelInView()
     {
-        if(!SidePanel.IsVisible)
+        if(Scroller == null || !SidePanel.IsEffectivelyVisible)
             return;
 
-        var most = Math.Max(0, Main.Bounds.Height - SidePanel.Bounds.Height);
-        var shift = Math.Clamp(Scroller.Offset.Y, 0, most);
+        var most = Math.Max(0, Scroller.Extent.Height - _sheetTop - _sheetBottom - SidePanel.Bounds.Height);
+        var shift = -Math.Max(0, Scroller.Offset.Y - most);
         SidePanel.RenderTransform = new TranslateTransform(0, shift);
+    }
+
+    /// <summary>
+    /// The wheel over the panel scrolls the page, as it did when the panel was a part of it.
+    /// </summary>
+    private void OnPanelWheel(object? sender, PointerWheelEventArgs e)
+    {
+        if(Scroller == null)
+            return;
+
+        var furthest = Math.Max(0, Scroller.Extent.Height - Scroller.Viewport.Height);
+        Scroller.Offset = new Vector(Scroller.Offset.X, Math.Clamp(Scroller.Offset.Y - (e.Delta.Y * _wheelStep), 0, furthest));
+        e.Handled = true;
     }
 
     private void OnFileRevealRequested(FileGroupViewModel group)
@@ -144,16 +179,28 @@ internal sealed partial class ReviewView : UserControl
 
     private void BringToTop(FileGroupViewModel group)
     {
-        if(_model == null || Scroller.Content is not Visual content)
+        if(_model == null || Scroller == null)
             return;
 
-        var index = _model.FileGroups.ToList().IndexOf(group);
-        if(index < 0 || Files.ContainerFromIndex(index) is not Control container)
+        var index = _model.Items.IndexOf(group);
+        if(index < 0)
             return;
 
-        var top = container.TranslatePoint(new Point(0, 0), content);
+        Rows.ScrollIntoView(index);
+        Rows.UpdateLayout();
+        if(Rows.ContainerFromIndex(index) is not Control container)
+            return;
+
+        var top = container.TranslatePoint(new Point(0, 0), Scroller);
         if(top != null)
-            Scroller.Offset = new Vector(0, Math.Max(0, top.Value.Y));
+            Scroller.Offset = new Vector(0, Math.Max(0, Scroller.Offset.Y + top.Value.Y));
+    }
+
+    private async void OnOpenLineRequested(string path, int line)
+    {
+        var launcher = TopLevel.GetTopLevel(this)?.Launcher;
+        if(launcher != null)
+            await Parts.SourceFileLauncher.OpenAsync(launcher, path, line);
     }
 
     private async void OnOpenFileRequested(string path)
@@ -197,7 +244,7 @@ internal sealed partial class ReviewView : UserControl
     public void FocusRunButton()
     {
         var button = RunButton.IsEffectivelyVisible ? RunButton : BlockRunButton;
-        button.Focus(Avalonia.Input.NavigationMethod.Tab);
+        button.Focus(NavigationMethod.Tab);
     }
 
     /// <summary>
@@ -218,6 +265,6 @@ internal sealed partial class ReviewView : UserControl
     /// </summary>
     public IReadOnlyList<Button> FileLineButtons()
     {
-        return Files.GetVisualDescendants().OfType<Button>().Where(button => button.Classes.Contains("fileline")).ToList();
+        return Rows.GetVisualDescendants().OfType<Button>().Where(button => button.Classes.Contains("fileline")).ToList();
     }
 }

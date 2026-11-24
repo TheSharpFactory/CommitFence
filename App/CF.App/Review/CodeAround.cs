@@ -1,4 +1,5 @@
 using CF.App.Rules.Page.Code;
+using CF.Core.Code;
 
 namespace CF.App.Review;
 
@@ -12,42 +13,12 @@ internal static class CodeAround
 
     public static IReadOnlyList<CodeLineViewModel> Cut(string content, int line)
     {
-        var starts = LineStarts(content);
-        if(line < 1 || line > starts.Count)
+        var cut = Excerpt.Around(content, line, _linesAround);
+        if(cut.Count == 0)
             return new List<CodeLineViewModel>();
 
         var tokens = CSharpTokens.Scan(content);
-        var first = Math.Max(1, line - _linesAround);
-        var last = Math.Min(starts.Count, line + _linesAround);
-        var lines = new List<CodeLineViewModel>();
-        for(var number = first; number <= last; number++)
-        {
-            var start = starts[number - 1];
-            var end = number < starts.Count ? starts[number] : content.Length;
-            lines.Add(new CodeLineViewModel(number, Segments(content, start, TrimEnd(content, start, end), tokens), number == line));
-        }
-
-        return lines;
-    }
-
-    private static List<int> LineStarts(string content)
-    {
-        var starts = new List<int> { 0 };
-        for(var index = 0; index < content.Length; index++)
-        {
-            if(content[index] == '\n')
-                starts.Add(index + 1);
-        }
-
-        return starts;
-    }
-
-    private static int TrimEnd(string content, int start, int end)
-    {
-        while(end > start && (content[end - 1] == '\n' || content[end - 1] == '\r'))
-            end--;
-
-        return end;
+        return cut.Select(excerpt => new CodeLineViewModel(excerpt.Number, Segments(content, excerpt.Start, excerpt.End, tokens), excerpt.Number == line)).ToList();
     }
 
     private static List<CodeSegment> Segments(string content, int start, int end, IReadOnlyList<CodeToken> tokens)

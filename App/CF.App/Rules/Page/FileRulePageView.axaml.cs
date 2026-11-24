@@ -1,5 +1,6 @@
 using Avalonia.Controls;
 using Avalonia.Input;
+using Avalonia.VisualTree;
 
 namespace CF.App.Rules.Page;
 
@@ -23,6 +24,9 @@ internal sealed partial class FileRulePageView : UserControl
     public void SetOnePane(bool onePane)
     {
         Classes.Set("onepane", onePane);
+        Grid.SetRow(StatePanel, onePane ? 1 : 0);
+        Grid.SetColumn(StatePanel, onePane ? 0 : 1);
+        Grid.SetColumnSpan(StatePanel, onePane ? 2 : 1);
     }
 
     private void Fit()
@@ -39,6 +43,6 @@ internal sealed partial class FileRulePageView : UserControl
     public void FocusEntry()
     {
         var back = this.FindControl<Button>("BackButton");
-        (back is { IsEffectivelyVisible: true } ? back : OpenAtLine).Focus(NavigationMethod.Tab);
+        (back is { IsEffectivelyVisible: true } ? back : this.GetVisualDescendants().OfType<Button>().FirstOrDefault(button => button.IsEffectivelyVisible))?.Focus(NavigationMethod.Tab);
     }
 }

@@ -39,7 +39,8 @@ internal sealed class FileRules
         try
         {
             var rule = Find(settingsPath, ruleId);
-            return rule == null ? null : new RuleChangeException($"{rule.Id} is set in {rule.File}, line {rule.Line}; the product does not change that file.");
+            var location = rule?.Line == null ? string.Empty : $", line {rule.Line}";
+            return rule == null ? null : new RuleChangeException($"{rule.Id} is set in {rule.File}{location}; the product does not change that file.");
         }
         catch(RuleChangeException)
         {

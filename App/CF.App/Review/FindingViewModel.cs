@@ -1,4 +1,6 @@
+using CF.Core.Code;
 using CF.Core.Findings;
+using CF.Core.Prompts;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 
@@ -8,8 +10,10 @@ namespace CF.App.Review;
 /// One finding under its file: the header (the effect, the message, the rule and its title, the line), and, when it is open,
 /// what the rule is to this push, its sentence, the lines around it and the way to the rule.
 /// </summary>
-internal sealed partial class FindingViewModel : ObservableObject
+internal sealed partial class FindingViewModel : ReviewListItemViewModel
 {
+    private readonly FileRulePlace? _place;
+    private readonly Action<int>? _openLine;
     private readonly Finding _finding;
     private readonly RuleInfo _rule;
     private readonly string? _content;
@@ -22,15 +26,24 @@ internal sealed partial class FindingViewModel : ObservableObject
     [NotifyPropertyChangedFor(nameof(HasCode))]
     public partial IReadOnlyList<CodeLineViewModel> Lines { get; set; } = new List<CodeLineViewModel>();
 
-    public FindingViewModel(Finding finding, RuleInfo rule, string? content, bool startsOpen, Action<string> openRule, bool isFolderReview)
+    public FindingViewModel(Finding finding, RuleInfo rule, string? content, bool startsOpen, Action<string> openRule, bool isFolderReview, Func<ITextClipboard?> clipboard, Action<int>? openLine = null)
     {
+        Copy = new CopyButtonViewModel("Copy as a prompt", () => AgentPrompt.ForFinding(finding, rule.Prompt, content), clipboard);
         IsFolderReview = isFolderReview;
         _finding = finding;
+        _openLine = openLine;
+        if(finding.Source == FindingSource.EditorConfig && finding.File != null)
+            _place = rule.FileRule?.ForPath(finding.File);
         _rule = rule;
         _content = content;
         _openRule = openRule;
         IsOpen = startsOpen;
     }
+
+    /// <summary>
+    /// The button that puts the prompt for this finding on the clipboard.
+    /// </summary>
+    public CopyButtonViewModel Copy { get; }
 
     public bool IsBlock
     {
@@ -141,10 +154,34 @@ internal sealed partial class FindingViewModel : ObservableObject
     {
         get
         {
-            if(IsFolderReview)
-                return _rule.Origin + (IsBlock ? ", where it blocks a push." : ", where it only warns.") + " It was already in the code, so it stops no push today.";
+            return SourcePrefix + SourceScope + SourceSuffix;
+        }
+    }
 
-            return _rule.Origin + (IsBlock ? ". It blocks this push." : ". It only warns, so it does not stop this push.");
+    public string SourcePrefix
+    {
+        get { return HasSetting ? _rule.Origin + ", set for " : _rule.Origin; }
+    }
+
+    public string SourceScope
+    {
+        get { return _place != null && _rule.FileRule != null ? _rule.FileRule.Scope(_place) : string.Empty; }
+    }
+
+    public bool IsScoped
+    {
+        get { return _place != null && _place != _rule.FileRule?.Main; }
+    }
+
+    public string SourceSuffix
+    {
+        get
+        {
+            var line = _place == null ? string.Empty : $" on line {_place.Line}";
+            if(IsFolderReview)
+                return line + (IsBlock ? ", where it blocks a push." : ", where it only warns.") + " It was already in the code, so it stops no push today.";
+
+            return line + (IsBlock ? ". It blocks this push." : ". It only warns, so it does not stop this push.");
         }
     }
 
@@ -170,6 +207,29 @@ internal sealed partial class FindingViewModel : ObservableObject
         {
             return Lines.Count > 0;
         }
+    }
+
+    public bool HasSetting
+    {
+        get
+        {
+            return _place != null;
+        }
+    }
+
+    public string OpenLineText
+    {
+        get
+        {
+            return $"Open .editorconfig at line {_place?.Line}";
+        }
+    }
+
+    [RelayCommand]
+    private void OpenLine()
+    {
+        if(_place != null)
+            _openLine?.Invoke(_place.Line);
     }
 
     public bool CanOpenRule

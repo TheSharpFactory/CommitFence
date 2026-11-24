@@ -124,6 +124,14 @@ internal sealed class MeaningFactReader
 
     private string RelativeFile(string path)
     {
-        return path.Length == 0 ? string.Empty : ToolchainPaths.RelativeTo(_treeFolder, path);
+        if(path.Length == 0)
+            return string.Empty;
+
+        // a file that is not inside the tree cannot be placed in the repository, and a fact about it must not be taken for one about no file
+        var relative = ToolchainPaths.RelativeTo(_treeFolder, path);
+        if(Path.IsPathRooted(relative))
+            throw new MeaningLogException($"the meaning analyzer named the file {path}, which is not inside the private copy ({_treeFolder}), so what it says about that file cannot be placed in the repository");
+
+        return relative;
     }
 }

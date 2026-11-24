@@ -58,4 +58,15 @@ public interface IFileSystem
     /// without entering the folders whose names are given.
     /// </summary>
     IReadOnlyList<string> FindFiles(string folder, string extension, IReadOnlyList<string> skippedFolderNames);
+
+    /// <summary>
+    /// The path with every symbolic link in it replaced by what it points to, so that the same folder has one name
+    /// however it is reached. A part of the path that does not exist is left as it is.
+    /// </summary>
+    /// <remarks>
+    /// A program started in a folder sees the folder under its real name, so the paths it writes into its logs use that
+    /// name. A path of ours that goes through a link (on macOS the temporary folder, /var, is one) must be turned into
+    /// the real one before it is compared with theirs.
+    /// </remarks>
+    string ResolveRealPath(string path);
 }

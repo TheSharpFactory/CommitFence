@@ -6,4 +6,10 @@
     <ProjectReference Include="..\CF.Adapters\CF.Adapters.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <!-- the tests reach the internal types -->
+    <InternalsVisibleTo Include="CF.Tests" />
+    <InternalsVisibleTo Include="CF.App.Tests" />
+  </ItemGroup>
+
 </Project>

@@ -19,7 +19,12 @@ internal static class FileRuleTextFormatter
             lines.Add(FormatHeading(listing));
 
         var idWidth = listing.Rules.Count == 0 ? 0 : listing.Rules.Max(rule => rule.Id.Length);
-        lines.AddRange(listing.Rules.Select(rule => FormatListLine(rule, idWidth)));
+        foreach(var rule in listing.Rules)
+        {
+            lines.Add(FormatListLine(rule, idWidth));
+            lines.AddRange(rule.ExceptionLines().Select(line => new string(' ', idWidth + 2) + char.ToLowerInvariant(line[0]) + line.Substring(1)));
+        }
+
         lines.AddRange(listing.Notes);
 
         return lines;
@@ -29,13 +34,24 @@ internal static class FileRuleTextFormatter
     {
         var builder = new StringBuilder();
         builder.AppendLine(rule.Title == null ? rule.Id : $"{rule.Id}  {rule.Title}");
-        AppendLine(builder, "setting", $"'{rule.Setting}'");
+        if(rule.Main != null)
+            AppendLine(builder, "setting", $"'{rule.Setting}'");
         if(rule.Severity != null)
             AppendLine(builder, "severity", FormatSeverity(rule.Severity.Value));
 
         AppendLine(builder, "status", FormatStatus(rule));
-        AppendLine(builder, "file", $"{rule.File}, line {rule.Line}");
+        AppendLine(builder, "file", rule.Line == null ? rule.File : $"{rule.File}, line {rule.Line}");
         AppendLine(builder, "source", $"set in {rule.File}; the product does not change that file");
+
+        if(rule.Exceptions.Count > 0)
+        {
+            var count = rule.Places.Count();
+            var scope = rule.Main == null ? ", for some files only" : string.Empty;
+            var order = count > 1 ? "; a later line overrides an earlier one" : string.Empty;
+            AppendLine(builder, "lines", $"{count} {(count == 1 ? "line sets" : "lines set")} this rule{scope}{order}");
+            foreach(var place in rule.Places)
+                builder.AppendLine($"            {place.Effect.ToLowerInvariant()} for {rule.Scope(place)}, line {place.Line} ('{place.Setting}')");
+        }
 
         return builder.ToString().TrimEnd();
     }
@@ -50,11 +66,15 @@ internal static class FileRuleTextFormatter
         var title = rule.Title == null ? string.Empty : rule.Title + "  ";
         var setting = rule.State == FileRuleState.NotUnderstood ? $"setting '{rule.Setting}', " : string.Empty;
 
-        return $"{rule.Id.PadRight(idWidth)}  {FormatState(rule),-14}  {FormatEffect(rule),-6}  {title}{setting}line {rule.Line}";
+        var location = rule.Line == null ? string.Empty : $"line {rule.Line}";
+        return $"{rule.Id.PadRight(idWidth)}  {FormatState(rule),-14}  {FormatEffect(rule),-6}  {title}{setting}{location}".TrimEnd();
     }
 
     private static string FormatState(FileRule rule)
     {
+        if(rule.Main == null)
+            return "not set";
+
         switch(rule.State)
         {
             case FileRuleState.On:
@@ -80,6 +100,13 @@ internal static class FileRuleTextFormatter
 
     private static string FormatStatus(FileRule rule)
     {
+        if(rule.Exceptions.Count > 0)
+        {
+            var effect = rule.Main?.Effect.ToLowerInvariant() ?? "not set";
+            var applied = rule.Main == null ? "applied by the build where set" : rule.State == FileRuleState.Off ? "not applied by the build" : "applied by the build";
+            return $"{effect} for all {rule.Language} files, {rule.ExceptionCount}, {applied}";
+        }
+
         switch(rule.State)
         {
             case FileRuleState.On:

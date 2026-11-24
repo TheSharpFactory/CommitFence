@@ -11,24 +11,31 @@ namespace CF.Cli.Commands;
 internal sealed class ReviewCommand
 {
     private readonly IReviewService _reviewService;
+    private readonly IRuleService _ruleService;
     private readonly TextWriter _output;
     private readonly string _settingsPath;
     private readonly string _currentFolder;
     private readonly IReadOnlyList<string> _files;
+    private readonly bool _asPrompt;
 
-    public ReviewCommand(IReviewService reviewService, CommandEnvironment environment, string settingsPath, IReadOnlyList<string> files)
+    public ReviewCommand(IReviewService reviewService, IRuleService ruleService, CommandEnvironment environment, string settingsPath, ReviewArguments arguments)
     {
         _reviewService = reviewService;
+        _ruleService = ruleService;
         _output = environment.Output;
         _settingsPath = settingsPath;
         _currentFolder = environment.CurrentFolder;
-        _files = files;
+        _files = arguments.Files;
+        _asPrompt = arguments.AsPrompt;
     }
 
     public ExitCode Run()
     {
         var result = _reviewService.ReviewFiles(_settingsPath, _files.Select(ToFileToReview).ToList());
-        new PlainTextReporter(_output, countByRule: false).Write(result);
+        if(_asPrompt)
+            new PromptReporter(_output, _ruleService, _settingsPath).Write(result);
+        else
+            new PlainTextReporter(_output, countByRule: false).Write(result);
 
         return result.ExitCode;
     }

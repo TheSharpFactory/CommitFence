@@ -27,10 +27,12 @@ internal sealed class CSharpToolchain : IToolchain
     private readonly ProjectEvaluator _evaluator;
     private readonly MeaningAnalyzerFile _analyzer;
     private readonly KeptAnswers _kept;
+    private readonly IDataFolder _dataFolder;
 
     public CSharpToolchain(IProcessRunner processRunner, IFileSystem fileSystem, IDataFolder dataFolder)
     {
         _fileSystem = fileSystem;
+        _dataFolder = dataFolder;
         _targets = new ToolchainTargets(fileSystem, dataFolder);
         _dotnet = new DotnetTool(processRunner);
         _finder = new ProjectFinder(fileSystem);
@@ -74,7 +76,7 @@ internal sealed class CSharpToolchain : IToolchain
         var report = new ToolchainReport();
         try
         {
-            RunInto(request, report);
+            RunInto(WithRealTree(request), report);
         }
         catch(Exception exception) when(exception is IOException || exception is UnauthorizedAccessException)
         {
@@ -84,6 +86,15 @@ internal sealed class CSharpToolchain : IToolchain
         }
 
         return report.ToResult();
+    }
+
+    /// <summary>
+    /// The request with the tree under the name the build will see it by: what the compiler writes into its logs is
+    /// compared with this folder, and a folder reached through a symbolic link is another text for the same place.
+    /// </summary>
+    private ToolchainRequest WithRealTree(ToolchainRequest request)
+    {
+        return new ToolchainRequest(request.Tree, _fileSystem.ResolveRealPath(request.TreeFolder), request.LogFolder, request.ChangedFiles, request.IsWholeReview);
     }
 
     private void RunInto(ToolchainRequest request, ToolchainReport report)
@@ -121,8 +132,28 @@ internal sealed class CSharpToolchain : IToolchain
             return;
 
         report.AddReadings(FileReadings.Find(graph, plan, request.TreeFolder, request.ChangedFiles));
-        Compile(request.TreeFolder, request.LogFolder, request.IsWholeReview, graph, plan, report);
+        Compile(request.TreeFolder, request.LogFolder, request.IsWholeReview, sdk.Version, graph, plan, report);
         KeepAnswers(request.Tree, request.TreeFolder, sdk.Version, report);
+        RemoveEvidenceOfGoneProjects(request.TreeFolder, graph);
+    }
+
+    /// <summary>
+    /// Removes what was kept for projects that no longer exist, when every project of the tree could be read: one that
+    /// could not be read may still be there.
+    /// </summary>
+    private void RemoveEvidenceOfGoneProjects(string treeFolder, UnitGraph graph)
+    {
+        if(graph.Evaluations.Any(evaluation => evaluation.Failure != null))
+            return;
+
+        try
+        {
+            new KeptEvidence(_fileSystem, _dataFolder, treeFolder).RemoveExcept(graph.Units.Select(unit => unit.PartKeyIn(treeFolder)));
+        }
+        catch(Exception exception) when(exception is IOException || exception is UnauthorizedAccessException)
+        {
+            // only a cleaning: the next review tries again
+        }
     }
 
     private static BuildPlan SelectPlan(UnitGraph graph, ToolchainRequest request)
@@ -139,8 +170,9 @@ internal sealed class CSharpToolchain : IToolchain
     /// Answers kept under the same key are used; otherwise the parts are built in the private copy, which already holds
     /// that tree. A tree that cannot be built gives answers with gaps.
     /// </remarks>
-    public MeaningAnswers AnswerFor(MeaningRequest request)
+    public MeaningAnswers AnswerFor(MeaningRequest requested)
     {
+        var request = new MeaningRequest(requested.Tree, _fileSystem.ResolveRealPath(requested.TreeFolder), requested.LogFolder, requested.Parts);
         var sdk = _sdkCheck.Check(request.TreeFolder);
         if(sdk.Problem != null)
             return MeaningAnswers.Missing(_languageId, sdk.Problem);
@@ -172,7 +204,7 @@ internal sealed class CSharpToolchain : IToolchain
         if(plan.Order.Count == 0)
             return;
 
-        Compile(request.TreeFolder, request.LogFolder, false, graph, plan, report);
+        Compile(request.TreeFolder, request.LogFolder, false, sdkVersion, graph, plan, report);
         KeepAnswers(request.Tree, request.TreeFolder, sdkVersion, report);
     }
 
@@ -204,12 +236,13 @@ internal sealed class CSharpToolchain : IToolchain
             report.AddCoverage(path, CoverageStatus.Failed, "not covered: no project compiles this file, so the build did not check it");
     }
 
-    private void Compile(string treeFolder, string logFolder, bool isWholeReview, UnitGraph graph, BuildPlan plan, ToolchainReport report)
+    private void Compile(string treeFolder, string logFolder, bool isWholeReview, string sdkVersion, UnitGraph graph, BuildPlan plan, ToolchainReport report)
     {
         var targetsPath = _targets.EnsureTargetsFile();
         var restorer = new PackageRestorer(_dotnet, _targets.EnsureEmptyPackageSource());
         var restoreFailures = restorer.Restore(plan, graph, treeFolder);
-        var builder = new UnitBuilder(_fileSystem, _dotnet, treeFolder, logFolder, targetsPath, _analyzer.Path, isWholeReview);
+        var evidenceKey = new EvidenceKey(_fileSystem, treeFolder, sdkVersion, _analyzer.Hash());
+        var builder = new UnitBuilder(_fileSystem, _dotnet, treeFolder, logFolder, targetsPath, _analyzer.Path, evidenceKey, new KeptEvidence(_fileSystem, _dataFolder, treeFolder), isWholeReview);
         new BuildWalker(builder, graph).Walk(plan, restoreFailures, report);
     }
 }

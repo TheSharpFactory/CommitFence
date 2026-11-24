@@ -31,7 +31,7 @@ internal static class UsageText
         "  commitfence review --base <revision> [--head <revision>]",
         "  commitfence review --all [<folder or project file>]",
         "rules list and rules show also cover the rules that .editorconfig sets; the product never changes that file.",
-        "Every rules command takes [--settings <path>]; review takes [--settings <path>]."
+        "Every rules command takes [--settings <path>]; review takes [--settings <path>] and [--format text|prompt]    (prompt prints what was found as text to hand to an AI coding agent)."
     };
 
     /// <summary>

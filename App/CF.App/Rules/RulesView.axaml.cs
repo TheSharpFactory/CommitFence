@@ -258,6 +258,7 @@ internal sealed partial class RulesView : UserControl
         if(_model != null)
         {
             _model.OpenFileRequested -= OnOpenFileRequested;
+            _model.OpenLineRequested -= OnOpenLineRequested;
             _model.PropertyChanged -= OnModelPropertyChanged;
             _model.Items.CollectionChanged -= OnItemsChanged;
             _model.FileRulesArrived -= WarmUp;
@@ -267,6 +268,7 @@ internal sealed partial class RulesView : UserControl
         if(_model != null)
         {
             _model.OpenFileRequested += OnOpenFileRequested;
+            _model.OpenLineRequested += OnOpenLineRequested;
             _model.PropertyChanged += OnModelPropertyChanged;
             _model.Items.CollectionChanged += OnItemsChanged;
             _model.FileRulesArrived += WarmUp;
@@ -279,6 +281,13 @@ internal sealed partial class RulesView : UserControl
     {
         if(e.PropertyName == nameof(RulesViewModel.ShowsPage) || e.PropertyName == nameof(RulesViewModel.ShowsFilePage) || e.PropertyName == nameof(RulesViewModel.CurrentPage) || e.PropertyName == nameof(RulesViewModel.IsOnePane))
             ApplyLayout();
+    }
+
+    private async void OnOpenLineRequested(string path, int line)
+    {
+        var launcher = TopLevel.GetTopLevel(this)?.Launcher;
+        if(launcher != null)
+            await SourceFileLauncher.OpenAsync(launcher, path, line);
     }
 
     private async void OnOpenFileRequested(string path)

@@ -5,162 +5,105 @@ using Xunit;
 namespace CF.Tests;
 
 /// <summary>
-/// A review and an update never overlap: a review holds the program's lock shared while it runs, an update takes it alone
-/// before it replaces the files, and each side tries again for a bounded time.
+/// A review and an update never overlap: a review holds the program's lock shared while it runs, an update takes it alone before it
+/// replaces the files, and each side gives up after a bounded time. The tests give a side no time at all to wait, so that none of
+/// them waits on the clock.
 /// </summary>
 public sealed class ProgramLockTests
 {
     private static readonly TimeSpan _long = TimeSpan.FromSeconds(30);
-    private static readonly TimeSpan _short = TimeSpan.FromMilliseconds(300);
 
     [Fact]
-    public void TwoReviewsHoldTheLockTogether()
+    public async Task ProgramSwapExcludesReviews()
     {
         using(var folder = new TestFolder())
         {
             var install = ReleaseFixtures.CreateInstall(folder.Path, PackageKind.CommandLine);
-            var programLock = new FileProgramLock(install, _short);
+            var program = Path.Combine(folder.Path, ReleaseFixtures.Program("commitfence"));
+            var programLock = new FileProgramLock(install, _long);
 
-            using(programLock.HoldForReview())
-            {
-                using(programLock.HoldForReview())
-                {
-                    Assert.True(File.Exists(ProgramLockFile.PathIn(folder.Path)));
-                }
-            }
-        }
-    }
-
-    [Fact]
-    public async Task AReviewWaitsForAnUpdateToFinishReplacingTheFiles()
-    {
-        using(var folder = new TestFolder())
-        {
-            var install = ReleaseFixtures.CreateInstall(folder.Path, PackageKind.CommandLine);
-            var swapping = await ProgramLockFile.TryHoldAloneAsync(folder.Path, _long, TestContext.Current.CancellationToken);
+            // reviews share the lock, so two run together; the swap needs it alone and gets it only when both have ended
+            var first = programLock.HoldForReview();
+            var second = programLock.HoldForReview();
+            Assert.True(File.Exists(ProgramLockFile.PathIn(folder.Path)));
+            Assert.Null(await ProgramLockFile.TryHoldAloneAsync(folder.Path, TimeSpan.Zero, TestContext.Current.CancellationToken));
+            first.Dispose();
+            Assert.Null(await ProgramLockFile.TryHoldAloneAsync(folder.Path, TimeSpan.Zero, TestContext.Current.CancellationToken));
+            second.Dispose();
+            var swapping = await ProgramLockFile.TryHoldAloneAsync(folder.Path, TimeSpan.Zero, TestContext.Current.CancellationToken);
             Assert.NotNull(swapping);
-            var release = Task.Run(async () =>
-            {
-                await Task.Delay(400, TestContext.Current.CancellationToken);
-                swapping.Dispose();
-            }, TestContext.Current.CancellationToken);
 
-            var started = DateTime.UtcNow;
-            using(new FileProgramLock(install, _long).HoldForReview())
+            // while the swap holds it a review gives up and says an update is why; after it, a review gets in
+            var error = Assert.Throws<TimeoutException>(() => new FileProgramLock(install, TimeSpan.Zero).HoldForReview());
+            Assert.Contains("update", error.Message, StringComparison.Ordinal);
+            swapping.Dispose();
+            using(new FileProgramLock(install, TimeSpan.Zero).HoldForReview())
             {
-                Assert.True(DateTime.UtcNow - started >= TimeSpan.FromMilliseconds(300));
+                Assert.True(File.Exists(ProgramLockFile.PathIn(folder.Path)));
             }
 
-            await release;
+            // the lock is a file of its own: the program is as it was
+            Assert.Equal("old cli", File.ReadAllText(program));
         }
     }
 
-    [Fact]
-    public async Task AReviewThatCannotHaveTheLockInTimeSaysSo()
-    {
-        using(var folder = new TestFolder())
-        {
-            var install = ReleaseFixtures.CreateInstall(folder.Path, PackageKind.CommandLine);
-            using(await ProgramLockFile.TryHoldAloneAsync(folder.Path, _long, TestContext.Current.CancellationToken))
-            {
-                var error = Assert.Throws<TimeoutException>(() => new FileProgramLock(install, _short).HoldForReview());
-
-                Assert.Contains("update", error.Message, StringComparison.Ordinal);
-            }
-        }
-    }
-
-    [Fact]
-    public void ACopyThatCannotBeUpdatedHoldsNothing()
-    {
-        using(var folder = new TestFolder())
-        {
-            var fromSource = new InstallLocation { Folder = folder.Path, Problem = "not a release" };
-
-            using(new FileProgramLock(fromSource, _short).HoldForReview())
-            {
-                Assert.False(File.Exists(ProgramLockFile.PathIn(folder.Path)));
-            }
-        }
-    }
-
-    [Fact]
-    public async Task AnUpdateWaitsForARunningReviewAndThenReplacesTheFiles()
+    [Theory]
+    [InlineData("the wait runs out")]
+    [InlineData("the update is cancelled")]
+    public async Task WaitingInstallerCanExitWithoutChanges(string how)
     {
         using(var folder = new TestFolder())
         {
             var install = ReleaseFixtures.CreateInstall(Path.Combine(folder.Path, "program"), PackageKind.CommandLine);
             var feed = new LocalFeed(Path.Combine(folder.Path, "feed"));
             var release = ReleaseFixtures.PublishPackage(feed, "commitfence-cli-test.zip", PackageKind.CommandLine, null);
-            var review = new FileProgramLock(install, _long).HoldForReview();
-            var cliPath = Path.Combine(install.Folder, ReleaseFixtures.Program("commitfence"));
+            var before = ReleaseFixtures.Snapshot(install.Folder);
             var steps = new RecordingProgress();
+            var downloaded = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
 
-            var update = ReleaseFixtures.CreateInstaller(feed, release, install, steps, null).RunAsync();
-            await Task.Delay(700, TestContext.Current.CancellationToken);
-
-            // the review is still running: nothing was replaced, and the update has not reached the swap
-            Assert.False(update.IsCompleted);
-            Assert.Equal("old cli", File.ReadAllText(cliPath));
-            Assert.DoesNotContain(UpdateStage.Replacing, steps.Stages);
-
-            review.Dispose();
-            await update;
-
-            Assert.Equal("new cli", File.ReadAllText(cliPath));
-        }
-    }
-
-    [Fact]
-    public async Task AnUpdateThatTheReviewsOutlastLeavesTheProgramAsItWas()
-    {
-        using(var folder = new TestFolder())
-        {
-            var install = ReleaseFixtures.CreateInstall(Path.Combine(folder.Path, "program"), PackageKind.CommandLine);
-            var feed = new LocalFeed(Path.Combine(folder.Path, "feed"));
-            var release = ReleaseFixtures.PublishPackage(feed, "commitfence-cli-test.zip", PackageKind.CommandLine, null);
-            var before = ReleaseFixtures.ListFolder(install.Folder);
-
-            using(new FileProgramLock(install, _long).HoldForReview())
-            {
-                var installer = ReleaseFixtures.CreateInstaller(feed, release, install, null, null);
-                installer.ReviewsWaitLimit = _short;
-
-                var error = await Assert.ThrowsAsync<UpdateException>(installer.RunAsync);
-
-                Assert.Contains("review is still running", error.Message, StringComparison.Ordinal);
-                Assert.EndsWith("Nothing was changed.", error.Message, StringComparison.Ordinal);
-            }
-
-            // the lock file is the only thing that appeared beside the program
-            var after = ReleaseFixtures.ListFolder(install.Folder);
-            Assert.Equal(before.Append(ProgramLockFile.FileName).Order(StringComparer.Ordinal).ToList(), after);
-            Assert.Equal("old cli", File.ReadAllText(Path.Combine(install.Folder, ReleaseFixtures.Program("commitfence"))));
-        }
-    }
-
-    [Fact]
-    public async Task CancelEndsTheWaitForARunningReview()
-    {
-        using(var folder = new TestFolder())
-        {
-            var install = ReleaseFixtures.CreateInstall(Path.Combine(folder.Path, "program"), PackageKind.CommandLine);
-            var feed = new LocalFeed(Path.Combine(folder.Path, "feed"));
-            var release = ReleaseFixtures.PublishPackage(feed, "commitfence-cli-test.zip", PackageKind.CommandLine, null);
-
-            using(new FileProgramLock(install, _long).HoldForReview())
+            // a review is running, so the update has to wait for it
+            var review = new FileProgramLock(install, _long).HoldForReview();
+            try
             {
                 using(var cancellation = new UpdateCancellation())
                 {
-                    var update = ReleaseFixtures.CreateInstaller(feed, release, install, null, cancellation).RunAsync();
-                    await Task.Delay(500, TestContext.Current.CancellationToken);
-                    Assert.True(cancellation.TryCancel());
-
-                    await Assert.ThrowsAnyAsync<OperationCanceledException>(() => update);
+                    var progress = new ReactingProgress(value =>
+                    {
+                        steps.Report(value);
+                        if(value.Percent >= 100)
+                            downloaded.TrySetResult();
+                    });
+                    var installer = ReleaseFixtures.CreateInstaller(feed, release, install, progress, cancellation);
+                    if(how == "the wait runs out")
+                    {
+                        installer.ReviewsWaitLimit = TimeSpan.Zero;
+                        var error = await Assert.ThrowsAsync<UpdateException>(installer.RunAsync);
+                        Assert.Contains("review is still running", error.Message, StringComparison.Ordinal);
+                        Assert.EndsWith("Nothing was changed.", error.Message, StringComparison.Ordinal);
+                    }
+                    else
+                    {
+                        var update = installer.RunAsync();
+                        await downloaded.Task;
+                        Assert.True(cancellation.TryCancel());
+                        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => update);
+                    }
                 }
             }
+            finally
+            {
+                review.Dispose();
+            }
 
-            Assert.Equal("old cli", File.ReadAllText(Path.Combine(install.Folder, ReleaseFixtures.Program("commitfence"))));
+            // neither ended in the swap; the program is as it was and the lock is free
+            Assert.DoesNotContain(UpdateStage.Replacing, steps.Stages);
+            var after = ReleaseFixtures.Snapshot(install.Folder);
+            Assert.Equal(before.Keys.Append(ProgramLockFile.FileName).Order(StringComparer.Ordinal), after.Keys.Order(StringComparer.Ordinal));
+            Assert.All(before, file => Assert.Equal(file.Value, after[file.Key]));
+            using(await ProgramLockFile.TryHoldAloneAsync(install.Folder, TimeSpan.Zero, TestContext.Current.CancellationToken) ?? throw new InvalidOperationException("the lock was not free"))
+            {
+                Assert.False(Directory.Exists(Path.Combine(install.Folder, UpdateInstaller.StagingFolderName)));
+            }
         }
     }
 }

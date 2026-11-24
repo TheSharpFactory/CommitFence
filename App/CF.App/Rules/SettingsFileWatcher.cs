@@ -6,7 +6,7 @@ namespace CF.App.Rules;
 /// Says when the settings file changes on disk, so that a change made by the command line shows in the list without a
 /// restart. It only watches: nothing here reads or writes the file.
 /// </summary>
-internal sealed class SettingsFileWatcher : IDisposable
+internal sealed class SettingsFileWatcher : ISettingsChangeSource
 {
     private static readonly TimeSpan _quietTime = TimeSpan.FromMilliseconds(150);
 

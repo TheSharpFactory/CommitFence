@@ -12,13 +12,18 @@
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="18.11.0" />
     <PackageReference Include="xunit.v3" Version="3.2.2" />
     <PackageReference Include="xunit.runner.visualstudio" Version="4.0.1" />
+    <!-- the compiler the meaning tests drive in memory: the version the C# plug-in already uses -->
+    <PackageReference Include="Microsoft.CodeAnalysis.CSharp" Version="5.12.0" />
   </ItemGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\..\App\CF.Cli\CF.Cli.csproj" />
-    <ProjectReference Include="..\..\App\CF.App\CF.App.csproj" />
     <ProjectReference Include="..\..\Dependencies\CF.Adapters\CF.Adapters.csproj" />
     <ProjectReference Include="..\..\Dependencies\CF.Core\CF.Core.csproj" />
+    <ProjectReference Include="..\..\Dependencies\CF.Languages.CSharp\CF.Languages.CSharp.csproj" />
+    <ProjectReference Include="..\..\Dependencies\CF.Composition\CF.Composition.csproj" />
+    <!-- the analyzer the team's compiler loads: the meaning tests run it over code compiled in memory -->
+    <ProjectReference Include="..\..\Dependencies\CF.Meaning\CF.Meaning.csproj" />
   </ItemGroup>
 
 </Project>

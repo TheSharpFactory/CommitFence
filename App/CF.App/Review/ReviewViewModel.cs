@@ -1,7 +1,9 @@
+using System.Collections.ObjectModel;
 using System.Globalization;
 using CF.Core.Changes;
 using CF.Core.Findings;
 using CF.Core.Ports;
+using CF.Core.Prompts;
 using CF.Core.Review;
 using CF.Core.Rules.Settings;
 using CF.Core.Services;
@@ -27,6 +29,10 @@ internal sealed partial class ReviewViewModel : ObservableObject
     private const string _noFolderYet = "No folder reviewed yet";
     private const string _noFolderLead = "It is read as the last commit holds it, old findings included.";
 
+    private readonly ReviewHeadViewModel _head;
+    private readonly ReviewTailViewModel _tail;
+    private bool _itemsPaused;
+
     private readonly IReviewService _review;
     private readonly IRuleService _rules;
     private readonly IClock _clock;
@@ -44,7 +50,7 @@ internal sealed partial class ReviewViewModel : ObservableObject
     private int _generation;
 
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(ShowsEmptyBlock), nameof(ShowsRulesLine), nameof(ShowsBarRun), nameof(RunIsMain), nameof(RunIsSecond))]
+    [NotifyPropertyChangedFor(nameof(ShowsEmptyBlock), nameof(ShowsRulesLine), nameof(ShowsBarRun), nameof(RunIsMain), nameof(RunIsSecond), nameof(CanCopyAll))]
     public partial VerdictViewModel Verdict { get; set; }
 
     [ObservableProperty]
@@ -52,6 +58,7 @@ internal sealed partial class ReviewViewModel : ObservableObject
     public partial bool IsBusy { get; set; }
 
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(CanCopyAll))]
     public partial bool HasResult { get; set; }
 
     [ObservableProperty]
@@ -134,7 +141,7 @@ internal sealed partial class ReviewViewModel : ObservableObject
     public partial string RulesHead { get; set; } = string.Empty;
 
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(HasChosenRule))]
+    [NotifyPropertyChangedFor(nameof(HasChosenRule), nameof(CanCopyAll))]
     public partial string? ChosenRule { get; set; }
 
     [ObservableProperty]
@@ -163,6 +170,11 @@ internal sealed partial class ReviewViewModel : ObservableObject
         _clock = clock;
         _folder = folder;
         _showRule = showRule;
+        CopyAll = new CopyButtonViewModel("Copy all as a prompt", BuildAllPrompt, () => Clipboard);
+        _head = new ReviewHeadViewModel(this);
+        _tail = new ReviewTailViewModel(this);
+        Items.Add(_head);
+        Items.Add(_tail);
         Choices = new List<ReviewChoiceViewModel>
         {
             new ReviewChoiceViewModel("The changes", "branch", true),
@@ -174,6 +186,11 @@ internal sealed partial class ReviewViewModel : ObservableObject
     }
 
     /// <summary>
+    /// The page as one flat list: the head, then each file's line followed by its findings while it is open, then the tail.
+    /// </summary>
+    public ObservableCollection<ReviewListItemViewModel> Items { get; } = new ObservableCollection<ReviewListItemViewModel>();
+
+    /// <summary>
     /// Raised when a file of the panel asks to be brought to the top of the sheet.
     /// </summary>
     public event Action<FileGroupViewModel>? FileRevealRequested;
@@ -183,11 +200,40 @@ internal sealed partial class ReviewViewModel : ObservableObject
     /// </summary>
     public event Action<string>? OpenFileRequested;
 
+    public event Action<string, int>? OpenLineRequested;
+
+    private void OpenConfigLine(int line)
+    {
+        var folder = Path.GetDirectoryName(_folder.SettingsPath) ?? string.Empty;
+        OpenLineRequested?.Invoke(Path.Combine(folder, ".editorconfig"), line);
+    }
+
     /// <summary>
     /// Raised when the picker asks for the system's own dialog: true for a folder, false for a project file. The view answers with
     /// <see cref="UseTarget" />.
     /// </summary>
     public event Action<bool>? ChooseRequested;
+
+    /// <summary>
+    /// Where the copy buttons put their text: the window gives the system's clipboard.
+    /// </summary>
+    public ITextClipboard? Clipboard { get; set; }
+
+    /// <summary>
+    /// The button of the verdict's first line: the prompt for the review as shown.
+    /// </summary>
+    public CopyButtonViewModel CopyAll { get; }
+
+    /// <summary>
+    /// Whether the review as shown has findings to hand over.
+    /// </summary>
+    public bool CanCopyAll
+    {
+        get
+        {
+            return HasResult && FindingsShown().Count > 0;
+        }
+    }
 
     public IReadOnlyList<ReviewChoiceViewModel> Choices { get; }
 
@@ -622,8 +668,12 @@ internal sealed partial class ReviewViewModel : ObservableObject
     private void ToggleAll()
     {
         var open = !FileGroups.Any(group => group.IsOpen);
+        _itemsPaused = true;
         foreach(var group in FileGroups)
             group.IsOpen = open;
+
+        _itemsPaused = false;
+        SyncItems();
     }
 
     [RelayCommand]
@@ -785,6 +835,7 @@ internal sealed partial class ReviewViewModel : ObservableObject
         _startsOpen = state.StartsOpen;
         SetReasons(state.Reasons, state.ReasonsLine, state.AllReasonsShown);
         SetCleanPush(state.CleanPushFiles, state.CleanPushLine, state.CleanPushMore);
+        OnPropertyChanged(nameof(CanCopyAll));
     }
 
     private void Blank(bool isFolder)
@@ -809,6 +860,7 @@ internal sealed partial class ReviewViewModel : ObservableObject
         _resultLabel = string.Empty;
         SetReasons(new List<ReasonViewModel>(), string.Empty, false);
         SetCleanPush(new List<string>(), string.Empty, string.Empty);
+        OnPropertyChanged(nameof(CanCopyAll));
     }
 
     private void SetReasons(IReadOnlyList<ReasonViewModel> reasons, string line, bool all)
@@ -877,9 +929,9 @@ internal sealed partial class ReviewViewModel : ObservableObject
         {
             var isTeam = finding.Source is FindingSource.CodeRule or FindingSource.StructureRule;
             if(isTeam && team.TryGetValue(finding.RuleId, out var definition))
-                infos[finding.RuleId] = new RuleInfo(finding.Source, definition.Title, true, SentencePieceViewModel.Of(definition));
+                infos[finding.RuleId] = new RuleInfo(finding.Source, definition.Title, true, SentencePieceViewModel.Of(definition), PromptRule.Of(definition));
             else if(!isTeam && file.TryGetValue(finding.RuleId, out var fileRule))
-                infos[finding.RuleId] = new RuleInfo(finding.Source, fileRule.Title ?? string.Empty, true, null);
+                infos[finding.RuleId] = new RuleInfo(finding.Source, fileRule.Title ?? string.Empty, true, null, PromptRule.Of(fileRule), fileRule);
             else
                 infos[finding.RuleId] = new RuleInfo(finding.Source, string.Empty, false, null);
         }
@@ -972,7 +1024,14 @@ internal sealed partial class ReviewViewModel : ObservableObject
     private void SetFiles(List<FileGroupViewModel> groups)
     {
         foreach(var group in groups)
-            group.PropertyChanged += (_, _) => UpdateOpenAllText();
+        {
+            group.PropertyChanged += (_, e) =>
+            {
+                UpdateOpenAllText();
+                if(e.PropertyName == nameof(FileGroupViewModel.IsOpen) && !_itemsPaused)
+                    SyncItems();
+            };
+        }
 
         FileGroups = groups;
         UpdateOpenAllText();
@@ -984,11 +1043,28 @@ internal sealed partial class ReviewViewModel : ObservableObject
         var findings = onlyRule == null ? result.Findings : result.Findings.Where(finding => finding.RuleId == onlyRule).ToList();
         foreach(var byFile in findings.GroupBy(finding => finding.File ?? "(no file)", StringComparer.Ordinal))
         {
-            var models = byFile.Select(finding => new FindingViewModel(finding, rules[finding.RuleId], ContentOf(result, finding), _startsOpen && finding.Severity == Severity.Block, _showRule, isFolder)).ToList();
+            var models = byFile.Select(finding => new FindingViewModel(finding, rules[finding.RuleId], ContentOf(result, finding), _startsOpen && finding.Severity == Severity.Block, _showRule, isFolder, () => Clipboard, OpenConfigLine)).ToList();
             groups.Add(new FileGroupViewModel(byFile.Key, models, _startsOpen));
         }
 
         return groups.OrderByDescending(group => group.Total).ThenBy(group => group.Path, StringComparer.Ordinal).ToList();
+    }
+
+    /// <summary>
+    /// The findings the page shows: all of them, or the rule's own while a rule is chosen in a folder review.
+    /// </summary>
+    private IReadOnlyList<Finding> FindingsShown()
+    {
+        if(_result == null)
+            return new List<Finding>();
+
+        return ChosenRule == null ? _result.Findings : _result.Findings.Where(finding => finding.RuleId == ChosenRule).ToList();
+    }
+
+    private string BuildAllPrompt()
+    {
+        var rules = _ruleInfos.Where(entry => entry.Value.Prompt != null).ToDictionary(entry => entry.Key, entry => entry.Value.Prompt!, StringComparer.Ordinal);
+        return AgentPrompt.ForReview(FindingsShown(), _result?.Sources ?? new Dictionary<string, string>(), rules, _result?.Outcome == ReviewOutcome.Incomplete);
     }
 
     private static string? ContentOf(ReviewResult result, Finding finding)
@@ -1059,7 +1135,7 @@ internal sealed partial class ReviewViewModel : ObservableObject
         var rows = new List<RuleRowViewModel>();
         foreach(var count in counts)
         {
-            var isBlock = result.Findings.First(finding => finding.RuleId == count.RuleId).Severity == Severity.Block;
+            var isBlock = result.Findings.Any(finding => finding.RuleId == count.RuleId && finding.Severity == Severity.Block);
             var title = rules.TryGetValue(count.RuleId, out var info) && info.Title.Length > 0 ? info.Title : count.RuleId;
             rows.Add(new RuleRowViewModel(count.RuleId, title, count.Count, isBlock, (double)count.Count / most, hasBars, ChooseRule));
         }
@@ -1121,6 +1197,52 @@ internal sealed partial class ReviewViewModel : ObservableObject
     {
         group.IsOpen = true;
         FileRevealRequested?.Invoke(group);
+    }
+
+    partial void OnFileGroupsChanged(IReadOnlyList<FileGroupViewModel> value)
+    {
+        SyncItems();
+    }
+
+    /// <summary>
+    /// Makes the list the page shows match the files: the rows that stay are kept (and so are their controls), the others come and go.
+    /// </summary>
+    private void SyncItems()
+    {
+        var desired = new List<ReviewListItemViewModel>(FileGroups.Count + 2) { _head };
+        foreach(var group in FileGroups)
+        {
+            desired.Add(group);
+            if(group.IsOpen)
+                desired.AddRange(group.Findings);
+        }
+
+        desired.Add(_tail);
+        for(var index = 0; index < desired.Count; index++)
+        {
+            if(index < Items.Count && ReferenceEquals(Items[index], desired[index]))
+                continue;
+
+            var existing = IndexOfFrom(desired[index], index + 1);
+            if(existing > index)
+                Items.Move(existing, index);
+            else
+                Items.Insert(index, desired[index]);
+        }
+
+        while(Items.Count > desired.Count)
+            Items.RemoveAt(Items.Count - 1);
+    }
+
+    private int IndexOfFrom(ReviewListItemViewModel item, int start)
+    {
+        for(var index = start; index < Items.Count; index++)
+        {
+            if(ReferenceEquals(Items[index], item))
+                return index;
+        }
+
+        return -1;
     }
 
     private void UpdateOpenAllText()

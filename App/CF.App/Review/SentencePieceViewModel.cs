@@ -75,7 +75,7 @@ internal sealed class SentencePieceViewModel
     }
 
     /// <summary>
-    /// The piece as plain words, for a screen reader and for the checks.
+    /// The piece as plain words, for a screen reader and for the tests.
     /// </summary>
     public string Spoken
     {

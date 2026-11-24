@@ -117,10 +117,10 @@ internal sealed class CommandRunner
     private ExitCode RunReviewCommand(ReviewArguments arguments, string settingsPath)
     {
         if(arguments.Mode == ReviewMode.Files)
-            return new ReviewCommand(_reviewService, _environment, settingsPath, arguments.Files).Run();
+            return new ReviewCommand(_reviewService, _ruleService, _environment, settingsPath, arguments).Run();
 
         var givenPath = arguments.SettingsPath == null ? null : settingsPath;
-        return new ChangesReviewCommand(_productInfo, _reviewService, _environment, givenPath, arguments).Run();
+        return new ChangesReviewCommand(_productInfo, _reviewService, _ruleService, _environment, givenPath, arguments).Run();
     }
 
     private static bool IsSettingsReadFromTree(ReviewArguments arguments)

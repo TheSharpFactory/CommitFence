@@ -14,7 +14,7 @@ internal sealed partial class FileRuleRowViewModel : RuleListItemViewModel
 {
     private const string _fileName = ".editorconfig";
 
-    private readonly Action _openFile;
+    private readonly Action<int> _openFile;
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(RingOnRow), nameof(RingOnLine))]
@@ -24,7 +24,7 @@ internal sealed partial class FileRuleRowViewModel : RuleListItemViewModel
     [NotifyPropertyChangedFor(nameof(RingOnRow), nameof(RingOnLine))]
     public partial bool IsRingVisible { get; set; }
 
-    public FileRuleRowViewModel(FileRule rule, Action openFile)
+    public FileRuleRowViewModel(FileRule rule, Action<int> openFile)
     {
         _openFile = openFile;
         Rule = rule;
@@ -42,6 +42,35 @@ internal sealed partial class FileRuleRowViewModel : RuleListItemViewModel
     public string IdFamily { get; }
 
     public string IdNumber { get; }
+
+    public bool HasExceptions
+    {
+        get { return Rule.Exceptions.Count > 0; }
+    }
+
+    public bool IsUnset
+    {
+        get
+        {
+            return Rule.Main == null;
+        }
+    }
+
+    public string UnsetTip
+    {
+        get
+        {
+            return $"Not set for all {Rule.Language} files in {_fileName}, so the rule's own default holds for them. Change it in the file.";
+        }
+    }
+
+    public IEnumerable<ExceptionLine> ExceptionLines
+    {
+        get
+        {
+            return Rule.ExceptionGroups().Select(group => new ExceptionLine(group));
+        }
+    }
 
     public string Title
     {
@@ -81,7 +110,7 @@ internal sealed partial class FileRuleRowViewModel : RuleListItemViewModel
     {
         get
         {
-            return Rule.State == FileRuleState.OwnDefault || Rule.State == FileRuleState.NotUnderstood;
+            return Rule.Main != null && (Rule.State == FileRuleState.OwnDefault || Rule.State == FileRuleState.NotUnderstood);
         }
     }
 
@@ -146,7 +175,7 @@ internal sealed partial class FileRuleRowViewModel : RuleListItemViewModel
     {
         get
         {
-            return !IsOffInFile;
+            return Rule.Line != null;
         }
     }
 
@@ -181,7 +210,7 @@ internal sealed partial class FileRuleRowViewModel : RuleListItemViewModel
     {
         get
         {
-            return $"Off in {_fileName}: {Rule.Setting}, on line {Rule.Line}. Change it in the file.";
+            return $"Off for all {Rule.Language} files: {Rule.Setting}, on line {Rule.Line} of {_fileName}. Change it in the file.";
         }
     }
 
@@ -214,11 +243,14 @@ internal sealed partial class FileRuleRowViewModel : RuleListItemViewModel
     /// <summary>
     /// What a screen reader says for the whole row.
     /// </summary>
-    public string SpokenName
+    private string MainSpokenName
     {
         get
         {
             var title = Rule.Title == null ? string.Empty : $", {Rule.Title}";
+            if(IsUnset)
+                return $"{Id}{title}. From {_fileName}, on and off set in the file. Not set for all {Rule.Language} files.";
+
             if(IsOffInFile)
                 return $"{Id}{title}. From {_fileName}, on and off set in the file. Off in the file.";
 
@@ -226,6 +258,20 @@ internal sealed partial class FileRuleRowViewModel : RuleListItemViewModel
                 return $"{Id}{title}. From {_fileName}, on and off set in the file. {StateWord}. Set on line {Rule.Line} of {_fileName}.";
 
             return $"{Id}{title}. From {_fileName}, on and off set in the file. On. {(Rule.Severity == Severity.Block ? "Blocks a push" : "Only warns")}. Set on line {Rule.Line} of {_fileName}.";
+        }
+    }
+
+    public string SpokenName
+    {
+        get
+        {
+            if(Rule.Exceptions.Count == 0)
+                return MainSpokenName;
+
+            var summary = Rule.ExceptionLines().Select(line => line.Replace("Blocks for ", "it blocks a push for ", StringComparison.Ordinal)
+                .Replace("Warns for ", "it only warns for ", StringComparison.Ordinal).Replace("Off for ", "it is off for ", StringComparison.Ordinal));
+            var count = Rule.Exceptions.Count;
+            return $"{MainSpokenName} Set {(IsUnset ? "only" : "differently")} for {count} {(count == 1 ? "pattern" : "patterns")}: {string.Join("; ", summary)}.";
         }
     }
 
@@ -252,7 +298,8 @@ internal sealed partial class FileRuleRowViewModel : RuleListItemViewModel
     [RelayCommand]
     private void OpenFile()
     {
-        _openFile();
+        if(Rule.Line is int line)
+            _openFile(line);
     }
 
     private static (string Family, string Number) SplitId(string id)

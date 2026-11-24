@@ -27,7 +27,7 @@ internal sealed class BuildWalker
         foreach(var unit in plan.Order)
         {
             var underReview = plan.ReviewedKeys.Contains(unit.Key);
-            var outcome = FindReasonNotToBuild(unit, succeeded, restoreFailures) ?? _builder.Build(unit, underReview);
+            var outcome = FindReasonNotToBuild(unit, succeeded, restoreFailures) ?? _builder.Build(unit, underReview, plan.OwnerKeys.Contains(unit.Key));
             if(outcome.Succeeded)
                 succeeded.Add(unit.Key);
 

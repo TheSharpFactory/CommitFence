@@ -32,11 +32,11 @@ internal sealed partial class RulesViewModel : ObservableObject, IRuleChanges, I
     private readonly RuleCatalog _catalog;
     private readonly DispatcherTimer _undoTimer;
     private readonly Dictionary<string, RulePageViewModel> _pages = new Dictionary<string, RulePageViewModel>();
-    private readonly SettingsFileWatcher? _watcher;
+    private readonly ISettingsChangeSource? _watcher;
     private readonly Dictionary<string, TeamRuleRowViewModel> _rows = new Dictionary<string, TeamRuleRowViewModel>();
     private readonly GroupHeadingViewModel _customHeading;
     private readonly GroupHeadingViewModel _fileHeading;
-    private readonly SettingsFileWatcher? _fileWatcher;
+    private readonly ISettingsChangeSource? _fileWatcher;
     private readonly Dictionary<string, FileRuleRowViewModel> _fileRows = new Dictionary<string, FileRuleRowViewModel>();
     private IReadOnlyList<RuleDefinition> _definitions = new List<RuleDefinition>();
     private RulePageViewModel? _draft;
@@ -89,7 +89,7 @@ internal sealed partial class RulesViewModel : ObservableObject, IRuleChanges, I
     [ObservableProperty]
     public partial string NoMatchText { get; set; } = string.Empty;
 
-    public RulesViewModel(IRuleService rules, OpenedFolder folder, RuleCatalog catalog, SettingsFileWatcher? watcher, SettingsFileWatcher? fileWatcher = null)
+    public RulesViewModel(IRuleService rules, OpenedFolder folder, RuleCatalog catalog, ISettingsChangeSource? watcher, ISettingsChangeSource? fileWatcher = null)
     {
         _rules = rules;
         _folder = folder;
@@ -98,7 +98,7 @@ internal sealed partial class RulesViewModel : ObservableObject, IRuleChanges, I
         _undoTimer.Tick += OnUndoTimeUp;
         _customHeading = new GroupHeadingViewModel(GroupSource.Custom, _customName, _customNote, "written here", Rebuild);
         _fileHeading = new GroupHeadingViewModel(GroupSource.EditorConfig, _fileGroupName, _readingNote, "on and off set in the file", Rebuild, OpenEditorConfig) { ShowsCount = false };
-        FilePage = new FileRulePageViewModel(OpenEditorConfig);
+        FilePage = new FileRulePageViewModel(OpenEditorConfigLine);
         Filters = new List<FilterSegmentViewModel>
         {
             new FilterSegmentViewModel(RuleFilter.All, "All"),

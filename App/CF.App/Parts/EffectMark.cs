@@ -16,6 +16,7 @@ internal sealed class EffectMark : Control
     private static readonly Geometry _stopSign = Geometry.Parse("M4.6 8h6.8");
     private static readonly Geometry _triangleShape = Geometry.Parse("M8 2.2l6.3 11.3H1.7z");
     private static readonly Geometry _triangleSign = Geometry.Parse("M8 6.4v3.4M8 11.9v.1");
+    private static readonly Geometry _unsetShape = Geometry.Parse("M8 2.5a5.5 5.5 0 1 0 0 11 5.5 5.5 0 0 0 0-11z");
     private static readonly Geometry _offShape = Geometry.Parse("M8 2.5a5.5 5.5 0 1 0 0 11 5.5 5.5 0 0 0 0-11zM5.5 8h5");
 
     public static readonly StyledProperty<EffectKind> KindProperty = AvaloniaProperty.Register<EffectMark, EffectKind>(nameof(Kind));
@@ -77,6 +78,9 @@ internal sealed class EffectMark : Control
                     break;
                 case EffectKind.Warn:
                     DrawTriangle(context);
+                    break;
+                case EffectKind.Unset:
+                    context.DrawGeometry(null, RoundPen(Shape, 1.5), _unsetShape);
                     break;
                 default:
                     DrawOff(context);

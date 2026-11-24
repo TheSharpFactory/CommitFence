@@ -16,7 +16,6 @@ internal sealed class EditorConfigRules : IRepositoryRules
 {
     private const string _languageId = "csharp";
     private const string _fileName = ".editorconfig";
-    private const int _linesAround = 3;
 
     private static readonly IReadOnlyList<string> _skippedFolders = new List<string> { ".git", "bin", "obj", "node_modules" };
 
@@ -40,12 +39,21 @@ internal sealed class EditorConfigRules : IRepositoryRules
             return new FileRuleListing(_languageId, null, new List<FileRule>(), notes);
         }
 
-        var settings = AppliedSettings(EditorConfigParser.Parse(text), new CSharpFileSet(_fileSystem, repositoryFolder));
-        var titles = settings.Count == 0 ? new DiagnosticTitles() : DiagnosticTitles.Load(_fileSystem, _sdkFolder.Find(repositoryFolder));
+        var files = new CSharpFileSet(_fileSystem, repositoryFolder);
+        var patterns = new Dictionary<string, SectionPattern>(StringComparer.Ordinal);
+        var settings = EditorConfigParser.Parse(text);
+        foreach(var section in settings.Select(setting => setting.Section).Distinct(StringComparer.Ordinal))
+        {
+            var pattern = new SectionPattern(section);
+            if(files.Matches(pattern))
+                patterns.Add(section, pattern);
+        }
 
+        var titles = patterns.Count == 0 ? new DiagnosticTitles() : DiagnosticTitles.Load(_fileSystem, _sdkFolder.Find(repositoryFolder));
         var lines = FileLines(text);
-
-        return new FileRuleListing(_languageId, _fileName, settings.Select(setting => ToRule(setting, titles, lines)).ToList(), notes);
+        var rules = settings.Where(setting => patterns.ContainsKey(setting.Section)).GroupBy(setting => setting.Id, StringComparer.OrdinalIgnoreCase)
+            .Select(group => ToRule(group, patterns, files, titles, lines)).OrderBy(rule => rule.Id, StringComparer.Ordinal).ToList();
+        return new FileRuleListing(_languageId, _fileName, rules, notes);
     }
 
     private string? ReadText(string path)
@@ -64,22 +72,6 @@ internal sealed class EditorConfigRules : IRepositoryRules
         }
     }
 
-    private static List<EditorConfigSetting> AppliedSettings(IReadOnlyList<EditorConfigSetting> settings, CSharpFileSet files)
-    {
-        var matching = new Dictionary<string, bool>();
-        var winners = new Dictionary<string, EditorConfigSetting>(StringComparer.OrdinalIgnoreCase);
-        foreach(var setting in settings)
-        {
-            if(!matching.TryGetValue(setting.Section, out var matches))
-                matching[setting.Section] = matches = files.Matches(new SectionPattern(setting.Section));
-
-            if(matches)
-                winners[setting.Id] = setting;
-        }
-
-        return winners.Values.OrderBy(setting => setting.Id, StringComparer.Ordinal).ToList();
-    }
-
     private static List<string> FileLines(string text)
     {
         var lines = text.Split('\n').Select(line => line.TrimEnd('\r')).ToList();
@@ -89,19 +81,31 @@ internal sealed class EditorConfigRules : IRepositoryRules
         return lines;
     }
 
-    private static List<FileLine> LinesAround(IReadOnlyList<string> lines, int line)
+    private static FileRule ToRule(IEnumerable<EditorConfigSetting> settings, Dictionary<string, SectionPattern> patterns, CSharpFileSet files, DiagnosticTitles titles, IReadOnlyList<string> lines)
     {
-        var first = Math.Max(1, line - _linesAround);
-        var last = Math.Min(lines.Count, line + _linesAround);
+        FileRulePlace? main = null;
+        var exceptions = new List<FileRulePlace>();
+        var primary = settings.LastOrDefault(setting => CSharpFileSet.NamesAll(patterns[setting.Section]));
+        foreach(var setting in settings.Where(setting => primary == null || setting.Line >= primary.Line))
+        {
+            var pattern = patterns[setting.Section];
+            var place = new FileRulePlace(setting.Section, setting.Value, SeverityWords.StateOf(setting.Value), SeverityWords.SeverityOf(setting.Value), setting.Line,
+                Excerpt(lines, setting.Header, setting.Line), pattern.Matches);
+            if(setting == primary)
+                main = place;
+            else if(main == null || place.Effect != main.Effect || (exceptions.Count > 0 && files.Overlaps(pattern, exceptions)))
+                exceptions.Add(place);
+        }
 
-        return Enumerable.Range(first, Math.Max(0, last - first + 1)).Select(number => new FileLine(number, lines[number - 1])).ToList();
+        var named = primary ?? settings.First();
+        var title = titles.Find(named.Id) ?? CommentTitle.From(named.TrailingComment) ?? CommentTitle.From(named.CommentAbove);
+        return new FileRule(named.Id, title, _fileName, "C#", main, exceptions);
     }
 
-    private static FileRule ToRule(EditorConfigSetting setting, DiagnosticTitles titles, IReadOnlyList<string> lines)
+    private static List<FileLine> Excerpt(IReadOnlyList<string> lines, int header, int setting)
     {
-        var title = titles.Find(setting.Id) ?? CommentTitle.From(setting.TrailingComment) ?? CommentTitle.From(setting.CommentAbove);
-
-        return new FileRule(setting.Id, title, setting.Value, SeverityWords.StateOf(setting.Value), SeverityWords.SeverityOf(setting.Value), _fileName, setting.Line, LinesAround(lines, setting.Line));
+        var numbers = setting - header > 3 ? [header, setting] : Enumerable.Range(header, setting - header + 1);
+        return numbers.Select(number => new FileLine(number, lines[number - 1])).ToList();
     }
 
     private void AddSubFolderNote(List<string> notes, string repositoryFolder)

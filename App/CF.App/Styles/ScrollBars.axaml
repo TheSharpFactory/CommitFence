@@ -1,0 +1,59 @@
+<ResourceDictionary xmlns="https://github.com/avaloniaui"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+  <!-- The scroll bar of the list of rules: 12 wide, no track, no arrows, a thumb 6 wide with
+       radius 3 in line-strong (ink-3 under the pointer or dragged), at least 32 long. It replaces the framework's
+       template; it is not a restyle of it. -->
+  <ControlTheme x:Key="CfScrollThumb" TargetType="Thumb">
+    <Setter Property="Template">
+      <ControlTemplate>
+        <Border Name="Bar" Background="{DynamicResource line-strong}" CornerRadius="3" Margin="{TemplateBinding Padding}"/>
+      </ControlTemplate>
+    </Setter>
+    <Style Selector="^:pointerover /template/ Border#Bar">
+      <Setter Property="Background" Value="{DynamicResource ink-3}"/>
+    </Style>
+    <Style Selector="^:pressed /template/ Border#Bar">
+      <Setter Property="Background" Value="{DynamicResource ink-3}"/>
+    </Style>
+  </ControlTheme>
+
+  <ControlTheme x:Key="{x:Type ScrollBar}" TargetType="ScrollBar">
+    <Setter Property="Background" Value="Transparent"/>
+    <Setter Property="AllowAutoHide" Value="False"/>
+    <Setter Property="Template">
+      <ControlTemplate>
+        <Border Background="Transparent">
+          <Track Name="PART_Track"
+                 Minimum="{TemplateBinding Minimum}"
+                 Maximum="{TemplateBinding Maximum}"
+                 Value="{TemplateBinding Value, Mode=TwoWay}"
+                 ViewportSize="{TemplateBinding ViewportSize}"
+                 Orientation="{TemplateBinding Orientation}">
+            <Thumb Name="thumb" Theme="{StaticResource CfScrollThumb}"/>
+          </Track>
+        </Border>
+      </ControlTemplate>
+    </Setter>
+    <Style Selector="^:vertical">
+      <Setter Property="Width" Value="12"/>
+      <Setter Property="MinWidth" Value="12"/>
+      <Style Selector="^ /template/ Track">
+        <Setter Property="IsDirectionReversed" Value="True"/>
+      </Style>
+      <Style Selector="^ /template/ Thumb#thumb">
+        <Setter Property="MinHeight" Value="32"/>
+        <Setter Property="Padding" Value="3,0"/>
+      </Style>
+    </Style>
+    <Style Selector="^:horizontal">
+      <Setter Property="Height" Value="12"/>
+      <Setter Property="MinHeight" Value="12"/>
+      <Style Selector="^ /template/ Thumb#thumb">
+        <Setter Property="MinWidth" Value="32"/>
+        <Setter Property="Padding" Value="0,3"/>
+      </Style>
+    </Style>
+  </ControlTheme>
+
+</ResourceDictionary>

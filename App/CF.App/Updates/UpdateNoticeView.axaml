@@ -1,0 +1,66 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:updates="using:CF.App.Updates"
+             xmlns:core="using:CF.Core.Updates"
+             xmlns:review="using:CF.App.Review"
+             x:Class="CF.App.Updates.UpdateNoticeView"
+             x:ClassModifier="internal"
+             x:DataType="updates:UpdatesViewModel"
+             IsVisible="{Binding IsNoticeVisible}">
+
+  <!-- The notice of an update: it lies over the bottom of the screen, as wide as a banner (684 at most), in the colours of a
+       banner. The headline says what is going on or which version is available; under it the release notes (scrolled when
+       long) or the bar of the download; at the right the buttons. A raised panel: the small neutral shadow. -->
+  <Border MaxWidth="684" Padding="16,12" CornerRadius="12" Background="{DynamicResource warn-tint}" BoxShadow="{DynamicResource shadow-popup}">
+    <StackPanel Spacing="10">
+
+      <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
+        <TextBlock Grid.Column="0" Theme="{StaticResource type-body-strong}" TextWrapping="Wrap" VerticalAlignment="Center"
+                   Text="{Binding Headline}" AutomationProperties.LiveSetting="Polite"/>
+
+        <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8" VerticalAlignment="Top">
+          <Button Classes="cf small quiet" Command="{Binding CancelUpdateCommand}" IsVisible="{Binding CanCancel}"
+                  AutomationProperties.Name="Cancel the update">
+            <TextBlock Theme="{StaticResource type-meta-strong}" Text="Cancel"/>
+          </Button>
+          <Button Classes="cf small quiet" Command="{Binding DismissCommand}" IsVisible="{Binding CanDismiss}"
+                  AutomationProperties.Name="Later">
+            <TextBlock Theme="{StaticResource type-meta-strong}" Text="Later"/>
+          </Button>
+          <Button Classes="cf small main" Command="{Binding UpdateNowCommand}" IsVisible="{Binding CanUpdate}"
+                  AutomationProperties.Name="Update now">
+            <TextBlock Theme="{StaticResource type-meta-strong}" Text="Update now"/>
+          </Button>
+          <Button Classes="cf small main" Command="{Binding OpenReleasePageCommand}" IsVisible="{Binding CanOpenReleasePage}"
+                  AutomationProperties.Name="Open the release page">
+            <TextBlock Theme="{StaticResource type-meta-strong}" Text="Open the release page"/>
+          </Button>
+        </StackPanel>
+      </Grid>
+
+      <!-- Why the app cannot install the release itself. -->
+      <TextBlock Theme="{StaticResource type-body}" TextWrapping="Wrap" Text="{Binding ProblemText}"
+                 IsVisible="{Binding HasProblem}"/>
+
+      <!-- The release notes: headings, list items and paragraphs. -->
+      <ScrollViewer MaxHeight="280" IsVisible="{Binding HasNotes}" VerticalScrollBarVisibility="Auto">
+        <ItemsControl ItemsSource="{Binding NotesLines}" Margin="0,0,16,0">
+          <ItemsControl.ItemTemplate>
+            <DataTemplate x:DataType="core:ReleaseNoteLine">
+              <Panel Margin="0,0,0,4">
+                <TextBlock IsVisible="{Binding IsHeading}" Theme="{StaticResource type-body-strong}" TextWrapping="Wrap" Text="{Binding Text}"/>
+                <TextBlock IsVisible="{Binding IsListItem}" Theme="{StaticResource type-body}" TextWrapping="Wrap" Text="{Binding Text, StringFormat='• {0}'}"/>
+                <TextBlock IsVisible="{Binding IsParagraph}" Theme="{StaticResource type-body}" TextWrapping="Wrap" Text="{Binding Text}"/>
+              </Panel>
+            </DataTemplate>
+          </ItemsControl.ItemTemplate>
+        </ItemsControl>
+      </ScrollViewer>
+
+      <!-- The download: a bar from the left, as wide as the part done. -->
+      <review:FractionBar Thickness="4" Height="4" Fraction="{Binding DownloadFraction}"
+                          Fill="{DynamicResource solid}" IsVisible="{Binding IsInstalling}"/>
+    </StackPanel>
+  </Border>
+
+</UserControl>

@@ -1,0 +1,90 @@
+{
+    "rules": [
+        {
+            "id": "TEAM010",
+            "language": "csharp",
+            "for": "if-statement",
+            "severity": "block",
+            "title": "No braces around a single-line if",
+            "where": { "statementsInBody": 1, "bodyFitsOnOneLine": true },
+            "require": { "braces": false }
+        },
+        {
+            "id": "TEAM011",
+            "language": "csharp",
+            "for": "method",
+            "severity": "block",
+            "title": "Only public and private methods inside an internal class",
+            "where": { "containingType": "class", "containingTypeDeclaredAccess": "internal", "isOverride": false },
+            "require": { "declaredAccess": ["public", "private"] }
+        },
+        {
+            "id": "TEAM012",
+            "language": "csharp",
+            "for": "usage",
+            "severity": "block",
+            "title": "Use IClock, not DateTime.Now",
+            "where": { "target": "System.DateTime.Now" },
+            "forbid": true,
+            "why": "Code that reads the clock directly cannot be given another time in a check."
+        },
+        {
+            "id": "TEAM013",
+            "language": "csharp",
+            "for": "usage",
+            "severity": "block",
+            "title": "Core uses no file, process or network API",
+            "where": { "targetType": ["System.IO.File", "System.IO.Directory", "System.IO.FileStream", "System.IO.FileInfo", "System.IO.DirectoryInfo", "System.IO.StreamReader", "System.IO.StreamWriter", "System.Diagnostics.Process", "System.Net.Http.HttpClient", "System.Net.Sockets.Socket", "System.Net.Sockets.TcpClient", "System.Environment"] },
+            "forbid": true,
+            "paths": [ "Dependencies/CF.Core/**" ],
+            "why": "Core touches files, processes and the network only through its ports (IFileSystem, IProcessRunner and the others), so that a check can replace them and the adapters stay the only place that does real work."
+        }
+    ],
+    "structure": {
+        "modules": {
+            "core-structure": [ "namespace:CF.Core.Structure" ],
+            "core-rules": [ "namespace:CF.Core.Rules" ],
+            "core-review": [ "namespace:CF.Core.Review" ],
+            "core-services": [ "namespace:CF.Core.Services" ],
+            "core": [ "namespace:CF.Core", "project:CF.Core" ],
+            "csharp": [ "namespace:CF.Languages.CSharp", "project:CF.Languages.CSharp" ],
+            "adapters": [ "namespace:CF.Adapters", "project:CF.Adapters" ],
+            "composition": [ "namespace:CF.Composition", "project:CF.Composition" ],
+            "cli": [ "namespace:CF.Cli", "project:commitfence" ],
+            "app": [ "namespace:CF.App", "project:commitfenceapp" ],
+            "meaning": [ "namespace:CF.Meaning", "project:CF.Meaning" ]
+        },
+        "directions": {
+            "allow": [
+                "core-structure -> core",
+                "core-rules -> core",
+                "core-rules -> core-structure",
+                "core-review -> core",
+                "core-review -> core-rules",
+                "core-review -> core-structure",
+                "core-services -> core",
+                "core-services -> core-rules",
+                "core-services -> core-review",
+                "core-services -> core-structure",
+                "csharp -> core",
+                "adapters -> core",
+                "composition -> core",
+                "composition -> core-review",
+                "composition -> core-rules",
+                "composition -> core-services",
+                "composition -> csharp",
+                "composition -> adapters",
+                "cli -> composition",
+                "cli -> core",
+                "cli -> core-review",
+                "cli -> core-rules",
+                "cli -> core-services",
+                "app -> composition",
+                "app -> core",
+                "app -> core-review",
+                "app -> core-rules",
+                "app -> core-services"
+            ]
+        }
+    }
+}

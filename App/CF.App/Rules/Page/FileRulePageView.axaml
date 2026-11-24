@@ -1,0 +1,185 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:rules="using:CF.App.Rules"
+             xmlns:local="using:CF.App.Rules.Page"
+             xmlns:parts="using:CF.App.Parts"
+             x:Class="CF.App.Rules.Page.FileRulePageView"
+             x:ClassModifier="internal"
+             x:DataType="local:FileRulePageViewModel">
+
+  <!-- The page of a rule that .editorconfig sets (read-only): the first
+       row with its tag, the id and the state as a sentence; the title; the lines of the file round the one that sets the rule;
+       the table of what a push does for each setting. There is no control to change the
+       rule, so "When code breaks it" and the sentences about a change are not on this page. -->
+  <UserControl.Styles>
+    <Style Selector="local|FileRulePageView Border.sheet">
+      <Setter Property="Padding" Value="32,4,32,32"/>
+    </Style>
+    <Style Selector="local|FileRulePageView StackPanel.content">
+      <Setter Property="HorizontalAlignment" Value="Left"/>
+    </Style>
+    <Style Selector="local|FileRulePageView.onepane Border.sheet">
+      <Setter Property="Padding" Value="24,4,24,32"/>
+    </Style>
+    <Style Selector="local|FileRulePageView.onepane StackPanel.content">
+      <Setter Property="HorizontalAlignment" Value="Center"/>
+    </Style>
+    <Style Selector="local|FileRulePageView Button.back">
+      <Setter Property="IsVisible" Value="False"/>
+    </Style>
+    <Style Selector="local|FileRulePageView.onepane Button.back">
+      <Setter Property="IsVisible" Value="True"/>
+    </Style>
+    <Style Selector="Border.fileline.current">
+      <Setter Property="Background" Value="{DynamicResource hover}"/>
+    </Style>
+    <Style Selector="Border.fileline Border.bar">
+      <Setter Property="IsVisible" Value="False"/>
+    </Style>
+    <Style Selector="Border.fileline.current Border.bar">
+      <Setter Property="IsVisible" Value="True"/>
+    </Style>
+    <Style Selector="Border.fileline TextBlock.number">
+      <Setter Property="Foreground" Value="{DynamicResource ink-3}"/>
+    </Style>
+    <Style Selector="Border.fileline TextBlock.text">
+      <Setter Property="Foreground" Value="{DynamicResource ink}"/>
+    </Style>
+    <Style Selector="Border.fileline TextBlock.text.comment">
+      <Setter Property="Foreground" Value="{DynamicResource code-comment}"/>
+    </Style>
+    <Style Selector="Border.fileline.current TextBlock.number">
+      <Setter Property="FontWeight" Value="SemiBold"/>
+      <Setter Property="Foreground" Value="{DynamicResource ink}"/>
+    </Style>
+    <Style Selector="Border.fileline.current TextBlock.text">
+      <Setter Property="FontWeight" Value="SemiBold"/>
+    </Style>
+    <Style Selector="Border.setting.current">
+      <Setter Property="Background" Value="{DynamicResource hover}"/>
+    </Style>
+    <Style Selector="Border.setting Border.bar">
+      <Setter Property="IsVisible" Value="False"/>
+    </Style>
+    <Style Selector="Border.setting.current Border.bar">
+      <Setter Property="IsVisible" Value="True"/>
+    </Style>
+    <Style Selector="Border.setting.current TextBlock.words">
+      <Setter Property="FontWeight" Value="SemiBold"/>
+    </Style>
+  </UserControl.Styles>
+
+  <ScrollViewer Name="Scroller" HorizontalScrollBarVisibility="Disabled" AllowAutoHide="False">
+    <Border Name="Sheet" Classes="sheet">
+      <StackPanel Classes="content" Name="SheetContent" MaxWidth="900">
+
+        <!-- The first row: the tag and the id at the left, the state as a sentence at the right. No switch. -->
+        <Grid ColumnDefinitions="Auto,*" MinHeight="36">
+          <StackPanel Orientation="Horizontal" Spacing="10" VerticalAlignment="Center">
+            <Button Name="BackButton" Classes="cf quiet back" Padding="8,0,12,0"
+                    Command="{Binding $parent[rules:RulesView].((rules:RulesViewModel)DataContext).BackCommand}"
+                    AutomationProperties.Name="Back to the rules">
+              <StackPanel Orientation="Horizontal" Spacing="8">
+                <parts:Icon Data="{StaticResource i-left}" Width="16" Height="16" Stroke="{Binding $parent[Button].Foreground}"/>
+                <TextBlock Theme="{StaticResource type-body-strong}" FontWeight="Medium" Text="Rules"/>
+              </StackPanel>
+            </Button>
+            <Border Height="24" CornerRadius="7" Padding="7,0,9,0" Background="{DynamicResource hover}" VerticalAlignment="Center">
+              <StackPanel Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
+                <parts:Icon Data="{StaticResource i-file}" Width="12" Height="12" Stroke="{DynamicResource ink-2}"/>
+                <TextBlock Theme="{StaticResource type-label}" Foreground="{DynamicResource ink-2}" Text=".editorconfig rule"/>
+              </StackPanel>
+            </Border>
+            <TextBlock Name="IdText" Theme="{StaticResource code-strong}" VerticalAlignment="Center" Text="{Binding Id}"/>
+          </StackPanel>
+          <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="6" HorizontalAlignment="Right" VerticalAlignment="Center"
+                      ToolTip.Tip="{Binding StateToolTip}" AutomationProperties.Name="{Binding StateSpokenName}">
+            <parts:Icon Data="{StaticResource i-lock-line}" Width="14" Height="14" Stroke="{DynamicResource ink-3}"/>
+            <TextBlock Theme="{StaticResource type-body}" Foreground="{DynamicResource ink-2}">
+              <Run Text="{Binding StateWord}" FontWeight="SemiBold" Foreground="{DynamicResource ink}"/><Run Text=", set in the file"/>
+            </TextBlock>
+          </StackPanel>
+        </Grid>
+
+        <!-- The title as plain text, 10 above and 14 below. -->
+        <TextBlock Name="TitleText" Theme="{StaticResource type-title}" TextWrapping="Wrap" Margin="0,10,0,14"
+                   IsVisible="{Binding HasTitle}" Text="{Binding Title}"/>
+
+        <!-- The lines of the file: a box with a head and the lines round the one that sets the rule. -->
+        <Border Name="LinesBox" Margin="0,10,0,0" BorderBrush="{DynamicResource line}" BorderThickness="1" CornerRadius="16"
+                ClipToBounds="True" AutomationProperties.Name="{Binding LinesSpokenName}">
+          <StackPanel>
+            <Border Background="{DynamicResource well}" BorderBrush="{DynamicResource line}" BorderThickness="0,0,0,1"
+                    MinHeight="48" Padding="16,6,8,6">
+              <Grid ColumnDefinitions="*,Auto">
+                <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                  <parts:Icon Data="{StaticResource i-file}" Width="16" Height="16" Stroke="{DynamicResource ink-2}"/>
+                  <TextBlock Theme="{StaticResource code-strong}" VerticalAlignment="Center" Text=".editorconfig"/>
+                  <TextBlock Theme="{StaticResource type-meta}" Foreground="{DynamicResource ink-2}" VerticalAlignment="Center"
+                             Text="{Binding LineHeadText}"/>
+                </StackPanel>
+                <Button Name="OpenAtLine" Grid.Column="1" Classes="cf outlined small" Command="{Binding OpenFileCommand}"
+                        AutomationProperties.Name="{Binding OpenAtLineText}">
+                  <StackPanel Orientation="Horizontal" Spacing="6">
+                    <parts:Icon Data="{StaticResource i-open}" Width="14" Height="14" Stroke="{Binding $parent[Button].Foreground}"/>
+                    <TextBlock Theme="{StaticResource type-meta-strong}" Text="{Binding OpenAtLineText}"/>
+                  </StackPanel>
+                </Button>
+              </Grid>
+            </Border>
+            <ItemsControl Margin="0,8" ItemsSource="{Binding Lines}">
+              <ItemsControl.ItemTemplate>
+                <DataTemplate DataType="local:FileLineViewModel" x:DataType="local:FileLineViewModel">
+                  <Border Classes="fileline" Classes.current="{Binding IsCurrent}" Height="20" IsVisible="{Binding IsPresent}" AutomationProperties.Name="{Binding SpokenName}">
+                    <Panel>
+                      <Border Classes="bar" Width="4" CornerRadius="2" HorizontalAlignment="Left" Background="{DynamicResource here}"/>
+                      <Grid ColumnDefinitions="52,16,*">
+                        <TextBlock Grid.Column="0" Classes="number" Theme="{StaticResource code}"
+                                   HorizontalAlignment="Right" Text="{Binding Number}"/>
+                        <TextBlock Grid.Column="2" Classes="text" Classes.comment="{Binding IsComment}" Theme="{StaticResource code}"
+                                   TextWrapping="NoWrap" TextTrimming="CharacterEllipsis"
+                                   Text="{Binding Text}"/>
+                      </Grid>
+                    </Panel>
+                  </Border>
+                </DataTemplate>
+              </ItemsControl.ItemTemplate>
+            </ItemsControl>
+          </StackPanel>
+        </Border>
+
+        <!-- What the file can say, and what a push does then: three rows, one per effect; the one the file holds is marked. -->
+        <TextBlock Theme="{StaticResource type-h2}" Margin="0,20,0,12" Text="What the file can say, and what a push does then"/>
+        <ItemsControl ItemsSource="{Binding Settings}">
+          <ItemsControl.ItemTemplate>
+            <DataTemplate DataType="local:FileSettingRowViewModel" x:DataType="local:FileSettingRowViewModel">
+              <Border Classes="setting" Classes.current="{Binding IsCurrent}" Height="40" BorderBrush="{DynamicResource line}"
+                      BorderThickness="0,1,0,0" AutomationProperties.Name="{Binding SpokenName}">
+                <Panel>
+                  <Border Classes="bar" Width="4" CornerRadius="2" Margin="0,8" HorizontalAlignment="Left"
+                          Background="{DynamicResource here}"/>
+                  <Grid ColumnDefinitions="168,104,*,Auto" ColumnSpacing="12" Margin="16,0,12,0" VerticalAlignment="Center">
+                    <TextBlock Grid.Column="0" Classes="words" Theme="{StaticResource code}" Foreground="{DynamicResource ink}"
+                               Text="{Binding Words}"/>
+                    <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
+                      <parts:EffectMark Classes.block="{Binding IsBlock}" Classes.warn="{Binding IsWarn}" Classes.off="{Binding IsOff}"
+                                        Kind="{Binding Kind}" Width="14" Height="14"/>
+                      <TextBlock Theme="{StaticResource type-effect}" Text="{Binding EffectWord}"/>
+                    </StackPanel>
+                    <TextBlock Grid.Column="2" Theme="{StaticResource type-body}" Foreground="{DynamicResource ink-2}"
+                               TextTrimming="CharacterEllipsis" Text="{Binding Push}"/>
+                    <TextBlock Grid.Column="3" Theme="{StaticResource type-meta-strong}" Foreground="{DynamicResource ink}"
+                               IsVisible="{Binding IsCurrent}" Text="In the file now"/>
+                  </Grid>
+                </Panel>
+              </Border>
+            </DataTemplate>
+          </ItemsControl.ItemTemplate>
+        </ItemsControl>
+        <Border Height="1" Background="{DynamicResource line}"/>
+
+      </StackPanel>
+    </Border>
+  </ScrollViewer>
+
+</UserControl>

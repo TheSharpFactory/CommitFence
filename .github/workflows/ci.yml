@@ -1,0 +1,30 @@
+name: CI Windows + Linux
+
+# Windows and Linux. macOS runs the same build and tests in its own workflow (ci-macos.yml): GitHub's macOS runners are
+# often all busy, and a job that never gets one would fail this one
+on:
+  push:
+  pull_request:
+
+jobs:
+  build-and-test:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, ubuntu-latest]
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: 11.0.x
+
+      - name: Build
+        run: dotnet build CF.slnx -c Release
+
+      - name: Tests
+        run: dotnet test CF.slnx -c Release --no-build

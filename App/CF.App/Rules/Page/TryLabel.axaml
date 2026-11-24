@@ -1,0 +1,77 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:local="using:CF.App.Rules.Page"
+             xmlns:parts="using:CF.App.Parts"
+             x:Class="CF.App.Rules.Page.TryLabel"
+             x:ClassModifier="internal"
+             ClipToBounds="False">
+
+  <!-- A label of Try it: 24 high in the head with radius 7, 20 high inside the code with radius 6,
+       padding 0 9 0 7, an icon of 13, a gap of 5. Kind and count decide the fill, the text and the icon. -->
+  <UserControl.Styles>
+    <Style Selector="Border.back">
+      <Setter Property="Height" Value="24"/>
+      <Setter Property="CornerRadius" Value="7"/>
+      <Setter Property="Padding" Value="7,0,9,0"/>
+    </Style>
+    <Style Selector="Border.back.code">
+      <Setter Property="Height" Value="20"/>
+      <Setter Property="CornerRadius" Value="6"/>
+    </Style>
+    <Style Selector="Border.back.breaks">
+      <Setter Property="Background" Value="{DynamicResource block-tint}"/>
+    </Style>
+    <Style Selector="Border.back.follows">
+      <Setter Property="Background" Value="{DynamicResource req}"/>
+    </Style>
+    <Style Selector="Border.back.notcovered">
+      <Setter Property="Background" Value="{DynamicResource hover}"/>
+    </Style>
+    <Style Selector="Border.back.warn">
+      <Setter Property="Background" Value="{DynamicResource warn-tint}"/>
+    </Style>
+    <Style Selector="Border.back.zero">
+      <Setter Property="Background" Value="{DynamicResource hover}"/>
+    </Style>
+    <Style Selector="Border.back.breaks TextBlock#Words">
+      <Setter Property="Foreground" Value="{DynamicResource block-ink}"/>
+    </Style>
+    <Style Selector="Border.back.follows TextBlock#Words">
+      <Setter Property="Foreground" Value="{DynamicResource req-ink}"/>
+    </Style>
+    <Style Selector="Border.back.notcovered TextBlock#Words">
+      <Setter Property="Foreground" Value="{DynamicResource ink-2}"/>
+    </Style>
+    <Style Selector="Border.back.warn TextBlock#Words">
+      <Setter Property="Foreground" Value="{DynamicResource ink}"/>
+    </Style>
+    <Style Selector="Border.back.zero TextBlock#Words">
+      <Setter Property="Foreground" Value="{DynamicResource ink-3}"/>
+    </Style>
+    <Style Selector="Border.back parts|EffectMark#BlockMark">
+      <Setter Property="Shape" Value="{DynamicResource block}"/>
+      <Setter Property="Sign" Value="{DynamicResource on-block}"/>
+    </Style>
+    <Style Selector="Border.back.zero parts|EffectMark#BlockMark">
+      <Setter Property="Shape" Value="{DynamicResource ink-3}"/>
+      <Setter Property="Sign" Value="{DynamicResource hover}"/>
+    </Style>
+    <Style Selector="Border.back parts|EffectMark#WarnMark">
+      <Setter Property="Shape" Value="{DynamicResource warn}"/>
+      <Setter Property="Sign" Value="{DynamicResource on-warn}"/>
+    </Style>
+  </UserControl.Styles>
+
+  <Border Name="Back" Classes="back" VerticalAlignment="Center">
+    <StackPanel Orientation="Horizontal" Spacing="5" VerticalAlignment="Center">
+      <parts:EffectMark Name="BlockMark" Kind="Block" Width="13" Height="13" IsVisible="False"/>
+      <parts:EffectMark Name="WarnMark" Kind="Warn" Width="13" Height="13" IsVisible="False"/>
+      <parts:Icon Name="CheckIcon" Data="{StaticResource i-check}" Width="13" Height="13" StrokeThickness="1.8"
+                  Stroke="{Binding #Words.Foreground}" IsVisible="False"/>
+      <parts:Icon Name="OffIcon" Data="{StaticResource i-off}" Width="13" Height="13" StrokeThickness="1.6"
+                  Stroke="{Binding #Words.Foreground}" IsVisible="False"/>
+      <TextBlock Name="Words" Theme="{StaticResource type-label}"/>
+    </StackPanel>
+  </Border>
+
+</UserControl>

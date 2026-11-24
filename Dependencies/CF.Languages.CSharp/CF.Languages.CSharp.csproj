@@ -1,0 +1,14 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <ItemGroup>
+    <!-- compile is private: a program that references this plug-in cannot name a Roslyn type; the runtime files still flow to it, so they reach its output -->
+    <PackageReference Include="Microsoft.CodeAnalysis.CSharp" Version="5.12.0" PrivateAssets="compile" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\CF.Core\CF.Core.csproj" />
+    <!-- built before this plug-in and never referenced by it: its file is only handed to the team's compiler, so it is copied beside the programs -->
+    <ProjectReference Include="..\CF.Meaning\CF.Meaning.csproj" ReferenceOutputAssembly="false" OutputItemType="Content" CopyToOutputDirectory="PreserveNewest" TargetPath="analyzers\CF.Meaning.dll" />
+  </ItemGroup>
+
+</Project>

@@ -1,0 +1,102 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:shell="using:CF.App.Shell"
+        xmlns:rules="using:CF.App.Rules"
+        xmlns:review="using:CF.App.Review"
+        xmlns:parts="using:CF.App.Parts"
+        xmlns:updates="using:CF.App.Updates"
+        x:Class="CF.App.Shell.MainWindow"
+        x:DataType="shell:MainWindowViewModel"
+        x:ClassModifier="internal"
+        Title="CommitFence"
+        Width="1440"
+        Height="900"
+        MinWidth="760"
+        MinHeight="560"
+        ExtendClientAreaToDecorationsHint="True"
+        ExtendClientAreaTitleBarHeightHint="36">
+
+  <!-- The window: the rail, then the screen. The client area reaches into the title bar; the top
+       36 is the title strip, which drags the window except over the repository button. The system draws its own window
+       buttons. -->
+  <Grid ColumnDefinitions="88,*">
+
+    <!-- The rail: 88 wide, side. Padding top 10, bottom 12. The logo, then five screens; Settings and Doctor stand at the
+         bottom, apart. A screen not built yet is disabled. -->
+    <Border Grid.Column="0" Background="{DynamicResource side}">
+      <DockPanel Margin="0,10,0,12">
+        <ListBox DockPanel.Dock="Bottom" Classes="rail" IsEnabled="False" HorizontalAlignment="Center"
+                 AutomationProperties.Name="App screens, not built yet">
+          <ListBoxItem Tag="{StaticResource i-set}"><TextBlock Theme="{StaticResource type-rail}" Text="Settings"/></ListBoxItem>
+          <ListBoxItem Tag="{StaticResource i-doc}"><TextBlock Theme="{StaticResource type-rail}" Text="Doctor"/></ListBoxItem>
+        </ListBox>
+        <StackPanel Spacing="10" HorizontalAlignment="Center">
+          <parts:LogoMark Margin="0,0,0,0"/>
+          <ListBox Name="Rail" Classes="rail" SelectedIndex="{Binding ScreenIndex, Mode=TwoWay}"
+                   AutomationProperties.Name="Screens">
+            <ListBoxItem Tag="{StaticResource i-rules}"><TextBlock Theme="{StaticResource type-rail}" Text="Rules"/></ListBoxItem>
+            <ListBoxItem Tag="{StaticResource i-review}"><TextBlock Theme="{StaticResource type-rail}" Text="Review"/></ListBoxItem>
+            <ListBoxItem Tag="{StaticResource i-dash}" IsEnabled="False"><TextBlock Theme="{StaticResource type-rail}" Text="Dashboard"/></ListBoxItem>
+            <ListBoxItem Tag="{StaticResource i-exempt}" IsEnabled="False"><TextBlock Theme="{StaticResource type-rail}" Text="Exemptions"/></ListBoxItem>
+            <ListBoxItem Tag="{StaticResource i-arch}" IsEnabled="False"><TextBlock Theme="{StaticResource type-rail}" Text="Architecture"/></ListBoxItem>
+          </ListBox>
+        </StackPanel>
+      </DockPanel>
+    </Border>
+
+    <!-- The count on Review: the blocking findings of the last review of the changes, on the corner of the tile. 20 high, a
+         border of 2 in side so that 16 of block shows, its left edge 50 from the item's left. Hidden at zero. The rail is
+         fixed: the first item's top is 10 + 32 + 10 below the top, the second 54 + 4 further. -->
+    <Border Grid.Column="0" HorizontalAlignment="Left" VerticalAlignment="Top" Margin="52,110,0,0" Height="20" MinWidth="20"
+            CornerRadius="10" BorderThickness="2" BorderBrush="{DynamicResource side}" Background="{DynamicResource block}"
+            Padding="2,0" IsHitTestVisible="True" IsVisible="{Binding Review.HasBlocking}" ZIndex="1"
+            ToolTip.Tip="{Binding Review.BlockingText}" AutomationProperties.Name="{Binding Review.BlockingText}">
+      <TextBlock Theme="{StaticResource type-label}" Foreground="{DynamicResource on-block}" HorizontalAlignment="Center"
+                 VerticalAlignment="Center" FontFeatures="+tnum" Text="{Binding Review.BlockingCount}"/>
+    </Border>
+
+    <!-- The repository button stands in the title strip at the left of the screen, over Rules and Review alike. It comes
+         before the screens so that the keyboard reaches it right after the rail. -->
+    <Button Grid.Column="1" Classes="cf quiet repository" ZIndex="3" HorizontalAlignment="Left" VerticalAlignment="Top"
+            CornerRadius="8" Padding="16,0" Focusable="True"
+            AutomationProperties.Name="{Binding RepositorySpokenName}"
+            ToolTip.Tip="{Binding RepositorySpokenName}">
+      <StackPanel Orientation="Horizontal" Spacing="6">
+        <parts:Icon Data="{StaticResource i-branch}" Width="13" Height="13" Stroke="{DynamicResource ink-2}"/>
+        <TextBlock Theme="{StaticResource type-meta-strong}" Text="{Binding RepositoryName}"/>
+        <TextBlock Classes="branch" Theme="{StaticResource type-meta}" Text="{Binding BranchText}"
+                   IsVisible="{Binding HasBranch}"/>
+        <parts:Icon Data="{StaticResource i-down}" Width="13" Height="13" Stroke="{DynamicResource ink-3}"/>
+      </StackPanel>
+    </Button>
+
+    <Panel Grid.Column="1">
+      <Panel IsVisible="{Binding ShowsRules}">
+        <rules:RulesView Name="RulesScreen" DataContext="{Binding Rules}"/>
+      </Panel>
+      <Panel IsVisible="{Binding ShowsReview}">
+        <review:ReviewView Name="ReviewScreen" DataContext="{Binding Review}"/>
+      </Panel>
+    </Panel>
+
+    <!-- The notice of an update: over the bottom of the screen, above everything but the title strip's buttons. -->
+    <updates:UpdateNoticeView Grid.Column="1" DataContext="{Binding Updates}" HorizontalAlignment="Stretch" VerticalAlignment="Bottom"
+                              Margin="16,0,16,16" ZIndex="4"/>
+
+    <!-- The title strip: 36 high, across the whole window, it drags the window. It lies over the screens and under the
+         repository button. -->
+    <Border Grid.ColumnSpan="2" Height="36" VerticalAlignment="Top" Background="Transparent" ZIndex="2"
+            WindowDecorationProperties.ElementRole="TitleBar"/>
+
+  </Grid>
+
+  <Window.Styles>
+    <Style Selector="Button.repository TextBlock.branch">
+      <Setter Property="Foreground" Value="{DynamicResource ink-2}"/>
+    </Style>
+    <Style Selector="Button.repository:pointerover TextBlock.branch">
+      <Setter Property="Foreground" Value="{DynamicResource ink}"/>
+    </Style>
+  </Window.Styles>
+
+</Window>

@@ -1,0 +1,156 @@
+<ResourceDictionary xmlns="https://github.com/avaloniaui"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+  <!-- The text styles. Size, weight, line height and letter spacing are always set;
+       a font's own line gap is never relied on. No colour is set here: text takes the colour it stands in (the window's is ink).
+       Inter comes from the package Avalonia.Fonts.Inter. Cascadia Mono is the code font; no font file is shipped,
+       so the fallback list does the work on a machine without it. -->
+  <ControlTheme x:Key="type-verdict" TargetType="TextBlock">
+    <Setter Property="FontFamily" Value="avares://Avalonia.Fonts.Inter/Assets#Inter, Segoe UI, Helvetica Neue, sans-serif"/>
+    <Setter Property="FontSize" Value="34"/>
+    <Setter Property="FontWeight" Value="Bold"/>
+    <Setter Property="LineHeight" Value="40"/>
+    <Setter Property="LetterSpacing" Value="-1"/>
+  </ControlTheme>
+  <ControlTheme x:Key="type-title" TargetType="TextBlock">
+    <Setter Property="FontFamily" Value="avares://Avalonia.Fonts.Inter/Assets#Inter, Segoe UI, Helvetica Neue, sans-serif"/>
+    <Setter Property="FontSize" Value="28"/>
+    <Setter Property="FontWeight" Value="Bold"/>
+    <Setter Property="LineHeight" Value="34"/>
+    <Setter Property="LetterSpacing" Value="-0.7"/>
+  </ControlTheme>
+  <ControlTheme x:Key="type-h1" TargetType="TextBlock">
+    <Setter Property="FontFamily" Value="avares://Avalonia.Fonts.Inter/Assets#Inter, Segoe UI, Helvetica Neue, sans-serif"/>
+    <Setter Property="FontSize" Value="28"/>
+    <Setter Property="FontWeight" Value="Bold"/>
+    <Setter Property="LineHeight" Value="34"/>
+    <Setter Property="LetterSpacing" Value="-0.7"/>
+  </ControlTheme>
+  <ControlTheme x:Key="type-sentence" TargetType="TextBlock">
+    <Setter Property="FontFamily" Value="avares://Avalonia.Fonts.Inter/Assets#Inter, Segoe UI, Helvetica Neue, sans-serif"/>
+    <Setter Property="FontSize" Value="22"/>
+    <Setter Property="FontWeight" Value="Normal"/>
+    <Setter Property="LineHeight" Value="36"/>
+    <Setter Property="LetterSpacing" Value="-0.2"/>
+  </ControlTheme>
+  <ControlTheme x:Key="type-token" TargetType="TextBlock">
+    <Setter Property="FontFamily" Value="avares://Avalonia.Fonts.Inter/Assets#Inter, Segoe UI, Helvetica Neue, sans-serif"/>
+    <Setter Property="FontSize" Value="20"/>
+    <Setter Property="FontWeight" Value="SemiBold"/>
+    <Setter Property="LineHeight" Value="36"/>
+    <Setter Property="LetterSpacing" Value="-0.2"/>
+  </ControlTheme>
+  <ControlTheme x:Key="type-h2" TargetType="TextBlock">
+    <Setter Property="FontFamily" Value="avares://Avalonia.Fonts.Inter/Assets#Inter, Segoe UI, Helvetica Neue, sans-serif"/>
+    <Setter Property="FontSize" Value="18"/>
+    <Setter Property="FontWeight" Value="SemiBold"/>
+    <Setter Property="LineHeight" Value="24"/>
+    <Setter Property="LetterSpacing" Value="-0.2"/>
+  </ControlTheme>
+  <ControlTheme x:Key="type-count" TargetType="TextBlock">
+    <Setter Property="FontFamily" Value="avares://Avalonia.Fonts.Inter/Assets#Inter, Segoe UI, Helvetica Neue, sans-serif"/>
+    <Setter Property="FontSize" Value="17"/>
+    <Setter Property="FontWeight" Value="SemiBold"/>
+    <Setter Property="LineHeight" Value="34"/>
+    <Setter Property="LetterSpacing" Value="-0.1"/>
+  </ControlTheme>
+  <ControlTheme x:Key="type-pin" TargetType="TextBlock">
+    <Setter Property="FontFamily" Value="avares://Avalonia.Fonts.Inter/Assets#Inter, Segoe UI, Helvetica Neue, sans-serif"/>
+    <Setter Property="FontSize" Value="16"/>
+    <Setter Property="FontWeight" Value="Bold"/>
+    <Setter Property="LineHeight" Value="22"/>
+    <Setter Property="LetterSpacing" Value="-0.2"/>
+  </ControlTheme>
+  <ControlTheme x:Key="type-lead" TargetType="TextBlock">
+    <Setter Property="FontFamily" Value="avares://Avalonia.Fonts.Inter/Assets#Inter, Segoe UI, Helvetica Neue, sans-serif"/>
+    <Setter Property="FontSize" Value="18"/>
+    <Setter Property="FontWeight" Value="Normal"/>
+    <Setter Property="LineHeight" Value="32"/>
+    <Setter Property="LetterSpacing" Value="-0.1"/>
+  </ControlTheme>
+  <ControlTheme x:Key="type-h3" TargetType="TextBlock">
+    <Setter Property="FontFamily" Value="avares://Avalonia.Fonts.Inter/Assets#Inter, Segoe UI, Helvetica Neue, sans-serif"/>
+    <Setter Property="FontSize" Value="15"/>
+    <Setter Property="FontWeight" Value="SemiBold"/>
+    <Setter Property="LineHeight" Value="22"/>
+    <Setter Property="LetterSpacing" Value="0"/>
+  </ControlTheme>
+  <ControlTheme x:Key="type-card" TargetType="TextBlock">
+    <Setter Property="FontFamily" Value="avares://Avalonia.Fonts.Inter/Assets#Inter, Segoe UI, Helvetica Neue, sans-serif"/>
+    <Setter Property="FontSize" Value="15"/>
+    <Setter Property="FontWeight" Value="SemiBold"/>
+    <Setter Property="LineHeight" Value="20"/>
+    <Setter Property="LetterSpacing" Value="0"/>
+  </ControlTheme>
+  <ControlTheme x:Key="type-note" TargetType="TextBlock">
+    <Setter Property="FontFamily" Value="avares://Avalonia.Fonts.Inter/Assets#Inter, Segoe UI, Helvetica Neue, sans-serif"/>
+    <Setter Property="FontSize" Value="15"/>
+    <Setter Property="FontWeight" Value="Normal"/>
+    <Setter Property="LineHeight" Value="20"/>
+    <Setter Property="LetterSpacing" Value="0"/>
+  </ControlTheme>
+  <ControlTheme x:Key="type-body" TargetType="TextBlock">
+    <Setter Property="FontFamily" Value="avares://Avalonia.Fonts.Inter/Assets#Inter, Segoe UI, Helvetica Neue, sans-serif"/>
+    <Setter Property="FontSize" Value="14"/>
+    <Setter Property="FontWeight" Value="Normal"/>
+    <Setter Property="LineHeight" Value="20"/>
+    <Setter Property="LetterSpacing" Value="0"/>
+  </ControlTheme>
+  <ControlTheme x:Key="type-body-strong" TargetType="TextBlock">
+    <Setter Property="FontFamily" Value="avares://Avalonia.Fonts.Inter/Assets#Inter, Segoe UI, Helvetica Neue, sans-serif"/>
+    <Setter Property="FontSize" Value="14"/>
+    <Setter Property="FontWeight" Value="SemiBold"/>
+    <Setter Property="LineHeight" Value="20"/>
+    <Setter Property="LetterSpacing" Value="0"/>
+  </ControlTheme>
+  <ControlTheme x:Key="type-meta" TargetType="TextBlock">
+    <Setter Property="FontFamily" Value="avares://Avalonia.Fonts.Inter/Assets#Inter, Segoe UI, Helvetica Neue, sans-serif"/>
+    <Setter Property="FontSize" Value="13"/>
+    <Setter Property="FontWeight" Value="Normal"/>
+    <Setter Property="LineHeight" Value="18"/>
+    <Setter Property="LetterSpacing" Value="0"/>
+  </ControlTheme>
+  <ControlTheme x:Key="type-meta-strong" TargetType="TextBlock">
+    <Setter Property="FontFamily" Value="avares://Avalonia.Fonts.Inter/Assets#Inter, Segoe UI, Helvetica Neue, sans-serif"/>
+    <Setter Property="FontSize" Value="13"/>
+    <Setter Property="FontWeight" Value="SemiBold"/>
+    <Setter Property="LineHeight" Value="18"/>
+    <Setter Property="LetterSpacing" Value="0"/>
+  </ControlTheme>
+  <ControlTheme x:Key="type-effect" TargetType="TextBlock">
+    <Setter Property="FontFamily" Value="avares://Avalonia.Fonts.Inter/Assets#Inter, Segoe UI, Helvetica Neue, sans-serif"/>
+    <Setter Property="FontSize" Value="13"/>
+    <Setter Property="FontWeight" Value="Medium"/>
+    <Setter Property="LineHeight" Value="18"/>
+    <Setter Property="LetterSpacing" Value="0"/>
+  </ControlTheme>
+  <ControlTheme x:Key="type-label" TargetType="TextBlock">
+    <Setter Property="FontFamily" Value="avares://Avalonia.Fonts.Inter/Assets#Inter, Segoe UI, Helvetica Neue, sans-serif"/>
+    <Setter Property="FontSize" Value="12"/>
+    <Setter Property="FontWeight" Value="SemiBold"/>
+    <Setter Property="LineHeight" Value="16"/>
+    <Setter Property="LetterSpacing" Value="0"/>
+  </ControlTheme>
+  <ControlTheme x:Key="type-rail" TargetType="TextBlock">
+    <Setter Property="FontFamily" Value="avares://Avalonia.Fonts.Inter/Assets#Inter, Segoe UI, Helvetica Neue, sans-serif"/>
+    <Setter Property="FontSize" Value="13"/>
+    <Setter Property="FontWeight" Value="Medium"/>
+    <Setter Property="LineHeight" Value="16"/>
+    <Setter Property="LetterSpacing" Value="0"/>
+  </ControlTheme>
+  <ControlTheme x:Key="code" TargetType="TextBlock">
+    <Setter Property="FontFamily" Value="Cascadia Mono, Consolas, Menlo, DejaVu Sans Mono, monospace"/>
+    <Setter Property="FontSize" Value="13"/>
+    <Setter Property="FontWeight" Value="Normal"/>
+    <Setter Property="LineHeight" Value="20"/>
+    <Setter Property="LetterSpacing" Value="0"/>
+  </ControlTheme>
+  <ControlTheme x:Key="code-strong" TargetType="TextBlock">
+    <Setter Property="FontFamily" Value="Cascadia Mono, Consolas, Menlo, DejaVu Sans Mono, monospace"/>
+    <Setter Property="FontSize" Value="13"/>
+    <Setter Property="FontWeight" Value="SemiBold"/>
+    <Setter Property="LineHeight" Value="20"/>
+    <Setter Property="LetterSpacing" Value="0"/>
+  </ControlTheme>
+
+</ResourceDictionary>

@@ -1,0 +1,542 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:local="using:CF.App.Rules"
+             xmlns:parts="using:CF.App.Parts"
+             xmlns:review="using:CF.App.Review"
+             x:Class="CF.App.Rules.RulesView"
+             x:ClassModifier="internal"
+             x:DataType="local:RulesViewModel">
+
+  <!-- Rules: the list column, then the page. Two panes from a window 1304 wide, one pane under it,
+       where the page comes over the list. -->
+  <UserControl.DataTemplates>
+    <DataTemplate DataType="local:GroupHeadingViewModel" x:DataType="local:GroupHeadingViewModel">
+      <Border Height="44" BorderBrush="{DynamicResource line}" BorderThickness="0,0,0,1" Padding="4,0"
+              AutomationProperties.Name="{Binding SpokenName}">
+        <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="8" VerticalAlignment="Center">
+          <Button Classes="cf quiet" Height="32" CornerRadius="8" Padding="6,0,8,0" Focusable="False"
+                  Command="{Binding ToggleFoldCommand}" AutomationProperties.Name="{Binding SpokenName}">
+            <StackPanel Orientation="Horizontal" Spacing="8">
+              <parts:Icon Classes="fold-arrow" Classes.folded="{Binding !IsExpanded}"
+                          Data="{StaticResource i-down}" Width="14" Height="14" Stroke="{DynamicResource ink-3}"/>
+              <parts:Icon IsVisible="{Binding IsCustom}" Data="{StaticResource i-pen}" Width="14" Height="14"
+                          Stroke="{DynamicResource ink-2}"/>
+              <parts:Icon IsVisible="{Binding IsEditorConfig}" Data="{StaticResource i-file}" Width="14" Height="14"
+                          Stroke="{DynamicResource ink-2}"/>
+              <TextBlock Classes="group-name" Theme="{StaticResource type-body-strong}" Text="{Binding Name}"/>
+              <TextBlock Classes="group-count" Theme="{StaticResource type-body}" FontFeatures="+tnum"
+                         IsVisible="{Binding ShowsCount}" Text="{Binding Count}"/>
+            </StackPanel>
+          </Button>
+          <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
+            <parts:Icon IsVisible="{Binding NoteHasLock}" Data="{StaticResource i-lock-line}" Width="13" Height="13"
+                        Stroke="{DynamicResource ink-3}"/>
+            <TextBlock Theme="{StaticResource type-meta}" Foreground="{DynamicResource ink-2}"
+                       TextTrimming="CharacterEllipsis" VerticalAlignment="Center" Text="{Binding Note}"/>
+          </StackPanel>
+          <Button Grid.Column="2" Classes="cf outlined small" IsVisible="{Binding HasOpenFile}" Command="{Binding OpenFileCommand}"
+                  AutomationProperties.Name="Open file">
+            <StackPanel Orientation="Horizontal" Spacing="6">
+              <parts:Icon Data="{StaticResource i-open}" Width="14" Height="14" Stroke="{Binding $parent[Button].Foreground}"/>
+              <TextBlock Theme="{StaticResource type-meta-strong}" Text="Open file"/>
+            </StackPanel>
+          </Button>
+        </Grid>
+      </Border>
+    </DataTemplate>
+  </UserControl.DataTemplates>
+
+  <UserControl.Styles>
+
+    <!-- The container of every entry of the list: a row, a heading or a line of words. Rest: no background; under the pointer
+         hover; pressed line; selected page with the raised shadow and a bar of here. The ring is a line of 2 inside the edge. -->
+    <Style Selector="ListBox.rules ListBoxItem">
+      <Setter Property="Padding" Value="0"/>
+      <Setter Property="Margin" Value="0,0,0,2"/>
+      <Setter Property="FocusAdorner" Value="{x:Null}"/>
+      <Setter Property="Template">
+        <ControlTemplate>
+          <Panel>
+            <Border Name="Surface" CornerRadius="12" Background="Transparent">
+              <ContentPresenter Name="ContentHost" Content="{TemplateBinding Content}"
+                                ContentTemplate="{TemplateBinding ContentTemplate}" HorizontalContentAlignment="Stretch"/>
+            </Border>
+            <Border Name="Bar" IsHitTestVisible="False" Width="4" CornerRadius="2" HorizontalAlignment="Left"
+                    Margin="0,10" Background="{DynamicResource here}" RenderTransform="scaleY(0)">
+              <Border.Transitions>
+                <Transitions>
+                  <TransformOperationsTransition Property="RenderTransform" Duration="0:0:0.18" Easing="{x:Static parts:CubicBezierEasing.Spring}"/>
+                </Transitions>
+              </Border.Transitions>
+            </Border>
+            <Border Name="Ring" IsVisible="False" IsHitTestVisible="False" CornerRadius="12" BorderThickness="2"
+                    BorderBrush="{DynamicResource focus}"/>
+          </Panel>
+        </ControlTemplate>
+      </Setter>
+    </Style>
+    <Style Selector="ListBox.rules ListBoxItem:pointerover /template/ Border#Surface">
+      <Setter Property="Background" Value="{DynamicResource hover}"/>
+    </Style>
+    <Style Selector="ListBox.rules ListBoxItem:pressed /template/ Border#Surface">
+      <Setter Property="Background" Value="{DynamicResource line}"/>
+    </Style>
+    <Style Selector="ListBox.rules ListBoxItem:selected /template/ Border#Surface">
+      <Setter Property="Background" Value="{DynamicResource page}"/>
+      <Setter Property="BoxShadow" Value="{DynamicResource shadow-raised}"/>
+    </Style>
+    <Style Selector="ListBox.rules ListBoxItem:selected /template/ Border#Bar">
+      <Setter Property="RenderTransform" Value="scaleY(1)"/>
+    </Style>
+    <Style Selector="ListBox.rules ListBoxItem.ring /template/ Border#Ring">
+      <Setter Property="IsVisible" Value="True"/>
+    </Style>
+
+    <!-- A heading and a note are not raised, and not drawn pressed or selected. -->
+    <Style Selector="ListBox.rules ListBoxItem.heading /template/ Border#Surface">
+      <Setter Property="CornerRadius" Value="0"/>
+      <Setter Property="Background" Value="Transparent"/>
+      <Setter Property="BoxShadow" Value="none"/>
+    </Style>
+    <Style Selector="ListBox.rules ListBoxItem.heading /template/ Border#Bar">
+      <Setter Property="RenderTransform" Value="scaleY(0)"/>
+    </Style>
+    <Style Selector="ListBox.rules ListBoxItem.note /template/ Border#Surface">
+      <Setter Property="Background" Value="Transparent"/>
+      <Setter Property="BoxShadow" Value="none"/>
+    </Style>
+    <Style Selector="ListBox.rules ListBoxItem.note /template/ Border#Bar">
+      <Setter Property="RenderTransform" Value="scaleY(0)"/>
+    </Style>
+    <Style Selector="ListBox.rules ListBoxItem.note">
+      <Setter Property="Focusable" Value="False"/>
+      <Setter Property="IsHitTestVisible" Value="False"/>
+    </Style>
+
+    <!-- In one pane the rows are never wider than the list of two panes plus the arrow, sit in the middle of the pane, and none
+         is drawn selected. -->
+    <Style Selector="ListBox.rules.onepane ListBoxItem">
+      <Setter Property="MaxWidth" Value="663"/>
+      <Setter Property="HorizontalAlignment" Value="Stretch"/>
+    </Style>
+    <Style Selector="ListBox.rules.onepane ListBoxItem:selected /template/ Border#Surface">
+      <Setter Property="Background" Value="Transparent"/>
+      <Setter Property="BoxShadow" Value="none"/>
+    </Style>
+    <Style Selector="ListBox.rules.onepane ListBoxItem:selected /template/ Border#Bar">
+      <Setter Property="RenderTransform" Value="scaleY(0)"/>
+    </Style>
+    <Style Selector="ListBox.rules.onepane ListBoxItem:selected:pointerover /template/ Border#Surface">
+      <Setter Property="Background" Value="{DynamicResource hover}"/>
+    </Style>
+
+    <!-- The title of a rule that is off: weight 400 in ink-2. -->
+    <Style Selector="TextBlock.rule-title.off">
+      <Setter Property="FontWeight" Value="Normal"/>
+      <Setter Property="Foreground" Value="{DynamicResource ink-2}"/>
+    </Style>
+
+    <!-- The line of the file in the row of a file rule: a link. At rest "line 378" in ink-3; under the pointer ink, underlined.
+         The ring is a line of 2 round the area that takes the click. -->
+    <!-- The copy of a heading that is held over the top of the list takes no keyboard: the heading in the list has the stop. -->
+    <Style Selector="ContentControl#StickyHeading Button">
+      <Setter Property="Focusable" Value="False"/>
+    </Style>
+    <Style Selector="Button.linelink">
+      <Setter Property="Focusable" Value="False"/>
+      <Setter Property="Padding" Value="0,0,12,0"/>
+      <Setter Property="Cursor" Value="Hand"/>
+      <Setter Property="Template">
+        <ControlTemplate>
+          <Panel Background="Transparent">
+            <Border Name="Ring" IsVisible="False" IsHitTestVisible="False" CornerRadius="8" BorderThickness="2"
+                    BorderBrush="{DynamicResource focus}"/>
+            <ContentPresenter Content="{TemplateBinding Content}" Padding="{TemplateBinding Padding}"
+                              HorizontalContentAlignment="Right" VerticalContentAlignment="Center"/>
+          </Panel>
+        </ControlTemplate>
+      </Setter>
+    </Style>
+    <Style Selector="Button.linelink TextBlock.line-text">
+      <Setter Property="Foreground" Value="{DynamicResource ink-3}"/>
+    </Style>
+    <Style Selector="Button.linelink:pointerover TextBlock.line-text">
+      <Setter Property="Foreground" Value="{DynamicResource ink}"/>
+      <Setter Property="TextDecorations" Value="Underline"/>
+    </Style>
+    <Style Selector="Button.linelink.ring /template/ Border#Ring">
+      <Setter Property="IsVisible" Value="True"/>
+    </Style>
+
+    <!-- The groups' fold arrow turns a quarter towards the left while folded (motion 11). -->
+    <Style Selector="parts|Icon.fold-arrow">
+      <Setter Property="RenderTransform" Value="rotate(0deg)"/>
+      <Setter Property="Transitions">
+        <Transitions>
+          <TransformOperationsTransition Property="RenderTransform" Duration="0:0:0.22" Easing="{x:Static parts:CubicBezierEasing.Standard}"/>
+        </Transitions>
+      </Setter>
+    </Style>
+    <Style Selector="parts|Icon.fold-arrow.folded">
+      <Setter Property="RenderTransform" Value="rotate(-90deg)"/>
+    </Style>
+    <Style Selector="TextBlock.group-name">
+      <Setter Property="Foreground" Value="{DynamicResource ink}"/>
+    </Style>
+    <Style Selector="TextBlock.group-count">
+      <Setter Property="Foreground" Value="{DynamicResource ink-3}"/>
+    </Style>
+
+    <!-- An entry of the menu of an effect: 36 high, radius 8; hover is for the pointer and the keyboard, the tick for the
+         entry in force. -->
+    <Style Selector="Button.menu-entry">
+      <Setter Property="Focusable" Value="False"/>
+      <Setter Property="Height" Value="36"/>
+      <Setter Property="Padding" Value="10,0"/>
+      <Setter Property="HorizontalAlignment" Value="Stretch"/>
+      <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+      <Setter Property="Template">
+        <ControlTemplate>
+          <Border Name="Surface" CornerRadius="8" Background="Transparent" Padding="{TemplateBinding Padding}">
+            <ContentPresenter Content="{TemplateBinding Content}" ContentTemplate="{TemplateBinding ContentTemplate}"
+                              VerticalContentAlignment="Center" HorizontalContentAlignment="Stretch"/>
+          </Border>
+        </ControlTemplate>
+      </Setter>
+    </Style>
+    <Style Selector="Button.menu-entry:pointerover /template/ Border#Surface">
+      <Setter Property="Background" Value="{DynamicResource hover}"/>
+    </Style>
+    <Style Selector="Button.menu-entry.highlight /template/ Border#Surface">
+      <Setter Property="Background" Value="{DynamicResource hover}"/>
+    </Style>
+    <Style Selector="Button.menu-entry TextBlock.entry-label.current">
+      <Setter Property="FontWeight" Value="SemiBold"/>
+    </Style>
+
+    <!-- The search field: a frame of 36 high; hover border line-strong; focused border 2 in focus, drawn inside so nothing
+         moves. The text box inside has no frame of its own. -->
+    <Style Selector="Border.search:pointerover">
+      <Setter Property="BorderBrush" Value="{DynamicResource line-strong}"/>
+    </Style>
+    <Style Selector="Border.search:focus-within">
+      <Setter Property="BorderBrush" Value="{DynamicResource focus}"/>
+      <Setter Property="BorderThickness" Value="2"/>
+      <Setter Property="Padding" Value="11,0"/>
+    </Style>
+
+  </UserControl.Styles>
+
+  <Grid Name="Columns" ColumnDefinitions="656,*">
+
+    <!-- The list column: side, a hairline on its right. The top 36 is the title strip. -->
+    <Border Name="ListColumn" Grid.Column="0" Background="{DynamicResource side}" BorderBrush="{DynamicResource line}"
+            BorderThickness="0,0,1,0">
+      <Grid RowDefinitions="36,Auto,Auto,Auto,Auto,*">
+
+        <!-- The settings file cannot be read or written: the reason, and a way to open the file. -->
+        <Border Grid.Row="1" IsVisible="{Binding HasBanner}" MaxWidth="684" Margin="16,0,16,12" Padding="14,10"
+                CornerRadius="12" Background="{DynamicResource warn-tint}">
+          <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
+            <TextBlock Theme="{StaticResource type-body}" Text="{Binding BannerText}" TextWrapping="Wrap"
+                       VerticalAlignment="Center"/>
+            <Button Grid.Column="1" Classes="cf quiet small" IsVisible="{Binding CanOpenSettingsFile}"
+                    Command="{Binding OpenSettingsFileCommand}" AutomationProperties.Name="Open the file">
+              <TextBlock Theme="{StaticResource type-meta-strong}" Text="Open the file"/>
+            </Button>
+          </Grid>
+        </Border>
+
+        <!-- A rule was removed: its id, and a way to bring it back. It goes after 10 seconds or on Undo. -->
+        <Border Grid.Row="2" IsVisible="{Binding HasUndo}" MaxWidth="684" Margin="16,0,16,12" Padding="14,6,8,6"
+                CornerRadius="12" Background="{DynamicResource warn-tint}">
+          <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
+            <TextBlock Theme="{StaticResource type-body}" Text="{Binding UndoText}" VerticalAlignment="Center"
+                       AutomationProperties.LiveSetting="Polite"/>
+            <Button Grid.Column="1" Classes="cf quiet small" Command="{Binding UndoRemoveCommand}" AutomationProperties.Name="Undo">
+              <TextBlock Theme="{StaticResource type-meta-strong}" Text="Undo"/>
+            </Button>
+          </Grid>
+        </Border>
+
+        <!-- The head: the name of the screen and New rule. -->
+        <Grid Grid.Row="3" MaxWidth="684" Margin="16,4,16,12" ColumnDefinitions="*,Auto">
+          <TextBlock Theme="{StaticResource type-h1}" Text="Rules" VerticalAlignment="Center"/>
+          <Button Grid.Column="1" Classes="cf main" Command="{Binding NewRuleFromHeadCommand}"
+                  AutomationProperties.Name="New rule">
+            <StackPanel Orientation="Horizontal" Spacing="8">
+              <parts:Icon Data="{StaticResource i-plus}" Width="16" Height="16"
+                          Stroke="{Binding $parent[Button].Foreground}"/>
+              <TextBlock Theme="{StaticResource type-body-strong}" Text="New rule"/>
+            </StackPanel>
+          </Button>
+        </Grid>
+
+        <!-- The tools: the search, then the filter, as wide as the search. -->
+        <StackPanel Grid.Row="4" MaxWidth="684" Margin="16,0,16,12" Spacing="10">
+          <Border Classes="search" Height="36" CornerRadius="12" Background="{DynamicResource page}"
+                  BorderBrush="{DynamicResource line}" BorderThickness="1" Padding="12,0">
+            <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="8">
+              <parts:Icon Data="{StaticResource i-search}" Width="16" Height="16" Stroke="{DynamicResource ink-3}"/>
+              <TextBox Name="Search" Grid.Column="1" Classes="bare" Text="{Binding SearchText, Mode=TwoWay}"
+                       PlaceholderText="Search by id or title" AutomationProperties.Name="Search by id or title"
+                       KeyDown="OnSearchKeyDown"/>
+              <Panel Grid.Column="2" VerticalAlignment="Center">
+                <Border IsVisible="{Binding ShowsSearchHint}" BorderBrush="{DynamicResource line-strong}"
+                        BorderThickness="1" CornerRadius="4" Padding="5,0" IsHitTestVisible="False">
+                  <TextBlock Theme="{StaticResource type-label}" FontWeight="Medium" Foreground="{DynamicResource ink-3}"
+                             Text="Ctrl+F"/>
+                </Border>
+                <Button Classes="cf quiet round" IsVisible="{Binding HasSearchText}" Command="{Binding ClearSearchCommand}"
+                        AutomationProperties.Name="Clear the search">
+                  <parts:Icon Data="{StaticResource i-x}" Width="12" Height="12"
+                              Stroke="{Binding $parent[Button].Foreground}"/>
+                </Button>
+              </Panel>
+            </Grid>
+          </Border>
+          <parts:SegmentedList Classes="segmented" ItemsSource="{Binding Filters}"
+                               SelectedItem="{Binding SelectedFilter, Mode=TwoWay}"
+                               AutomationProperties.Name="Show rules by what they do to a push">
+            <parts:SegmentedList.ItemTemplate>
+              <DataTemplate DataType="local:FilterSegmentViewModel" x:DataType="local:FilterSegmentViewModel">
+                <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" AutomationProperties.Name="{Binding SpokenName}">
+                  <parts:EffectMark Classes="block" Kind="Block" Width="14" Height="14" Margin="0,0,6,0"
+                                    IsVisible="{Binding ShowsBlockMark}"/>
+                  <parts:EffectMark Classes="warn" Kind="Warn" Width="14" Height="14" Margin="0,0,6,0"
+                                    IsVisible="{Binding ShowsWarnMark}"/>
+                  <parts:Icon Data="{StaticResource i-off}" Width="14" Height="14" Margin="0,0,6,0"
+                              Stroke="{DynamicResource ink-2}" IsVisible="{Binding ShowsOffMark}"/>
+                  <TextBlock Classes="segment" Theme="{StaticResource type-body}" Text="{Binding Label}"/>
+                  <TextBlock Classes="segment-count" Theme="{StaticResource type-body}" Margin="6,0,0,0"
+                             FontFeatures="+tnum" Text="{Binding CountText}"/>
+                </StackPanel>
+              </DataTemplate>
+            </parts:SegmentedList.ItemTemplate>
+          </parts:SegmentedList>
+        </StackPanel>
+
+        <!-- The list of rules: one recycling list of headings and rows. Padding 0 12 12 8. -->
+        <Panel Grid.Row="5" ClipToBounds="True">
+          <local:RuleListBox Name="Rows" Classes="rules" ItemsSource="{Binding Items}" SelectedItem="{Binding SelectedItem, Mode=TwoWay}"
+                             IsOnePane="{Binding IsOnePane}" Classes.onepane="{Binding IsOnePane}"
+                             IsVisible="{Binding !HasNoMatch}"
+                             Padding="8,0,12,12" Background="Transparent" BorderThickness="0"
+                             ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                             ScrollViewer.AllowAutoHide="False"
+                             AutomationProperties.Name="Rules">
+            <local:RuleListBox.ItemsPanel>
+              <ItemsPanelTemplate>
+                <VirtualizingStackPanel/>
+              </ItemsPanelTemplate>
+            </local:RuleListBox.ItemsPanel>
+            <local:RuleListBox.DataTemplates>
+
+              <DataTemplate DataType="local:GroupNoteViewModel" x:DataType="local:GroupNoteViewModel">
+                <Border Padding="12,8">
+                  <Panel>
+                    <TextBlock IsVisible="{Binding IsPlain}" Theme="{StaticResource type-body}"
+                               Foreground="{DynamicResource ink-2}" Text="{Binding Text}"/>
+                    <TextBlock IsVisible="{Binding FollowsFilter}" Theme="{StaticResource type-meta}"
+                               Foreground="{DynamicResource ink-2}" Text="{Binding Text}"/>
+                  </Panel>
+                </Border>
+              </DataTemplate>
+
+              <!-- The row of a team rule: id, title and what it is for, the effect control, the switch. Four columns 12 apart:
+                   56, the rest, 84, 52; in one pane a fifth, 16, with the arrow that opens the rule. -->
+              <DataTemplate DataType="local:TeamRuleRowViewModel" x:DataType="local:TeamRuleRowViewModel">
+                <Grid Name="RowRoot" Margin="12,12,12,8" ColumnDefinitions="56,*,96,64,Auto" RowDefinitions="Auto,Auto"
+                      AutomationProperties.Name="{Binding SpokenName}">
+
+                  <TextBlock Grid.Column="0" Theme="{StaticResource code}" TextWrapping="NoWrap">
+                    <Run Text="{Binding IdFamily}" FontWeight="SemiBold"/><Run Text="{Binding IdNumber}" Foreground="{DynamicResource ink-2}"/>
+                  </TextBlock>
+
+                  <TextBlock Grid.Column="1" Classes="rule-title" Classes.off="{Binding RuleIsOff}"
+                             Theme="{StaticResource type-body-strong}" Margin="12,0,0,0" TextWrapping="Wrap" MaxLines="2"
+                             TextTrimming="CharacterEllipsis" Text="{Binding Title}" ToolTip.Tip="{Binding Title}"/>
+
+                  <StackPanel Grid.Row="1" Grid.Column="1" Orientation="Horizontal" Spacing="5" Height="20" Margin="12,4,0,0">
+                    <Border Background="{DynamicResource for}" CornerRadius="6" Height="20" Padding="7,0">
+                      <TextBlock Theme="{StaticResource type-label}" Foreground="{DynamicResource for-ink}"
+                                 VerticalAlignment="Center" Text="{Binding ArtifactText}"/>
+                    </Border>
+                    <TextBlock Theme="{StaticResource type-meta}" Foreground="{DynamicResource ink-2}"
+                               VerticalAlignment="Center" Text="in"/>
+                    <Border Background="{DynamicResource for}" CornerRadius="6" Height="20" Padding="7,0">
+                      <TextBlock Theme="{StaticResource type-label}" Foreground="{DynamicResource for-ink}"
+                                 VerticalAlignment="Center" Text="{Binding LanguageText}"/>
+                    </Border>
+                    <StackPanel Orientation="Horizontal" Spacing="6" Margin="5,0,0,0" IsVisible="{Binding ShowsUnsaved}">
+                      <Ellipse Width="7" Height="7" Fill="{DynamicResource ink}" VerticalAlignment="Center"/>
+                      <TextBlock Theme="{StaticResource type-meta}" FontWeight="Medium" Foreground="{DynamicResource ink}"
+                                 VerticalAlignment="Center" Text="Unsaved"/>
+                    </StackPanel>
+                  </StackPanel>
+
+                  <Button Name="EffectButton" Grid.Column="2" Grid.RowSpan="2" Classes="effect" Classes.ring="{Binding RingOnEffect}"
+                          Classes.open="{Binding IsEffectMenuOpen}" Width="92" Height="36" HorizontalAlignment="Left"
+                          VerticalAlignment="Top" Margin="6,-8,0,0" Command="{Binding ToggleEffectMenuCommand}"
+                          IsVisible="{Binding !RuleIsOff}" AutomationProperties.Name="{Binding EffectSpokenName}">
+                    <DockPanel LastChildFill="False" VerticalAlignment="Center">
+                      <parts:Icon DockPanel.Dock="Right" Data="{StaticResource i-down}" Width="11" Height="11"
+                                  StrokeThickness="1.8" Stroke="{DynamicResource ink-3}" Margin="0,0,1,0"/>
+                      <StackPanel DockPanel.Dock="Left" Orientation="Horizontal" Spacing="6" Margin="1,0,0,0">
+                        <parts:EffectMark Classes.block="{Binding MarkIsBlock}" Classes.warn="{Binding MarkIsWarn}"
+                                          Kind="{Binding EffectKind}" Width="14" Height="14"/>
+                        <TextBlock Theme="{StaticResource type-effect}" Text="{Binding EffectWord}"/>
+                      </StackPanel>
+                    </DockPanel>
+                  </Button>
+
+                  <!-- A rule that is off says so as a statement ("Off", not a control) and, under it, the control that holds what it
+                       would do when it is on. -->
+                  <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="6" Height="20" VerticalAlignment="Top" Margin="13,0,0,0"
+                              IsVisible="{Binding RuleIsOff}">
+                    <parts:Icon Data="{StaticResource i-off}" Width="14" Height="14" Stroke="{DynamicResource off}" VerticalAlignment="Center"/>
+                    <TextBlock Theme="{StaticResource type-meta}" Foreground="{DynamicResource ink-2}" VerticalAlignment="Center" Text="Off"/>
+                  </StackPanel>
+                  <Button Name="OffEffectButton" Grid.Row="1" Grid.Column="2" Grid.ColumnSpan="2" Classes="effect" Classes.ring="{Binding RingOnEffect}"
+                          Classes.open="{Binding IsEffectMenuOpen}" Height="24" HorizontalAlignment="Left" VerticalAlignment="Top" Margin="14,2,0,-2"
+                          Command="{Binding ToggleEffectMenuCommand}" IsVisible="{Binding RuleIsOff}" AutomationProperties.Name="{Binding EffectSpokenName}">
+                    <StackPanel Orientation="Horizontal" Spacing="5" VerticalAlignment="Center" Margin="1,0,0,0">
+                      <TextBlock Theme="{StaticResource type-effect}" FontWeight="Normal" Foreground="{DynamicResource ink-2}" Text="{Binding OffEffectWord}"/>
+                      <parts:Icon Data="{StaticResource i-down}" Width="11" Height="11" StrokeThickness="1.8" Stroke="{DynamicResource ink-3}" VerticalAlignment="Center"/>
+                    </StackPanel>
+                  </Button>
+
+                  <ToggleButton Grid.Column="3" Grid.RowSpan="2" Classes="cfswitch" Classes.ring="{Binding RingOnSwitch}"
+                                HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,-2,0,0"
+                                IsChecked="{Binding IsOn, Mode=OneWay}" Command="{Binding ToggleSwitchCommand}"
+                                AutomationProperties.Name="{Binding SwitchSpokenName}"/>
+
+                  <parts:Icon Grid.Column="4" Grid.RowSpan="2" Data="{StaticResource i-right}" Width="16" Height="16" Margin="12,2,0,0"
+                              VerticalAlignment="Top" Stroke="{DynamicResource ink-3}"
+                              IsVisible="{Binding $parent[local:RuleListBox].IsOnePane}"/>
+
+                  <!-- The menu of the effect opens in the overlay layer, 4 under the row, its right edge in line with the
+                       control's. -->
+                  <Popup IsOpen="{Binding IsEffectMenuOpen, Mode=TwoWay}" PlacementTarget="{Binding #RowRoot}"
+                         Placement="BottomEdgeAlignedRight" VerticalOffset="12"
+                         HorizontalOffset="{Binding $parent[local:RuleListBox].IsOnePane, Converter={x:Static local:MenuOffset.Horizontal}}"
+                         IsLightDismissEnabled="True" ShouldUseOverlayLayer="True">
+                    <Border Width="344" Background="{DynamicResource page}" BorderBrush="{DynamicResource line-strong}"
+                            BorderThickness="1" CornerRadius="12" Padding="6" BoxShadow="{DynamicResource shadow-popup}">
+                      <ItemsControl ItemsSource="{Binding Entries}">
+                        <ItemsControl.ItemTemplate>
+                          <DataTemplate DataType="local:EffectMenuEntry" x:DataType="local:EffectMenuEntry">
+                            <Button Classes="menu-entry" Classes.highlight="{Binding IsHighlighted}"
+                                    Command="{Binding $parent[ItemsControl].((local:TeamRuleRowViewModel)DataContext).ChooseCommand}"
+                                    CommandParameter="{Binding}" AutomationProperties.Name="{Binding Label}">
+                              <Grid ColumnDefinitions="Auto,*,16" ColumnSpacing="8">
+                                <parts:EffectMark Classes.block="{Binding IsBlock}" Classes.warn="{Binding !IsBlock}"
+                                                  Kind="{Binding Kind}" Width="14" Height="14"/>
+                                <TextBlock Grid.Column="1" Classes="entry-label" Classes.current="{Binding IsCurrent}"
+                                           Theme="{StaticResource type-body}" Text="{Binding Label}"/>
+                                <parts:Icon Grid.Column="2" IsVisible="{Binding IsCurrent}" Data="{StaticResource i-check}"
+                                            Width="14" Height="14" Stroke="{DynamicResource ink}"/>
+                              </Grid>
+                            </Button>
+                          </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                      </ItemsControl>
+                    </Border>
+                  </Popup>
+                </Grid>
+              </DataTemplate>
+
+              <!-- The row of a rule that .editorconfig sets: id, title, the file's setting as a fact (the mark and the word of its
+                   effect, or "Off in the file"), and the line of the file that sets it as a link. No control changes the rule:
+                   no arrow, no menu, no switch. The row has no second line, so it is 12 above and 12 below. -->
+              <DataTemplate DataType="local:FileRuleRowViewModel" x:DataType="local:FileRuleRowViewModel">
+                <Grid Name="RowRoot" Margin="12" ColumnDefinitions="56,*,96,64,Auto" AutomationProperties.Name="{Binding SpokenName}">
+
+                  <TextBlock Grid.Column="0" Theme="{StaticResource code}" TextWrapping="NoWrap">
+                    <Run Text="{Binding IdFamily}" FontWeight="SemiBold"/><Run Text="{Binding IdNumber}" Foreground="{DynamicResource ink-2}"/>
+                  </TextBlock>
+
+                  <TextBlock Grid.Column="1" Classes="rule-title" Classes.off="{Binding RuleIsOff}"
+                             Theme="{StaticResource type-body-strong}" LineHeight="20" Margin="12,0,0,0" TextWrapping="Wrap" MaxLines="2"
+                             TextTrimming="CharacterEllipsis" Text="{Binding Title}" ToolTip.Tip="{Binding Title}"/>
+
+                  <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="6" Margin="16,3,0,0" VerticalAlignment="Top"
+                              IsVisible="{Binding ShowsEffect}">
+                    <parts:EffectMark Classes.block="{Binding MarkIsBlock}" Classes.warn="{Binding MarkIsWarn}"
+                                      Kind="{Binding EffectKind}" Width="14" Height="14"/>
+                    <TextBlock Theme="{StaticResource type-effect}" Text="{Binding EffectWord}"/>
+                  </StackPanel>
+
+                  <StackPanel Grid.Column="2" Grid.ColumnSpan="2" Orientation="Horizontal" Spacing="6" Margin="16,3,0,0"
+                              VerticalAlignment="Top" IsVisible="{Binding IsOffInFile}" ToolTip.Tip="{Binding OffToolTip}">
+                    <parts:EffectMark Classes="off" Kind="Off" Width="14" Height="14"/>
+                    <TextBlock Theme="{StaticResource type-meta}" Foreground="{DynamicResource ink-2}" VerticalAlignment="Center"
+                               Text="Off in the file"/>
+                  </StackPanel>
+
+                  <TextBlock Grid.Column="2" Theme="{StaticResource type-meta}" Foreground="{DynamicResource ink-2}"
+                             Margin="16,1,0,0" VerticalAlignment="Top" TextTrimming="CharacterEllipsis"
+                             IsVisible="{Binding ShowsStateWord}" Text="{Binding StateWord}" ToolTip.Tip="{Binding StateToolTip}"/>
+
+                  <Button Grid.Column="3" Classes="linelink" Classes.ring="{Binding RingOnLine}" Width="72" Height="36"
+                          HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,-8,0,-8"
+                          IsVisible="{Binding ShowsLine}" Command="{Binding OpenFileCommand}"
+                          ToolTip.Tip="{Binding LineToolTip}" AutomationProperties.Name="{Binding LineSpokenName}">
+                    <TextBlock Classes="line-text" Theme="{StaticResource type-meta}" FontFeatures="+tnum" Text="{Binding LineText}"/>
+                  </Button>
+
+                  <parts:Icon Grid.Column="4" Data="{StaticResource i-right}" Width="16" Height="16" Margin="12,2,0,0"
+                              VerticalAlignment="Top" Stroke="{DynamicResource ink-3}"
+                              IsVisible="{Binding $parent[local:RuleListBox].IsOnePane}"/>
+                </Grid>
+              </DataTemplate>
+
+            </local:RuleListBox.DataTemplates>
+          </local:RuleListBox>
+
+          <!-- The heading of the group whose rules are at the top stays in view while they scroll under it, and leaves with
+               its last rule. It is drawn over the list, 44 high, on the list column's colour. -->
+          <ContentControl Name="StickyHeading" IsVisible="False" VerticalAlignment="Top" Margin="8,0,12,0" Background="{DynamicResource side}"/>
+
+          <!-- The search finds nothing: in place of the rows, 48 from the top, centred. -->
+          <StackPanel IsVisible="{Binding HasNoMatch}" Margin="16,48,16,0" Spacing="12" HorizontalAlignment="Center"
+                      VerticalAlignment="Top">
+            <TextBlock Theme="{StaticResource type-body}" Foreground="{DynamicResource ink-2}" TextAlignment="Center"
+                       Text="{Binding NoMatchText}"/>
+            <Button Classes="cf quiet" HorizontalAlignment="Center" Command="{Binding ClearSearchCommand}">
+              <TextBlock Theme="{StaticResource type-body-strong}" FontWeight="Medium" Text="Clear the search"/>
+            </Button>
+          </StackPanel>
+        </Panel>
+      </Grid>
+    </Border>
+
+    <!-- The page: the page of the open rule, under the title strip. Each rule's page is made when the rule is first opened and
+         then only shown and hidden, so choosing another rule builds nothing. With no rule open it says so, 96 from the top. -->
+    <Border Name="PagePane" Grid.Column="1" Background="{DynamicResource page}">
+      <Panel Margin="0,36,0,0">
+        <Panel Name="PageHost"/>
+        <!-- No row to open: the empty block, its middle at 40 percent of the pane's height. -->
+        <StackPanel Name="NoRuleBlock" IsVisible="{Binding ShowsNoRuleBlock}" MaxWidth="520" HorizontalAlignment="Center" VerticalAlignment="Top"
+                    Margin="32,32,32,0">
+          <TextBlock Theme="{StaticResource type-title}" TextAlignment="Center" TextWrapping="Wrap" Text="{Binding NoRuleHeading}"/>
+          <TextBlock Theme="{StaticResource type-lead}" Foreground="{DynamicResource ink-2}" TextAlignment="Center" TextWrapping="Wrap" Margin="0,8,0,0"
+                     Text="{Binding NoRuleLead}"/>
+          <Border Background="{DynamicResource well}" CornerRadius="16" Padding="20,16" HorizontalAlignment="Center" Margin="0,16,0,0"
+                  AutomationProperties.Name="{Binding SpecimenSpokenName}">
+            <review:SentencePieces Pieces="{Binding Specimen}" IsHitTestVisible="False"/>
+          </Border>
+          <Button Classes="cf outlined" HorizontalAlignment="Center" Margin="0,24,0,0" IsVisible="{Binding HasNoRules}"
+                  Command="{Binding NewRuleFromHeadCommand}" AutomationProperties.Name="New rule">
+            <StackPanel Orientation="Horizontal" Spacing="8">
+              <parts:Icon Data="{StaticResource i-plus}" Width="16" Height="16" Stroke="{Binding $parent[Button].Foreground}"/>
+              <TextBlock Theme="{StaticResource type-body-strong}" Text="New rule"/>
+            </StackPanel>
+          </Button>
+        </StackPanel>
+      </Panel>
+    </Border>
+
+  </Grid>
+
+</UserControl>

@@ -1,0 +1,21 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <!-- the generated code of the one call into Windows (EnvironmentBroadcast) needs it -->
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+  </PropertyGroup>
+
+  <!-- the public key that releases are signed for is part of the program: an update is only taken from a list it signed -->
+  <ItemGroup>
+    <EmbeddedResource Include="Updates\update-signing-key.pem" LogicalName="update-signing-key.pem" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="CF.Tests" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\CF.Core\CF.Core.csproj" />
+  </ItemGroup>
+
+</Project>

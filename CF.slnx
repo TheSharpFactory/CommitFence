@@ -1,0 +1,19 @@
+<Solution>
+  <Folder Name="/App/">
+    <Project Path="App/CF.App/CF.App.csproj" />
+    <Project Path="App/CF.Cli/CF.Cli.csproj" />
+  </Folder>
+  <Folder Name="/Tools/">
+    <Project Path="Tools/CF.App.Check/CF.App.Check.csproj" />
+  </Folder>
+  <Folder Name="/Tests/">
+    <Project Path="Tests/CF.Tests/CF.Tests.csproj" />
+  </Folder>
+  <Folder Name="/Dependencies/">
+    <Project Path="Dependencies/CF.Adapters/CF.Adapters.csproj" />
+    <Project Path="Dependencies/CF.Composition/CF.Composition.csproj" />
+    <Project Path="Dependencies/CF.Core/CF.Core.csproj" />
+    <Project Path="Dependencies/CF.Languages.CSharp/CF.Languages.CSharp.csproj" />
+    <Project Path="Dependencies/CF.Meaning/CF.Meaning.csproj" />
+  </Folder>
+</Solution>

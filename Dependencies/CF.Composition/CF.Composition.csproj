@@ -1,0 +1,9 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <ItemGroup>
+    <ProjectReference Include="..\CF.Core\CF.Core.csproj" />
+    <ProjectReference Include="..\CF.Languages.CSharp\CF.Languages.CSharp.csproj" />
+    <ProjectReference Include="..\CF.Adapters\CF.Adapters.csproj" />
+  </ItemGroup>
+
+</Project>

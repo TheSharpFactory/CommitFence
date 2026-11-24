@@ -1,0 +1,57 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:local="using:CF.App.Rules.Page"
+             xmlns:parts="using:CF.App.Parts"
+             x:Class="CF.App.Rules.Page.PickerPanel"
+             x:ClassModifier="internal"
+             x:DataType="local:PickerViewModel">
+
+  <!-- The panel a token opens: a find row when there are more than eight entries, then
+       the entries, in groups when the picker has groups. At most 392 high; then the entries scroll and the find row stays. -->
+  <Border Name="Surface" Classes="picker" Width="{Binding Width}" AutomationProperties.Name="{Binding SpokenName}">
+    <StackPanel>
+
+      <Border IsVisible="{Binding HasFindRow}" Height="36" Padding="10,0" Margin="0,0,0,4"
+              BorderBrush="{DynamicResource line}" BorderThickness="0,0,0,1">
+        <Grid ColumnDefinitions="Auto,*" ColumnSpacing="8">
+          <parts:Icon Data="{StaticResource i-search}" Width="16" Height="16" Stroke="{DynamicResource ink-3}"/>
+          <TextBox Name="Find" Grid.Column="1" Classes="bare" Text="{Binding FindText, Mode=TwoWay}"
+                   PlaceholderText="{Binding FindPlaceholder}" AutomationProperties.Name="{Binding FindPlaceholder}"/>
+        </Grid>
+      </Border>
+
+      <TextBlock IsVisible="{Binding ShowsNoMatch}" Height="36" Padding="10,8,10,0"
+                 Theme="{StaticResource type-body}" Foreground="{DynamicResource ink-3}" Text="{Binding NoMatchText}"/>
+
+      <ScrollViewer MaxHeight="340" HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
+        <ItemsControl ItemsSource="{Binding Items}">
+          <ItemsControl.DataTemplates>
+
+            <DataTemplate DataType="local:PickerGroupLabel" x:DataType="local:PickerGroupLabel">
+              <TextBlock Classes="group-label" Height="28" Padding="10,6,10,0" Theme="{StaticResource type-meta}"
+                         Text="{Binding Text}"/>
+            </DataTemplate>
+
+            <DataTemplate DataType="local:PickerEntryViewModel" x:DataType="local:PickerEntryViewModel">
+              <Button Classes="pick" Classes.highlight="{Binding IsHighlighted}" IsEnabled="{Binding IsEnabled}"
+                      Command="{Binding $parent[ItemsControl].((local:PickerViewModel)DataContext).ChooseCommand}"
+                      CommandParameter="{Binding}" AutomationProperties.Name="{Binding Name}">
+                <Grid ColumnDefinitions="*,Auto,16" ColumnSpacing="10">
+                  <TextBlock Classes="entry-name" Classes.current="{Binding IsCurrent}" Theme="{StaticResource type-body}"
+                             Text="{Binding Name}" VerticalAlignment="Center"/>
+                  <TextBlock Grid.Column="1" Theme="{StaticResource type-meta}" Foreground="{DynamicResource ink-2}"
+                             Text="{Binding KindText}" VerticalAlignment="Center"/>
+                  <parts:Icon Grid.Column="2" IsVisible="{Binding IsCurrent}" Data="{StaticResource i-check}" Width="14"
+                              Height="14" Stroke="{DynamicResource ink}"/>
+                </Grid>
+              </Button>
+            </DataTemplate>
+
+          </ItemsControl.DataTemplates>
+        </ItemsControl>
+      </ScrollViewer>
+
+    </StackPanel>
+  </Border>
+
+</UserControl>

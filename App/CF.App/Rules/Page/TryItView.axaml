@@ -1,0 +1,109 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:local="using:CF.App.Rules.Page"
+             xmlns:parts="using:CF.App.Parts"
+             xmlns:ae="using:AvaloniaEdit"
+             x:Class="CF.App.Rules.Page.TryItView"
+             x:ClassModifier="internal"
+             x:DataType="local:TryItViewModel">
+
+  <!-- Try it: the head with its labels, and the code box, a field with its first row, its line
+       numbers, its labels and its band. The box takes the height the page has left. -->
+  <UserControl.Styles>
+    <Style Selector="Panel.codebox Border.edge">
+      <Setter Property="BorderBrush" Value="{DynamicResource line-strong}"/>
+      <Setter Property="BorderThickness" Value="1"/>
+    </Style>
+    <Style Selector="Panel.codebox:pointerover Border.edge">
+      <Setter Property="BorderBrush" Value="{DynamicResource ink-3}"/>
+    </Style>
+    <Style Selector="Panel.codebox.editing Border.edge">
+      <Setter Property="BorderBrush" Value="{DynamicResource focus}"/>
+      <Setter Property="BorderThickness" Value="2"/>
+    </Style>
+  </UserControl.Styles>
+
+  <Grid RowDefinitions="Auto,Auto">
+
+    <Grid Name="Head" ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto" Margin="0,20,0,10" MinHeight="24">
+      <TextBlock Name="Heading" Theme="{StaticResource type-h2}" VerticalAlignment="Center" Text="Try it"/>
+      <StackPanel Name="HeadRight" Grid.Column="1" Orientation="Horizontal" Spacing="6" VerticalAlignment="Center"
+                  HorizontalAlignment="Right">
+        <StackPanel Orientation="Horizontal" Spacing="6" IsVisible="{Binding ShowsCounts}"
+                    AutomationProperties.Name="{Binding CountsSpokenName}">
+          <local:TryLabel Kind="Breaks" Word="{Binding BreaksWord}" IsZero="{Binding NoBreaks}"/>
+          <local:TryLabel Kind="Follows" Word="{Binding FollowsWord}" IsZero="{Binding NoFollows}"/>
+          <local:TryLabel Kind="NotCovered" Word="{Binding NotCoveredWord}" IsZero="{Binding NoNotCovered}"/>
+        </StackPanel>
+        <local:TryLabel Kind="Warn" Word="{Binding ParseText}" IsVisible="{Binding ShowsParse}"
+                        AutomationProperties.Name="{Binding ParseText}"/>
+        <TextBlock Name="MessageText" Theme="{StaticResource type-meta}" Foreground="{DynamicResource ink-2}" TextWrapping="Wrap"
+                   VerticalAlignment="Center" IsVisible="{Binding ShowsMessage}" Text="{Binding Message}"
+                   AutomationProperties.Name="{Binding Message}"/>
+      </StackPanel>
+    </Grid>
+
+    <Border Name="Box" Grid.Row="1" CornerRadius="16" ClipToBounds="True" Background="{DynamicResource page}">
+      <Panel Name="BoxPanel" Classes="codebox">
+        <Grid Margin="1" RowDefinitions="36,*">
+
+          <Border BorderThickness="0,0,0,1" BorderBrush="{DynamicResource line}" Padding="16,0,4,0">
+            <Grid ColumnDefinitions="Auto,*,Auto,Auto" ColumnSpacing="4">
+              <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                <parts:Icon Data="{StaticResource i-type}" Width="14" Height="14" Stroke="{DynamicResource ink-3}"/>
+                <TextBlock Theme="{StaticResource type-meta}" Foreground="{DynamicResource ink-2}" VerticalAlignment="Center"
+                           Text="Type or paste C# here. The rule runs as you type."/>
+              </StackPanel>
+              <Button Name="PasteButton" Grid.Column="2" Classes="cf quiet small" AutomationProperties.Name="Paste"
+                      ToolTip.Tip="Put the text on the clipboard in place of the code">
+                <StackPanel Orientation="Horizontal" Spacing="6">
+                  <parts:Icon Data="{StaticResource i-paste}" Width="14" Height="14" Stroke="{Binding $parent[Button].Foreground}"/>
+                  <TextBlock Theme="{StaticResource type-meta-strong}" Text="Paste"/>
+                </StackPanel>
+              </Button>
+              <Button Name="ClearButton" Grid.Column="3" Classes="cf quiet small" IsVisible="{Binding HasCode}"
+                      AutomationProperties.Name="Clear" ToolTip.Tip="Empty the box">
+                <StackPanel Orientation="Horizontal" Spacing="6">
+                  <parts:Icon Data="{StaticResource i-x}" Width="14" Height="14" Stroke="{Binding $parent[Button].Foreground}"/>
+                  <TextBlock Theme="{StaticResource type-meta-strong}" Text="Clear"/>
+                </StackPanel>
+              </Button>
+            </Grid>
+          </Border>
+
+          <Panel Grid.Row="1" Margin="0,8,0,10">
+            <!-- Nothing in the box looks typed: while the rule can be tried the body holds the block that says what to put in it;
+                 while it cannot, line 1 holds the placeholder as a hint. -->
+            <StackPanel Name="EmptyBlock" ZIndex="1" IsVisible="{Binding ShowsEmptyBlock}" MaxWidth="520" HorizontalAlignment="Center"
+                        VerticalAlignment="Center">
+              <TextBlock Theme="{StaticResource type-body}" TextAlignment="Center" TextWrapping="Wrap" IsHitTestVisible="False" Text="{Binding BlockSentence}"/>
+              <TextBlock Theme="{StaticResource type-meta}" Foreground="{DynamicResource ink-2}" TextAlignment="Center" TextWrapping="Wrap" Margin="0,4,0,0"
+                         IsHitTestVisible="False" Text="{Binding BlockLegendLine}"/>
+              <StackPanel Orientation="Horizontal" Spacing="6" HorizontalAlignment="Center" Margin="0,12,0,0" IsHitTestVisible="False"
+                          AutomationProperties.Name="Breaks it, Follows it, Not covered">
+                <local:TryLabel Kind="Breaks" Word="Breaks it"/>
+                <local:TryLabel Kind="Follows" Word="Follows it"/>
+                <local:TryLabel Kind="NotCovered" Word="Not covered"/>
+              </StackPanel>
+              <Button Name="ExampleButton" Classes="cf outlined" HorizontalAlignment="Center" Margin="0,20,0,0" IsVisible="{Binding HasExample}"
+                      Command="{Binding LoadExampleCommand}" AutomationProperties.Name="Load an example">
+                <TextBlock Theme="{StaticResource type-body-strong}" Text="Load an example"/>
+              </Button>
+            </StackPanel>
+            <ae:TextEditor Name="Editor" ShowLineNumbers="False" Background="Transparent" Padding="0"
+                           HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto" WordWrap="False"
+                           FontFamily="Cascadia Mono, Consolas, Menlo, DejaVu Sans Mono, monospace" FontSize="13"
+                           Foreground="{DynamicResource ink}" AutomationProperties.Name="Code to try the rule on"/>
+            <TextBlock Name="PlaceholderText" Theme="{StaticResource type-meta}" Foreground="{DynamicResource ink-3}"
+                       IsHitTestVisible="False" IsVisible="{Binding ShowsHint}" Margin="49,0,0,0" VerticalAlignment="Top"
+                       Text="{Binding Placeholder}"/>
+          </Panel>
+        </Grid>
+
+        <Border Name="Edge" Classes="edge" CornerRadius="16" IsHitTestVisible="False"/>
+      </Panel>
+    </Border>
+
+  </Grid>
+
+</UserControl>

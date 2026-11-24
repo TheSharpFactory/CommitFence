@@ -1,0 +1,6 @@
+# Line endings: every file is LF, as .editorconfig says, on Windows too. The checks' .sh files must stay LF or bash
+# cannot run them.
+* text=auto eol=lf
+
+*.png binary
+*.ico binary

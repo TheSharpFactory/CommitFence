@@ -1,0 +1,22 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             x:Class="CF.App.Parts.LogoMark"
+             x:ClassModifier="internal"
+             Width="32" Height="32"
+             AutomationProperties.Name="CommitFence">
+
+  <!-- The logo: a fence of three pickets in the colours of a rule's three clauses on a white
+       rail, on a tile. Five plain shapes in three layers: the tile, the rail, the pickets. -->
+  <Canvas Width="32" Height="32">
+    <Border Width="32" Height="32" CornerRadius="10" Background="{DynamicResource logo-tile}"/>
+    <Border Canvas.Left="4" Canvas.Top="18" Width="24" Height="2.6" CornerRadius="1.3"
+            Background="{DynamicResource logo-rail}"/>
+    <Path Data="M6.7,24.7 L6.7,11.4 L9,9.1 L11.3,11.4 L11.3,24.7 Z" StrokeThickness="1" StrokeJoin="Round"
+          Fill="{DynamicResource logo-for}" Stroke="{DynamicResource logo-for}"/>
+    <Path Data="M13.7,24.7 L13.7,11.4 L16,9.1 L18.3,11.4 L18.3,24.7 Z" StrokeThickness="1" StrokeJoin="Round"
+          Fill="{DynamicResource logo-where}" Stroke="{DynamicResource logo-where}"/>
+    <Path Data="M20.7,24.7 L20.7,11.4 L23,9.1 L25.3,11.4 L25.3,24.7 Z" StrokeThickness="1" StrokeJoin="Round"
+          Fill="{DynamicResource logo-req}" Stroke="{DynamicResource logo-req}"/>
+  </Canvas>
+
+</UserControl>

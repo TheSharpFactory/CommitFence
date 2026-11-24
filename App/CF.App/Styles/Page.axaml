@@ -1,0 +1,274 @@
+<Styles xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:parts="using:CF.App.Parts">
+
+  <!-- The parts of the page of a rule (the second button, the sentence, its tokens, the picker, the
+       choice of effect). Colours come from the token dictionaries only. -->
+
+  <!-- Second button ("Discard", the add button of the sentence): the page, an edge of line-strong, ink. Under the pointer
+       hover; pressed line; disabled: label and edge fainter. -->
+  <Style Selector="Button.cf.second">
+    <Setter Property="Background" Value="{DynamicResource page}"/>
+    <Setter Property="BorderBrush" Value="{DynamicResource line-strong}"/>
+    <Setter Property="Foreground" Value="{DynamicResource ink}"/>
+  </Style>
+  <Style Selector="Button.cf.second:pointerover">
+    <Setter Property="Background" Value="{DynamicResource hover}"/>
+  </Style>
+  <Style Selector="Button.cf.second:pressed">
+    <Setter Property="Background" Value="{DynamicResource line}"/>
+  </Style>
+  <Style Selector="Button.cf.second:disabled">
+    <Setter Property="BorderBrush" Value="{DynamicResource line}"/>
+    <Setter Property="Foreground" Value="{DynamicResource ink-disabled}"/>
+  </Style>
+
+  <!-- A token of the sentence: 36 high, radius 10, padding 0 10 0 12. For, where and the last clause take their colours; under
+       the pointer it rises 1 and pressed it shrinks to 0.96 (motion 5). Empty: the page, an edge of line-strong, a faint word.
+       Not valid: an edge of 2 in block, inside. -->
+  <Style Selector="Button.token">
+    <Setter Property="ClipToBounds" Value="False"/>
+    <Setter Property="Height" Value="36"/>
+    <Setter Property="Padding" Value="12,0,10,0"/>
+    <Setter Property="CornerRadius" Value="10"/>
+    <Setter Property="BorderThickness" Value="1"/>
+    <Setter Property="BorderBrush" Value="Transparent"/>
+    <Setter Property="Background" Value="{DynamicResource page}"/>
+    <Setter Property="Foreground" Value="{DynamicResource ink}"/>
+    <Setter Property="VerticalContentAlignment" Value="Center"/>
+    <Setter Property="Template">
+      <ControlTemplate>
+        <Panel Name="Root" RenderTransform="translateY(0px) scale(1)">
+          <Panel.Transitions>
+            <Transitions>
+              <TransformOperationsTransition Property="RenderTransform" Duration="0:0:0.14" Easing="{x:Static parts:CubicBezierEasing.Spring}"/>
+            </Transitions>
+          </Panel.Transitions>
+          <parts:FocusRing Name="Ring" IsVisible="False" ControlRadius="10" GapBrush="{DynamicResource focus-gap}" LineBrush="{DynamicResource focus}"/>
+          <Border Name="Surface" Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}"
+                  BorderThickness="{TemplateBinding BorderThickness}" CornerRadius="{TemplateBinding CornerRadius}"
+                  Padding="{TemplateBinding Padding}">
+            <ContentPresenter Name="ContentHost" Content="{TemplateBinding Content}" ContentTemplate="{TemplateBinding ContentTemplate}"
+                              VerticalContentAlignment="Center" Foreground="{TemplateBinding Foreground}"/>
+          </Border>
+          <Border Name="Invalid" IsVisible="False" IsHitTestVisible="False" BorderThickness="2"
+                  BorderBrush="{DynamicResource block}" CornerRadius="{TemplateBinding CornerRadius}"/>
+        </Panel>
+      </ControlTemplate>
+    </Setter>
+  </Style>
+  <Style Selector="Button.token.for">
+    <Setter Property="Background" Value="{DynamicResource for}"/>
+    <Setter Property="Foreground" Value="{DynamicResource for-ink}"/>
+  </Style>
+  <Style Selector="Button.token.where">
+    <Setter Property="Background" Value="{DynamicResource where}"/>
+    <Setter Property="Foreground" Value="{DynamicResource where-ink}"/>
+  </Style>
+  <Style Selector="Button.token.req">
+    <Setter Property="Background" Value="{DynamicResource req}"/>
+    <Setter Property="Foreground" Value="{DynamicResource req-ink}"/>
+  </Style>
+  <Style Selector="Button.token.forbid">
+    <Setter Property="Background" Value="{DynamicResource forbid}"/>
+    <Setter Property="Foreground" Value="{DynamicResource forbid-ink}"/>
+  </Style>
+  <Style Selector="Button.token.start">
+    <Setter Property="CornerRadius" Value="10,3,3,10"/>
+  </Style>
+  <Style Selector="Button.token.end">
+    <Setter Property="CornerRadius" Value="3,10,10,3"/>
+  </Style>
+  <Style Selector="Button.token.empty">
+    <Setter Property="Background" Value="{DynamicResource page}"/>
+    <Setter Property="BorderBrush" Value="{DynamicResource line-strong}"/>
+    <Setter Property="Foreground" Value="{DynamicResource ink-3}"/>
+    <Setter Property="CornerRadius" Value="10"/>
+  </Style>
+  <Style Selector="Button.token.empty TextBlock.word">
+    <Setter Property="FontWeight" Value="Normal"/>
+  </Style>
+  <Style Selector="Button.token:pointerover /template/ Panel#Root">
+    <Setter Property="RenderTransform" Value="translateY(-1px) scale(1)"/>
+  </Style>
+  <Style Selector="Button.token:pressed /template/ Panel#Root">
+    <Setter Property="RenderTransform" Value="translateY(0px) scale(0.96)"/>
+  </Style>
+  <Style Selector="Button.token:focus-visible /template/ parts|FocusRing#Ring">
+    <Setter Property="IsVisible" Value="True"/>
+  </Style>
+  <Style Selector="Button.token.open /template/ parts|FocusRing#Ring">
+    <Setter Property="IsVisible" Value="True"/>
+  </Style>
+  <Style Selector="Button.token.invalid /template/ Border#Invalid">
+    <Setter Property="IsVisible" Value="True"/>
+  </Style>
+  <Style Selector="TextBlock.comparison-word">
+    <Setter Property="FontWeight" Value="Normal"/>
+  </Style>
+
+  <!-- The remove button of a condition: 32 by 36, radius 10, no fill; the sign in ink-3. The ring is a line of 2 inside its
+       edge. -->
+  <Style Selector="Button.remove">
+    <Setter Property="Width" Value="32"/>
+    <Setter Property="Height" Value="36"/>
+    <Setter Property="Padding" Value="0"/>
+    <Setter Property="Foreground" Value="{DynamicResource ink-3}"/>
+    <Setter Property="Template">
+      <ControlTemplate>
+        <Panel>
+          <Border Name="Surface" CornerRadius="10" Background="Transparent">
+            <ContentPresenter Name="ContentHost" Content="{TemplateBinding Content}" HorizontalContentAlignment="Center"
+                              VerticalContentAlignment="Center" Foreground="{TemplateBinding Foreground}"/>
+          </Border>
+          <Border Name="Ring" IsVisible="False" IsHitTestVisible="False" CornerRadius="10" BorderThickness="2"
+                  BorderBrush="{DynamicResource focus}"/>
+        </Panel>
+      </ControlTemplate>
+    </Setter>
+  </Style>
+  <Style Selector="Button.remove:pointerover /template/ Border#Surface">
+    <Setter Property="Background" Value="{DynamicResource hover}"/>
+  </Style>
+  <Style Selector="Button.remove:pointerover">
+    <Setter Property="Foreground" Value="{DynamicResource ink}"/>
+  </Style>
+  <Style Selector="Button.remove:pressed /template/ Border#Surface">
+    <Setter Property="Background" Value="{DynamicResource line}"/>
+  </Style>
+  <Style Selector="Button.remove:focus-visible /template/ Border#Ring">
+    <Setter Property="IsVisible" Value="True"/>
+  </Style>
+
+  <!-- The word require or forbid: a plain word of the sentence that opens a picker. 36 high, radius 10, padding 0 6 0 8. -->
+  <Style Selector="Button.kw">
+    <Setter Property="ClipToBounds" Value="False"/>
+    <Setter Property="Height" Value="36"/>
+    <Setter Property="Padding" Value="8,0,6,0"/>
+    <Setter Property="Foreground" Value="{DynamicResource ink-2}"/>
+    <Setter Property="Template">
+      <ControlTemplate>
+        <Panel Name="Root">
+          <parts:FocusRing Name="Ring" IsVisible="False" ControlRadius="10" GapBrush="{DynamicResource focus-gap}" LineBrush="{DynamicResource focus}"/>
+          <Border Name="Surface" CornerRadius="10" Background="Transparent" Padding="{TemplateBinding Padding}">
+            <Border.Transitions>
+              <Transitions>
+                <BrushTransition Property="Background" Duration="0:0:0.14" Easing="{x:Static parts:CubicBezierEasing.Standard}"/>
+              </Transitions>
+            </Border.Transitions>
+            <ContentPresenter Name="ContentHost" Content="{TemplateBinding Content}" VerticalContentAlignment="Center"
+                              Foreground="{TemplateBinding Foreground}"/>
+          </Border>
+        </Panel>
+      </ControlTemplate>
+    </Setter>
+  </Style>
+  <Style Selector="Button.kw:pointerover /template/ Border#Surface">
+    <Setter Property="Background" Value="{DynamicResource hover}"/>
+  </Style>
+  <Style Selector="Button.kw:pointerover">
+    <Setter Property="Foreground" Value="{DynamicResource ink}"/>
+  </Style>
+  <Style Selector="Button.kw:focus-visible /template/ parts|FocusRing#Ring">
+    <Setter Property="IsVisible" Value="True"/>
+  </Style>
+  <Style Selector="Button.kw.open /template/ parts|FocusRing#Ring">
+    <Setter Property="IsVisible" Value="True"/>
+  </Style>
+
+  <!-- The title of the rule: a frame of radius 10, no edge at rest; under the pointer an edge of 1 in line-strong; focused an
+       edge of 2 in focus, drawn inside so nothing moves. -->
+  <Style Selector="Border.titlebox">
+    <Setter Property="CornerRadius" Value="10"/>
+    <Setter Property="BorderThickness" Value="1"/>
+    <Setter Property="BorderBrush" Value="Transparent"/>
+    <Setter Property="Padding" Value="7,1"/>
+  </Style>
+  <Style Selector="Border.titlebox:pointerover">
+    <Setter Property="BorderBrush" Value="{DynamicResource line-strong}"/>
+  </Style>
+  <Style Selector="Border.titlebox:focus-within">
+    <Setter Property="BorderBrush" Value="{DynamicResource focus}"/>
+    <Setter Property="BorderThickness" Value="2"/>
+    <Setter Property="Padding" Value="6,0"/>
+  </Style>
+
+  <!-- The choice of effect on the page: a larger segmented control. A track of hover, radius 14, padding 4; two segments 38
+       high, 4 apart, radius 10, each at least 172 wide. -->
+  <Style Selector="ListBox.segmented.large">
+    <Setter Property="CornerRadius" Value="14"/>
+    <Setter Property="Padding" Value="4"/>
+    <Setter Property="HorizontalAlignment" Value="Left"/>
+  </Style>
+  <Style Selector="ListBox.segmented.large ListBoxItem">
+    <Setter Property="Height" Value="38"/>
+    <Setter Property="MinWidth" Value="172"/>
+    <Setter Property="Margin" Value="2,0"/>
+    <Setter Property="Padding" Value="14,0"/>
+  </Style>
+  <Style Selector="ListBox.segmented.large ListBoxItem /template/ Border#Thumb">
+    <Setter Property="CornerRadius" Value="10"/>
+  </Style>
+  <Style Selector="ListBox.segmented.large ListBoxItem /template/ Border#Ring">
+    <Setter Property="CornerRadius" Value="10"/>
+  </Style>
+  <Style Selector="ListBox.segmented.large TextBlock.segment">
+    <Setter Property="FontWeight" Value="Normal"/>
+  </Style>
+  <Style Selector="ListBox.segmented.large ListBoxItem:selected TextBlock.segment">
+    <Setter Property="FontWeight" Value="SemiBold"/>
+  </Style>
+
+  <!-- A picker: the page, an edge of line-strong, radius 12, padding 6, the popup's shadow. An entry is 36 high,
+       radius 8; hover and the keyboard's highlight are hover; the current one is stronger and ticked. -->
+  <Style Selector="Border.picker">
+    <Setter Property="Background" Value="{DynamicResource page}"/>
+    <Setter Property="BorderBrush" Value="{DynamicResource line-strong}"/>
+    <Setter Property="BorderThickness" Value="1"/>
+    <Setter Property="CornerRadius" Value="12"/>
+    <Setter Property="Padding" Value="6"/>
+    <Setter Property="BoxShadow" Value="{DynamicResource shadow-popup}"/>
+    <Setter Property="Focusable" Value="True"/>
+  </Style>
+  <Style Selector="Button.pick">
+    <Setter Property="Focusable" Value="False"/>
+    <Setter Property="Height" Value="36"/>
+    <Setter Property="Padding" Value="10,0"/>
+    <Setter Property="HorizontalAlignment" Value="Stretch"/>
+    <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+    <Setter Property="Template">
+      <ControlTemplate>
+        <Border Name="Surface" CornerRadius="8" Background="Transparent" Padding="{TemplateBinding Padding}">
+          <ContentPresenter Content="{TemplateBinding Content}" ContentTemplate="{TemplateBinding ContentTemplate}"
+                            VerticalContentAlignment="Center" HorizontalContentAlignment="Stretch"/>
+        </Border>
+      </ControlTemplate>
+    </Setter>
+  </Style>
+  <Style Selector="Button.pick:pointerover:enabled /template/ Border#Surface">
+    <Setter Property="Background" Value="{DynamicResource hover}"/>
+  </Style>
+  <Style Selector="Button.pick.highlight /template/ Border#Surface">
+    <Setter Property="Background" Value="{DynamicResource hover}"/>
+  </Style>
+  <Style Selector="Button.pick TextBlock.entry-name.current">
+    <Setter Property="FontWeight" Value="SemiBold"/>
+  </Style>
+  <Style Selector="Button.pick:disabled TextBlock">
+    <Setter Property="Foreground" Value="{DynamicResource ink-disabled}"/>
+  </Style>
+  <Style Selector="TextBlock.group-label">
+    <Setter Property="Foreground" Value="{DynamicResource ink-2}"/>
+  </Style>
+
+  <!-- The switch on the page is a stop of the keyboard of its own; the ring shows when the keyboard is on it. -->
+  <Style Selector="ToggleButton.cfswitch:focus-visible /template/ parts|FocusRing#Ring">
+    <Setter Property="IsVisible" Value="True"/>
+  </Style>
+
+  <!-- The state of a rule beside its first row: "Unsaved" with a dot, "Saved" with a tick. -->
+  <Style Selector="TextBlock.save-state">
+    <Setter Property="FontWeight" Value="Medium"/>
+  </Style>
+
+</Styles>

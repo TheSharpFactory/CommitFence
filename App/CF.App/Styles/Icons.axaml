@@ -1,0 +1,36 @@
+<ResourceDictionary xmlns="https://github.com/avaloniaui"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+  <!-- The icons, each drawn on a 16 by 16 box. The two marks of an effect (i-block and
+       i-warn) are drawn by the EffectMark control, which has two brushes. -->
+  <StreamGeometry x:Key="i-rules">M7 4h6.5M7 8h6.5M7 12h6.5M2.5 4.2l1 1 1.8-2M2.5 8.2l1 1 1.8-2M2.5 12.2l1 1 1.8-2</StreamGeometry>
+  <StreamGeometry x:Key="i-review">M8 1.8l5 1.8v4c0 3.2-2.1 5.4-5 6.6-2.9-1.2-5-3.4-5-6.6v-4zM5.8 8l1.6 1.6 2.9-3.2</StreamGeometry>
+  <StreamGeometry x:Key="i-dash">M2.5 13.5v-5M6.2 13.5v-9M9.8 13.5V7M13.5 13.5v-11</StreamGeometry>
+  <StreamGeometry x:Key="i-exempt">M8 2a6 6 0 1 0 0 12A6 6 0 0 0 8 2zM3.8 12.2l8.4-8.4</StreamGeometry>
+  <StreamGeometry x:Key="i-arch">M5.5 2.5h5V6h-5zM1.5 10h5v3.5h-5zM9.5 10h5v3.5h-5zM8 6v2M4 10V8h8v2</StreamGeometry>
+  <StreamGeometry x:Key="i-set">M2 4.5h6.5M11.5 4.5H14M2 11.5h2.5M7.5 11.5H14M10 3a1.5 1.5 0 1 0 0 3 1.5 1.5 0 0 0 0-3zM6 10a1.5 1.5 0 1 0 0 3 1.5 1.5 0 0 0 0-3z</StreamGeometry>
+  <StreamGeometry x:Key="i-doc">M1.5 8.5h3l1.5-4 3 8 1.5-4h4</StreamGeometry>
+  <StreamGeometry x:Key="i-search">M7 2.5a4.5 4.5 0 1 0 0 9 4.5 4.5 0 0 0 0-9zM10.4 10.4l3.1 3.1</StreamGeometry>
+  <StreamGeometry x:Key="i-plus">M8 3v10M3 8h10</StreamGeometry>
+  <StreamGeometry x:Key="i-down">M4 6l4 4 4-4</StreamGeometry>
+  <StreamGeometry x:Key="i-right">M6 4l4 4-4 4</StreamGeometry>
+  <StreamGeometry x:Key="i-left">M10 4L6 8l4 4</StreamGeometry>
+  <StreamGeometry x:Key="i-x">M4 4l8 8M12 4l-8 8</StreamGeometry>
+  <StreamGeometry x:Key="i-lock-line">M4 7.5h8v6H4zM5.8 7.5V5.2a2.2 2.2 0 0 1 4.4 0v2.3</StreamGeometry>
+  <StreamGeometry x:Key="i-file">M4 1.8h5l3 3v9.4H4zM9 1.8v3h3</StreamGeometry>
+  <StreamGeometry x:Key="i-pen">M2.5 13.5l.6-3L10.6 3 13 5.4l-7.5 7.5zM9 4.6L11.4 7</StreamGeometry>
+  <StreamGeometry x:Key="i-check">M3 8.5l3.2 3.2L13 4.8</StreamGeometry>
+  <StreamGeometry x:Key="i-copy">M5.5 5.5h8v8h-8zM3 10.5h-.5v-8h8V3</StreamGeometry>
+  <StreamGeometry x:Key="i-branch">M5 2.5a1.5 1.5 0 1 0 0 3 1.5 1.5 0 0 0 0-3zM5 10.5a1.5 1.5 0 1 0 0 3 1.5 1.5 0 0 0 0-3zM11 4.5a1.5 1.5 0 1 0 0 3 1.5 1.5 0 0 0 0-3zM5 5.5v5M11 7.5c0 2-6 1.5-6 3</StreamGeometry>
+  <StreamGeometry x:Key="i-off">M8 2.5a5.5 5.5 0 1 0 0 11 5.5 5.5 0 0 0 0-11zM5.5 8h5</StreamGeometry>
+  <StreamGeometry x:Key="i-folder">M2 3.5h4.5l1.5 2h6v7H2z</StreamGeometry>
+  <StreamGeometry x:Key="i-time">M8 2.5a5.5 5.5 0 1 0 0 11 5.5 5.5 0 0 0 0-11zM8 5v3l2 1.5</StreamGeometry>
+  <StreamGeometry x:Key="i-layers">M8 2.5l5.5 3L8 8.5l-5.5-3zM2.5 8.5L8 11.5l5.5-3</StreamGeometry>
+  <StreamGeometry x:Key="i-more">M3.5 8h.01M8 8h.01M12.5 8h.01</StreamGeometry>
+  <StreamGeometry x:Key="i-bin">M2.5 4.5h11M6.2 4.5V2.8h3.6v1.7M4 4.5l.7 9h6.6l.7-9</StreamGeometry>
+  <StreamGeometry x:Key="i-open">M9.5 2.5h4v4M13.5 2.5L8 8M11.5 9.5v4h-9v-9h4</StreamGeometry>
+  <StreamGeometry x:Key="i-info">M8 2.5a5.5 5.5 0 1 0 0 11 5.5 5.5 0 0 0 0-11zM8 7.4v3.4M8 5.2v.1</StreamGeometry>
+  <StreamGeometry x:Key="i-paste">M5.5 3H3.5v10.5h9V3h-2M5.5 2h5v2.5h-5z</StreamGeometry>
+  <StreamGeometry x:Key="i-type">M5 2.5h1.5a1.5 1.5 0 0 1 1.5 1.5v8a1.5 1.5 0 0 1-1.5 1.5H5M11 2.5H9.5A1.5 1.5 0 0 0 8 4M11 13.5H9.5A1.5 1.5 0 0 1 8 12M6.5 8h3</StreamGeometry>
+
+</ResourceDictionary>

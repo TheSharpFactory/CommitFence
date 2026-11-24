@@ -1,0 +1,28 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <AssemblyName>commitfence</AssemblyName>
+    <RootNamespace>CF.Cli</RootNamespace>
+    <DisableTransitiveProjectReferences>true</DisableTransitiveProjectReferences>
+    <!-- the command line runs anywhere, also on bare images without language data -->
+    <InvariantGlobalization>true</InvariantGlobalization>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="CF.Tests" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\Dependencies\CF.Composition\CF.Composition.csproj" />
+    <ProjectReference Include="..\..\Dependencies\CF.Core\CF.Core.csproj" />
+  </ItemGroup>
+
+  <!-- the analyzer is a file of its own beside the program, never inside the single file: the team's compiler loads it from disk. The publish list already holds it (the build copied it, see CF.Languages.CSharp); without this it would be bundled into the program -->
+  <Target Name="KeepMeaningAnalyzerBesideProgram" AfterTargets="ComputeResolvedFilesToPublishList">
+    <ItemGroup>
+      <ResolvedFileToPublish ExcludeFromSingleFile="true" Condition="'%(RelativePath)' == 'analyzers\CF.Meaning.dll'" />
+    </ItemGroup>
+  </Target>
+
+</Project>

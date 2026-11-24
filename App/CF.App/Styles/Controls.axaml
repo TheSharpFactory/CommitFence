@@ -1,0 +1,443 @@
+<Styles xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:parts="using:CF.App.Parts">
+
+  <!-- The window and the text in it: ink on the page, in Inter. -->
+  <Style Selector="Window">
+    <Setter Property="Background" Value="{DynamicResource page}"/>
+    <Setter Property="Foreground" Value="{DynamicResource ink}"/>
+    <Setter Property="FontFamily" Value="avares://Avalonia.Fonts.Inter/Assets#Inter, Segoe UI, Helvetica Neue, sans-serif"/>
+  </Style>
+
+  <!-- The one place that decides a focus ring's shape: the framework's own square focus rectangle is never drawn. Every control
+       that can take the keyboard draws its ring in its own template, with the radius of the control. -->
+  <Style Selector=":is(Control)">
+    <Setter Property="FocusAdorner" Value="{x:Null}"/>
+  </Style>
+
+  <!-- Every tooltip: solid background, on-solid text in type-meta, padding 4 8, radius 8, no shadow, no arrow. -->
+  <Style Selector="ToolTip">
+    <Setter Property="Background" Value="{DynamicResource solid}"/>
+    <Setter Property="Foreground" Value="{DynamicResource on-solid}"/>
+    <Setter Property="BorderThickness" Value="0"/>
+    <Setter Property="CornerRadius" Value="8"/>
+    <Setter Property="Padding" Value="8,4"/>
+    <Setter Property="FontSize" Value="13"/>
+  </Style>
+
+  <!-- Buttons: 36 high, radius 10, padding 0 14, gap 8. Main is solid; quiet has no fill. The ring is two
+       layers, a band of focus-gap and a line of focus, drawn outside the edge; a main button adds a white line inside. -->
+  <Style Selector="Button.cf">
+    <Setter Property="ClipToBounds" Value="False"/>
+    <Setter Property="Height" Value="36"/>
+    <Setter Property="Padding" Value="14,0"/>
+    <Setter Property="CornerRadius" Value="10"/>
+    <Setter Property="BorderThickness" Value="1"/>
+    <Setter Property="Background" Value="Transparent"/>
+    <Setter Property="BorderBrush" Value="Transparent"/>
+    <Setter Property="HorizontalContentAlignment" Value="Center"/>
+    <Setter Property="VerticalContentAlignment" Value="Center"/>
+    <Setter Property="Template">
+      <ControlTemplate>
+        <Panel Name="Root" RenderTransform="scale(1)">
+          <Panel.Transitions>
+            <Transitions>
+              <TransformOperationsTransition Property="RenderTransform" Duration="0:0:0.14" Easing="{x:Static parts:CubicBezierEasing.Standard}"/>
+            </Transitions>
+          </Panel.Transitions>
+          <parts:FocusRing Name="Ring" IsVisible="False" ControlRadius="10" GapBrush="{DynamicResource focus-gap}" LineBrush="{DynamicResource focus}"/>
+          <Border Name="Surface" Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}"
+                  BorderThickness="{TemplateBinding BorderThickness}" CornerRadius="{TemplateBinding CornerRadius}"
+                  Padding="{TemplateBinding Padding}">
+            <Border.Transitions>
+              <Transitions>
+                <BrushTransition Property="Background" Duration="0:0:0.14" Easing="{x:Static parts:CubicBezierEasing.Standard}"/>
+              </Transitions>
+            </Border.Transitions>
+            <ContentPresenter Name="ContentHost" Content="{TemplateBinding Content}"
+                              ContentTemplate="{TemplateBinding ContentTemplate}"
+                              HorizontalContentAlignment="{TemplateBinding HorizontalContentAlignment}"
+                              VerticalContentAlignment="{TemplateBinding VerticalContentAlignment}"
+                              Foreground="{TemplateBinding Foreground}"/>
+          </Border>
+          <Border Name="Inner" IsVisible="False" IsHitTestVisible="False" Margin="2" BorderThickness="1.5"
+                  BorderBrush="{DynamicResource on-solid}" CornerRadius="8"/>
+        </Panel>
+      </ControlTemplate>
+    </Setter>
+  </Style>
+  <Style Selector="Button.cf:focus-visible /template/ parts|FocusRing#Ring">
+    <Setter Property="IsVisible" Value="True"/>
+  </Style>
+  <Style Selector="Button.cf:pressed /template/ Panel#Root">
+    <Setter Property="RenderTransform" Value="scale(0.97)"/>
+  </Style>
+
+  <Style Selector="Button.cf.main">
+    <Setter Property="Background" Value="{DynamicResource solid}"/>
+    <Setter Property="BorderBrush" Value="{DynamicResource solid}"/>
+    <Setter Property="Foreground" Value="{DynamicResource on-solid}"/>
+  </Style>
+  <Style Selector="Button.cf.main:pointerover">
+    <Setter Property="Background" Value="{DynamicResource solid-hover}"/>
+    <Setter Property="BorderBrush" Value="{DynamicResource solid-hover}"/>
+  </Style>
+  <Style Selector="Button.cf.main:pressed">
+    <Setter Property="Background" Value="{DynamicResource solid-hover}"/>
+    <Setter Property="BorderBrush" Value="{DynamicResource solid-hover}"/>
+  </Style>
+  <Style Selector="Button.cf.main:focus-visible /template/ Border#Inner">
+    <Setter Property="IsVisible" Value="True"/>
+  </Style>
+  <Style Selector="Button.cf.main:disabled">
+    <Setter Property="Background" Value="{DynamicResource hover}"/>
+    <Setter Property="BorderBrush" Value="{DynamicResource hover}"/>
+    <Setter Property="Foreground" Value="{DynamicResource ink-disabled}"/>
+  </Style>
+
+  <Style Selector="Button.cf.quiet">
+    <Setter Property="Foreground" Value="{DynamicResource ink-2}"/>
+  </Style>
+  <Style Selector="Button.cf.quiet:pointerover">
+    <Setter Property="Background" Value="{DynamicResource hover}"/>
+    <Setter Property="Foreground" Value="{DynamicResource ink}"/>
+  </Style>
+  <Style Selector="Button.cf.quiet:pressed">
+    <Setter Property="Background" Value="{DynamicResource line}"/>
+  </Style>
+  <Style Selector="Button.cf.quiet:disabled">
+    <Setter Property="Foreground" Value="{DynamicResource ink-disabled}"/>
+  </Style>
+
+  <!-- The second look: the page colour, a line of 1 around, the label in ink. -->
+  <Style Selector="Button.cf.outlined">
+    <Setter Property="Background" Value="{DynamicResource page}"/>
+    <Setter Property="BorderBrush" Value="{DynamicResource line-strong}"/>
+    <Setter Property="Foreground" Value="{DynamicResource ink}"/>
+  </Style>
+  <Style Selector="Button.cf.outlined:pointerover">
+    <Setter Property="Background" Value="{DynamicResource hover}"/>
+  </Style>
+  <Style Selector="Button.cf.outlined:pressed">
+    <Setter Property="Background" Value="{DynamicResource line}"/>
+  </Style>
+  <Style Selector="Button.cf.outlined:disabled">
+    <Setter Property="BorderBrush" Value="{DynamicResource line}"/>
+    <Setter Property="Foreground" Value="{DynamicResource ink-disabled}"/>
+  </Style>
+
+  <Style Selector="Button.cf.small /template/ parts|FocusRing#Ring">
+    <Setter Property="ControlRadius" Value="8"/>
+  </Style>
+  <Style Selector="Button.cf.round /template/ parts|FocusRing#Ring">
+    <Setter Property="ControlRadius" Value="12"/>
+  </Style>
+  <Style Selector="Button.cf.small">
+    <Setter Property="Height" Value="28"/>
+    <Setter Property="CornerRadius" Value="8"/>
+    <Setter Property="Padding" Value="10,0"/>
+  </Style>
+
+  <!-- The clear button of the search field: 24 by 24, radius 12. -->
+  <Style Selector="Button.cf.round">
+    <Setter Property="Height" Value="24"/>
+    <Setter Property="Width" Value="24"/>
+    <Setter Property="CornerRadius" Value="12"/>
+    <Setter Property="Padding" Value="0"/>
+  </Style>
+
+  <!-- The segmented control: a track of hover, radius 12; segments 30 high, 2 apart, radius 9. The chosen
+       segment sits on the thumb: page, an edge of line-strong, the raised shadow. The ring is on the segment that has
+       the keyboard, inside its edge. -->
+  <Style Selector="ListBox.segmented">
+    <Setter Property="Background" Value="{DynamicResource hover}"/>
+    <Setter Property="CornerRadius" Value="12"/>
+    <Setter Property="Padding" Value="2"/>
+    <Setter Property="BorderThickness" Value="0"/>
+    <Setter Property="ScrollViewer.HorizontalScrollBarVisibility" Value="Disabled"/>
+    <Setter Property="ScrollViewer.VerticalScrollBarVisibility" Value="Disabled"/>
+    <Setter Property="ItemsPanel">
+      <ItemsPanelTemplate>
+        <UniformGrid Rows="1"/>
+      </ItemsPanelTemplate>
+    </Setter>
+  </Style>
+  <Style Selector="ListBox.segmented ListBoxItem">
+    <Setter Property="Height" Value="30"/>
+    <Setter Property="Margin" Value="1,0"/>
+    <Setter Property="Padding" Value="12,0"/>
+    <Setter Property="FocusAdorner" Value="{x:Null}"/>
+    <Setter Property="Template">
+      <ControlTemplate>
+        <Panel>
+          <Border Name="Thumb" CornerRadius="9" BorderThickness="1" BorderBrush="Transparent" Background="Transparent"
+                  Padding="{TemplateBinding Padding}">
+            <ContentPresenter Name="ContentHost" Content="{TemplateBinding Content}"
+                              ContentTemplate="{TemplateBinding ContentTemplate}"
+                              HorizontalContentAlignment="Center" VerticalContentAlignment="Center"/>
+          </Border>
+          <Border Name="Ring" IsVisible="False" IsHitTestVisible="False" CornerRadius="9" BorderThickness="2"
+                  BorderBrush="{DynamicResource focus}"/>
+        </Panel>
+      </ControlTemplate>
+    </Setter>
+  </Style>
+  <Style Selector="ListBox.segmented ListBoxItem:selected /template/ Border#Thumb">
+    <Setter Property="Background" Value="{DynamicResource page}"/>
+    <Setter Property="BorderBrush" Value="{DynamicResource line-strong}"/>
+    <Setter Property="BoxShadow" Value="{DynamicResource shadow-raised}"/>
+  </Style>
+  <Style Selector="ListBox.segmented ListBoxItem:focus-visible /template/ Border#Ring">
+    <Setter Property="IsVisible" Value="True"/>
+  </Style>
+  <Style Selector="ListBox.segmented TextBlock.segment">
+    <Setter Property="Foreground" Value="{DynamicResource ink-2}"/>
+  </Style>
+  <Style Selector="ListBox.segmented ListBoxItem:pointerover TextBlock.segment">
+    <Setter Property="Foreground" Value="{DynamicResource ink}"/>
+  </Style>
+  <Style Selector="ListBox.segmented ListBoxItem:selected TextBlock.segment">
+    <Setter Property="Foreground" Value="{DynamicResource ink}"/>
+    <Setter Property="FontWeight" Value="SemiBold"/>
+  </Style>
+  <Style Selector="ListBox.segmented TextBlock.segment-count">
+    <Setter Property="Foreground" Value="{DynamicResource ink-2}"/>
+  </Style>
+  <Style Selector="ListBox.segmented ListBoxItem:selected TextBlock.segment-count">
+    <Setter Property="FontWeight" Value="Medium"/>
+  </Style>
+
+  <!-- The rail: items 84 by 54 with a tile of 48 by 30 holding the icon and the name under it. The screen you
+       are on has its icon on a tile of here and its name at weight 600; a screen not built yet is disabled. -->
+  <Style Selector="ListBox.rail">
+    <Setter Property="Background" Value="Transparent"/>
+    <Setter Property="BorderThickness" Value="0"/>
+    <Setter Property="Padding" Value="0"/>
+    <Setter Property="ScrollViewer.HorizontalScrollBarVisibility" Value="Disabled"/>
+    <Setter Property="ScrollViewer.VerticalScrollBarVisibility" Value="Disabled"/>
+    <Setter Property="ItemsPanel">
+      <ItemsPanelTemplate>
+        <StackPanel Orientation="Vertical" Spacing="4"/>
+      </ItemsPanelTemplate>
+    </Setter>
+  </Style>
+  <Style Selector="ListBox.rail ListBoxItem">
+    <Setter Property="Width" Value="84"/>
+    <Setter Property="Height" Value="54"/>
+    <Setter Property="Padding" Value="0"/>
+    <Setter Property="FocusAdorner" Value="{x:Null}"/>
+    <Setter Property="Template">
+      <ControlTemplate>
+        <Panel>
+          <StackPanel Spacing="3" HorizontalAlignment="Center" VerticalAlignment="Center">
+            <Border Name="Tile" Width="48" Height="30" CornerRadius="10" Background="Transparent">
+              <Border.Transitions>
+                <Transitions>
+                  <BrushTransition Property="Background" Duration="0:0:0.14" Easing="{x:Static parts:CubicBezierEasing.Standard}"/>
+                </Transitions>
+              </Border.Transitions>
+              <parts:Icon Name="RailIcon" Data="{TemplateBinding Tag}" Width="18" Height="18"
+                          Stroke="{DynamicResource ink-2}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+            </Border>
+            <ContentPresenter Name="ContentHost" Content="{TemplateBinding Content}"
+                              ContentTemplate="{TemplateBinding ContentTemplate}" HorizontalAlignment="Center"
+                              TextElement.Foreground="{DynamicResource ink-2}"/>
+          </StackPanel>
+          <Border Name="Ring" IsVisible="False" IsHitTestVisible="False" CornerRadius="12" BorderThickness="2"
+                  BorderBrush="{DynamicResource focus}"/>
+        </Panel>
+      </ControlTemplate>
+    </Setter>
+  </Style>
+  <Style Selector="ListBox.rail ListBoxItem:pointerover /template/ Border#Tile">
+    <Setter Property="Background" Value="{DynamicResource hover}"/>
+  </Style>
+  <Style Selector="ListBox.rail ListBoxItem:pointerover /template/ parts|Icon#RailIcon">
+    <Setter Property="Stroke" Value="{DynamicResource ink}"/>
+  </Style>
+  <Style Selector="ListBox.rail ListBoxItem:pointerover /template/ ContentPresenter#ContentHost">
+    <Setter Property="TextElement.Foreground" Value="{DynamicResource ink}"/>
+  </Style>
+  <Style Selector="ListBox.rail ListBoxItem:pressed /template/ Border#Tile">
+    <Setter Property="Background" Value="{DynamicResource line}"/>
+  </Style>
+  <Style Selector="ListBox.rail ListBoxItem:selected /template/ Border#Tile">
+    <Setter Property="Background" Value="{DynamicResource here}"/>
+  </Style>
+  <Style Selector="ListBox.rail ListBoxItem:selected /template/ parts|Icon#RailIcon">
+    <Setter Property="Stroke" Value="{DynamicResource on-here}"/>
+  </Style>
+  <Style Selector="ListBox.rail ListBoxItem:selected /template/ ContentPresenter#ContentHost">
+    <Setter Property="TextElement.Foreground" Value="{DynamicResource ink}"/>
+    <Setter Property="TextElement.FontWeight" Value="SemiBold"/>
+  </Style>
+  <Style Selector="ListBox.rail ListBoxItem:disabled /template/ Border#Tile">
+    <Setter Property="Background" Value="Transparent"/>
+  </Style>
+  <Style Selector="ListBox.rail ListBoxItem:disabled /template/ parts|Icon#RailIcon">
+    <Setter Property="Stroke" Value="{DynamicResource ink-disabled}"/>
+  </Style>
+  <Style Selector="ListBox.rail ListBoxItem:disabled /template/ ContentPresenter#ContentHost">
+    <Setter Property="TextElement.Foreground" Value="{DynamicResource ink-disabled}"/>
+  </Style>
+  <Style Selector="ListBox.rail ListBoxItem:focus-visible /template/ Border#Ring">
+    <Setter Property="IsVisible" Value="True"/>
+  </Style>
+
+  <!-- The switch of a team rule: 40 by 24, radius 12, a knob of 18. Off: an outlined track of off-track and a
+       knob of off at the left. On: a track of on with no outline and a knob of on-knob 16 to the right. The knob moves
+       with the spring (motion 1), the track changes colour (motion 2), and under the pointer the knob grows (motion 17).
+       The ring stands 3 from the switch, then a line of 2. -->
+  <Style Selector="ToggleButton.cfswitch">
+    <Setter Property="ClipToBounds" Value="False"/>
+    <Setter Property="Width" Value="40"/>
+    <Setter Property="Height" Value="24"/>
+    <Setter Property="Padding" Value="0"/>
+    <Setter Property="Focusable" Value="False"/>
+    <Setter Property="Template">
+      <ControlTemplate>
+        <Panel>
+          <parts:FocusRing Name="Ring" IsVisible="False" GapThickness="3" ControlRadius="12" GapBrush="{DynamicResource focus-gap}" LineBrush="{DynamicResource focus}"/>
+          <Border Name="Track" CornerRadius="12" BorderThickness="1.5" BorderBrush="{DynamicResource off}"
+                  Background="{DynamicResource off-track}">
+            <Border.Transitions>
+              <Transitions>
+                <BrushTransition Property="Background" Duration="0:0:0.14" Easing="{x:Static parts:CubicBezierEasing.Standard}"/>
+                <BrushTransition Property="BorderBrush" Duration="0:0:0.14" Easing="{x:Static parts:CubicBezierEasing.Standard}"/>
+              </Transitions>
+            </Border.Transitions>
+          </Border>
+          <Border Name="Knob" Width="18" Height="18" CornerRadius="9" HorizontalAlignment="Left"
+                  Margin="3,0,0,0" Background="{DynamicResource off}" RenderTransform="translateX(0px) scale(1)">
+            <Border.Transitions>
+              <Transitions>
+                <TransformOperationsTransition Property="RenderTransform" Duration="0:0:0.18" Easing="{x:Static parts:CubicBezierEasing.Spring}"/>
+                <BrushTransition Property="Background" Duration="0:0:0.14" Easing="{x:Static parts:CubicBezierEasing.Standard}"/>
+              </Transitions>
+            </Border.Transitions>
+          </Border>
+        </Panel>
+      </ControlTemplate>
+    </Setter>
+  </Style>
+  <Style Selector="ToggleButton.cfswitch:pointerover /template/ Border#Knob">
+    <Setter Property="RenderTransform" Value="translateX(0px) scale(1.11)"/>
+  </Style>
+  <Style Selector="ToggleButton.cfswitch:checked /template/ Border#Track">
+    <Setter Property="Background" Value="{DynamicResource on}"/>
+    <Setter Property="BorderBrush" Value="{DynamicResource on}"/>
+  </Style>
+  <Style Selector="ToggleButton.cfswitch:checked /template/ Border#Knob">
+    <Setter Property="Background" Value="{DynamicResource on-knob}"/>
+    <Setter Property="RenderTransform" Value="translateX(16px) scale(1)"/>
+  </Style>
+  <Style Selector="ToggleButton.cfswitch:checked:pointerover /template/ Border#Knob">
+    <Setter Property="RenderTransform" Value="translateX(16px) scale(1.11)"/>
+  </Style>
+  <Style Selector="ToggleButton.cfswitch:disabled:checked /template/ Border#Track">
+    <Setter Property="Background" Value="{DynamicResource line-strong}"/>
+    <Setter Property="BorderBrush" Value="{DynamicResource line-strong}"/>
+  </Style>
+  <Style Selector="ToggleButton.cfswitch:disabled:checked /template/ Border#Knob">
+    <Setter Property="Background" Value="{DynamicResource page}"/>
+  </Style>
+  <Style Selector="ToggleButton.cfswitch:disabled /template/ Border#Track">
+    <Setter Property="BorderBrush" Value="{DynamicResource line-strong}"/>
+  </Style>
+  <Style Selector="ToggleButton.cfswitch:disabled /template/ Border#Knob">
+    <Setter Property="Background" Value="{DynamicResource line-strong}"/>
+  </Style>
+  <Style Selector="ToggleButton.cfswitch.ring /template/ parts|FocusRing#Ring">
+    <Setter Property="IsVisible" Value="True"/>
+  </Style>
+
+  <!-- The effect control of a row: 24 high, radius 7, no fill, an edge of 1 drawn inside so nothing moves.
+       Under the pointer, or while its menu shows, the background is page and the edge line-strong. -->
+  <Style Selector="Button.effect">
+    <Setter Property="ClipToBounds" Value="False"/>
+    <Setter Property="Focusable" Value="False"/>
+    <Setter Property="Background" Value="Transparent"/>
+    <Setter Property="Padding" Value="0"/>
+    <Setter Property="Template">
+      <ControlTemplate>
+        <Panel Name="Root" RenderTransform="scale(1)">
+          <Panel.Transitions>
+            <Transitions>
+              <TransformOperationsTransition Property="RenderTransform" Duration="0:0:0.14" Easing="{x:Static parts:CubicBezierEasing.Standard}"/>
+            </Transitions>
+          </Panel.Transitions>
+          <parts:FocusRing Name="Ring" IsVisible="False" Height="24" VerticalAlignment="Center" ControlRadius="7" GapBrush="{DynamicResource focus-gap}" LineBrush="{DynamicResource focus}"/>
+          <Border Name="Surface" Height="24" CornerRadius="7" BorderThickness="1" BorderBrush="Transparent"
+                  Background="Transparent" Padding="5,0,4,0">
+            <ContentPresenter Name="ContentHost" Content="{TemplateBinding Content}"
+                              ContentTemplate="{TemplateBinding ContentTemplate}" VerticalContentAlignment="Center"/>
+          </Border>
+        </Panel>
+      </ControlTemplate>
+    </Setter>
+  </Style>
+  <Style Selector="Button.effect:pointerover /template/ Border#Surface">
+    <Setter Property="Background" Value="{DynamicResource page}"/>
+    <Setter Property="BorderBrush" Value="{DynamicResource line-strong}"/>
+  </Style>
+  <Style Selector="Button.effect.open /template/ Border#Surface">
+    <Setter Property="Background" Value="{DynamicResource page}"/>
+    <Setter Property="BorderBrush" Value="{DynamicResource line-strong}"/>
+  </Style>
+  <Style Selector="Button.effect:pressed /template/ Panel#Root">
+    <Setter Property="RenderTransform" Value="scale(0.97)"/>
+  </Style>
+  <Style Selector="Button.effect.ring /template/ parts|FocusRing#Ring">
+    <Setter Property="IsVisible" Value="True"/>
+  </Style>
+  <Style Selector="Button.effect.open /template/ parts|FocusRing#Ring">
+    <Setter Property="IsVisible" Value="True"/>
+  </Style>
+
+  <!-- A text box with no frame of its own, inside a frame that the view draws (the search field, the title of a rule). -->
+  <Style Selector="TextBox.bare">
+    <Setter Property="Background" Value="Transparent"/>
+    <Setter Property="BorderThickness" Value="0"/>
+    <Setter Property="Padding" Value="0"/>
+    <Setter Property="MinHeight" Value="0"/>
+    <Setter Property="Height" Value="32"/>
+    <Setter Property="FontSize" Value="14"/>
+    <Setter Property="FontFamily" Value="avares://Avalonia.Fonts.Inter/Assets#Inter, Segoe UI, Helvetica Neue, sans-serif"/>
+    <Setter Property="VerticalContentAlignment" Value="Center"/>
+    <Setter Property="PlaceholderForeground" Value="{DynamicResource ink-3}"/>
+    <Setter Property="CaretBrush" Value="{DynamicResource ink}"/>
+    <Setter Property="SelectionBrush" Value="{DynamicResource for}"/>
+    <Setter Property="SelectionForegroundBrush" Value="{DynamicResource ink}"/>
+  </Style>
+  <Style Selector="TextBox.bare /template/ Border#PART_BorderElement">
+    <Setter Property="Background" Value="Transparent"/>
+    <Setter Property="BorderThickness" Value="0"/>
+  </Style>
+  <Style Selector="TextBox.bare:pointerover /template/ Border#PART_BorderElement">
+    <Setter Property="Background" Value="Transparent"/>
+    <Setter Property="BorderThickness" Value="0"/>
+  </Style>
+  <Style Selector="TextBox.bare:focus /template/ Border#PART_BorderElement">
+    <Setter Property="Background" Value="Transparent"/>
+    <Setter Property="BorderThickness" Value="0"/>
+  </Style>
+  <Style Selector="TextBox.bare /template/ TextBlock#PART_Placeholder">
+    <Setter Property="Opacity" Value="1"/>
+  </Style>
+
+  <!-- The mark of an effect takes the brushes of the place it stands in: red and amber when the rule is on, off when it is
+       off. The sign inside a grey mark takes the colour of the list. -->
+  <Style Selector="parts|EffectMark.block">
+    <Setter Property="Shape" Value="{DynamicResource block}"/>
+    <Setter Property="Sign" Value="{DynamicResource on-block}"/>
+  </Style>
+  <Style Selector="parts|EffectMark.warn">
+    <Setter Property="Shape" Value="{DynamicResource warn}"/>
+    <Setter Property="Sign" Value="{DynamicResource on-warn}"/>
+  </Style>
+  <Style Selector="parts|EffectMark.off">
+    <Setter Property="Shape" Value="{DynamicResource off}"/>
+    <Setter Property="Sign" Value="{DynamicResource side}"/>
+  </Style>
+
+</Styles>

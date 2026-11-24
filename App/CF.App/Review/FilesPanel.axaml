@@ -1,0 +1,206 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:review="using:CF.App.Review"
+             xmlns:parts="using:CF.App.Parts"
+             x:Class="CF.App.Review.FilesPanel"
+             x:ClassModifier="internal"
+             x:DataType="review:ReviewViewModel">
+
+  <!-- The panel of a push: every file the push holds, the ones with no findings
+       too. In one pane it is one line with "Show". A file with findings is a button that brings its line to the top of the
+       sheet; the files with findings are one tab stop, and Up and Down move between them. -->
+  <UserControl.Styles>
+    <Style Selector="Button.panelfile">
+      <Setter Property="Padding" Value="10,9,12,9"/>
+      <Setter Property="CornerRadius" Value="12"/>
+      <Setter Property="Background" Value="Transparent"/>
+      <Setter Property="HorizontalAlignment" Value="Stretch"/>
+      <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+      <Setter Property="Cursor" Value="Hand"/>
+      <Setter Property="Template">
+        <ControlTemplate>
+          <Panel>
+            <Border Name="Surface" Background="{TemplateBinding Background}" CornerRadius="{TemplateBinding CornerRadius}"
+                    Padding="{TemplateBinding Padding}">
+              <ContentPresenter Content="{TemplateBinding Content}" HorizontalContentAlignment="Stretch"/>
+            </Border>
+            <Border Name="Ring" IsVisible="False" IsHitTestVisible="False" CornerRadius="12" BorderThickness="2"
+                    BorderBrush="{DynamicResource focus}"/>
+          </Panel>
+        </ControlTemplate>
+      </Setter>
+    </Style>
+    <Style Selector="Button.panelfile:pointerover /template/ Border#Surface">
+      <Setter Property="Background" Value="{DynamicResource hover}"/>
+    </Style>
+    <Style Selector="Button.panelfile:pressed /template/ Border#Surface">
+      <Setter Property="Background" Value="{DynamicResource line}"/>
+    </Style>
+    <Style Selector="Button.panelfile:focus-visible /template/ Border#Ring">
+      <Setter Property="IsVisible" Value="True"/>
+    </Style>
+    <Style Selector="Button.rulerow">
+      <Setter Property="Padding" Value="10,9,12,9"/>
+      <Setter Property="CornerRadius" Value="12"/>
+      <Setter Property="Background" Value="Transparent"/>
+      <Setter Property="HorizontalAlignment" Value="Stretch"/>
+      <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+      <Setter Property="Cursor" Value="Hand"/>
+      <Setter Property="Template">
+        <ControlTemplate>
+          <Panel>
+            <Border Name="Surface" Background="{TemplateBinding Background}" CornerRadius="{TemplateBinding CornerRadius}"
+                    Padding="{TemplateBinding Padding}">
+              <ContentPresenter Content="{TemplateBinding Content}" HorizontalContentAlignment="Stretch"/>
+            </Border>
+            <Border Name="Here" IsVisible="False" IsHitTestVisible="False" Width="4" CornerRadius="2" HorizontalAlignment="Left"
+                    Margin="0,10" Background="{DynamicResource here}"/>
+            <Border Name="Ring" IsVisible="False" IsHitTestVisible="False" CornerRadius="12" BorderThickness="2"
+                    BorderBrush="{DynamicResource focus}"/>
+          </Panel>
+        </ControlTemplate>
+      </Setter>
+    </Style>
+    <Style Selector="Button.rulerow:pointerover /template/ Border#Surface">
+      <Setter Property="Background" Value="{DynamicResource hover}"/>
+    </Style>
+    <Style Selector="Button.rulerow:pressed /template/ Border#Surface">
+      <Setter Property="Background" Value="{DynamicResource line}"/>
+    </Style>
+    <Style Selector="Button.rulerow:focus-visible /template/ Border#Ring">
+      <Setter Property="IsVisible" Value="True"/>
+    </Style>
+    <Style Selector="Button.rulerow.chosen /template/ Border#Surface">
+      <Setter Property="Background" Value="{DynamicResource page}"/>
+      <Setter Property="BoxShadow" Value="{DynamicResource shadow-raised}"/>
+    </Style>
+    <Style Selector="Button.rulerow.chosen /template/ Border#Here">
+      <Setter Property="IsVisible" Value="True"/>
+    </Style>
+    <Style Selector="Button.rulerow.back TextBlock.title">
+      <Setter Property="FontWeight" Value="400"/>
+      <Setter Property="Foreground" Value="{DynamicResource ink-2}"/>
+    </Style>
+    <Style Selector="Button.rulerow.back TextBlock.number">
+      <Setter Property="FontWeight" Value="400"/>
+      <Setter Property="Foreground" Value="{DynamicResource ink-2}"/>
+    </Style>
+    <Style Selector="Button.rulerow.back review|FractionBar">
+      <Setter Property="Thickness" Value="4"/>
+    </Style>
+    <Style Selector="Button.rulerow.chosen TextBlock.title">
+      <Setter Property="FontWeight" Value="600"/>
+    </Style>
+  </UserControl.Styles>
+
+  <StackPanel>
+  <Border IsVisible="{Binding HasPanel}" Background="{DynamicResource side}" CornerRadius="16" Padding="8,12,8,8">
+  <StackPanel>
+
+    <Grid ColumnDefinitions="Auto,*,Auto" Margin="4,0,0,8" MinHeight="28">
+      <TextBlock Theme="{StaticResource type-h3}" VerticalAlignment="Center" Text="Files"/>
+      <TextBlock Grid.Column="1" Theme="{StaticResource type-meta}" Foreground="{DynamicResource ink-2}" Margin="10,2,0,0" VerticalAlignment="Center"
+                 TextTrimming="CharacterEllipsis" Text="{Binding PanelHead}"/>
+      <Button Grid.Column="2" Classes="cf quiet small" IsVisible="{Binding IsOnePane}" VerticalAlignment="Center"
+              Command="{Binding TogglePanelCommand}" AutomationProperties.Name="{Binding PanelToggleText, StringFormat='{}{0} the files of this push'}">
+        <TextBlock Theme="{StaticResource type-meta-strong}" Text="{Binding PanelToggleText}"/>
+      </Button>
+    </Grid>
+
+    <ItemsControl Name="Rows" ItemsSource="{Binding PanelFiles}" IsVisible="{Binding PanelIsListed}"
+                  KeyboardNavigation.TabNavigation="Once">
+      <ItemsControl.ItemsPanel>
+        <ItemsPanelTemplate>
+          <StackPanel Spacing="2"/>
+        </ItemsPanelTemplate>
+      </ItemsControl.ItemsPanel>
+      <ItemsControl.ItemTemplate>
+        <DataTemplate DataType="review:PanelFileViewModel" x:DataType="review:PanelFileViewModel">
+          <Panel>
+            <Button Classes="panelfile" IsVisible="{Binding HasFindings}" Command="{Binding ShowCommand}"
+                    AutomationProperties.Name="{Binding SpokenName}">
+              <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="10">
+                <parts:Icon Data="{StaticResource i-file}" Width="15" Height="15" Stroke="{DynamicResource ink-3}" VerticalAlignment="Top" Margin="0,2,0,0"/>
+                <TextBlock Grid.Column="1" Theme="{StaticResource code-strong}" TextWrapping="Wrap" VerticalAlignment="Center" Text="{Binding Path}"/>
+                <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                  <StackPanel Orientation="Horizontal" Spacing="4" MinWidth="26">
+                    <parts:EffectMark Classes="block" Kind="Block" Width="14" Height="14" IsVisible="{Binding HasBlock}"/>
+                    <TextBlock Theme="{StaticResource type-meta-strong}" FontFeatures="+tnum" IsVisible="{Binding HasBlock}" Text="{Binding BlockText}"/>
+                  </StackPanel>
+                  <StackPanel Orientation="Horizontal" Spacing="4" MinWidth="26">
+                    <parts:EffectMark Classes="warn" Kind="Warn" Width="14" Height="14" IsVisible="{Binding HasWarn}"/>
+                    <TextBlock Theme="{StaticResource type-meta-strong}" FontFeatures="+tnum" IsVisible="{Binding HasWarn}" Text="{Binding WarnText}"/>
+                  </StackPanel>
+                </StackPanel>
+              </Grid>
+            </Button>
+            <Grid IsVisible="{Binding !HasFindings}" ColumnDefinitions="Auto,*,Auto" ColumnSpacing="10" Margin="10,9,12,9"
+                  AutomationProperties.Name="{Binding SpokenName}">
+              <parts:Icon Data="{StaticResource i-check}" Width="15" Height="15" Stroke="{DynamicResource req-ink}" IsVisible="{Binding IsClean}" VerticalAlignment="Top" Margin="0,2,0,0"/>
+              <parts:Icon Data="{StaticResource i-off}" Width="15" Height="15" Stroke="{DynamicResource ink-3}" IsVisible="{Binding IsNotReviewed}" VerticalAlignment="Top" Margin="0,2,0,0"/>
+              <TextBlock Grid.Column="1" Theme="{StaticResource code}" Foreground="{DynamicResource ink-2}" TextWrapping="Wrap" Text="{Binding Path}"/>
+              <TextBlock Grid.Column="2" Theme="{StaticResource type-meta}" Foreground="{DynamicResource ink-2}" IsVisible="{Binding IsClean}" Text="No findings"/>
+              <TextBlock Grid.Column="2" Theme="{StaticResource type-meta}" Foreground="{DynamicResource ink-2}" IsVisible="{Binding IsNotReviewed}" Text="Not reviewed"
+                         ToolTip.Tip="{Binding NotReviewedReason}"/>
+            </Grid>
+          </Panel>
+        </DataTemplate>
+      </ItemsControl.ItemTemplate>
+    </ItemsControl>
+
+    <StackPanel Orientation="Horizontal" Spacing="8" Margin="8,8,8,0" IsVisible="{Binding HasCleanSummary}">
+      <parts:Icon Data="{StaticResource i-check}" Width="15" Height="15" Stroke="{DynamicResource req-ink}"/>
+      <TextBlock Theme="{StaticResource type-body}" Foreground="{DynamicResource ink-2}" Text="{Binding CleanFilesText}"/>
+    </StackPanel>
+
+  </StackPanel>
+  </Border>
+
+  <!-- The panel of a folder review: how many findings each rule has. In one pane it is one line with "Show". -->
+  <Border IsVisible="{Binding HasRulePanel}" Background="{DynamicResource side}" CornerRadius="16" Padding="8,12,8,8">
+    <StackPanel>
+      <Grid ColumnDefinitions="Auto,*,Auto,Auto" Margin="4,0,0,8" MinHeight="28">
+        <TextBlock Theme="{StaticResource type-h3}" VerticalAlignment="Center" Text="By rule"/>
+        <TextBlock Grid.Column="1" Theme="{StaticResource type-meta}" Foreground="{DynamicResource ink-2}" Margin="10,2,8,0" VerticalAlignment="Center"
+                   TextTrimming="CharacterEllipsis" Text="{Binding RulesHead}"/>
+        <Button Grid.Column="2" Classes="cf outlined small" IsVisible="{Binding HasChosenRule}" VerticalAlignment="Center" Margin="0,0,4,0"
+                Command="{Binding ClearRuleCommand}" AutomationProperties.Name="{Binding ShowAllText}">
+          <TextBlock Theme="{StaticResource type-meta-strong}" Text="{Binding ShowAllText}"/>
+        </Button>
+        <Button Grid.Column="3" Classes="cf quiet small" IsVisible="{Binding IsOnePane}" VerticalAlignment="Center"
+                Command="{Binding TogglePanelCommand}" AutomationProperties.Name="{Binding PanelToggleText, StringFormat='{}{0} the count by rule'}">
+          <TextBlock Theme="{StaticResource type-meta-strong}" Text="{Binding PanelToggleText}"/>
+        </Button>
+      </Grid>
+      <ItemsControl ItemsSource="{Binding RuleRows}" IsVisible="{Binding PanelIsListed}" KeyboardNavigation.TabNavigation="Once">
+        <ItemsControl.ItemsPanel>
+          <ItemsPanelTemplate>
+            <StackPanel Spacing="2"/>
+          </ItemsPanelTemplate>
+        </ItemsControl.ItemsPanel>
+        <ItemsControl.ItemTemplate>
+          <DataTemplate DataType="review:RuleRowViewModel" x:DataType="review:RuleRowViewModel">
+            <Button Classes="rulerow" Classes.chosen="{Binding IsChosen}" Classes.back="{Binding IsSteppedBack}"
+                    Command="{Binding ChooseCommand}" AutomationProperties.Name="{Binding SpokenName}">
+              <Grid ColumnDefinitions="Auto,*,Auto" RowDefinitions="Auto,Auto" ColumnSpacing="10">
+                <parts:EffectMark Classes="block" Kind="Block" Width="15" Height="15" IsVisible="{Binding IsBlock}" VerticalAlignment="Top" Margin="0,3,0,0"/>
+                <parts:EffectMark Classes="warn" Kind="Warn" Width="15" Height="15" IsVisible="{Binding IsWarn}" VerticalAlignment="Top" Margin="0,3,0,0"/>
+                <TextBlock Grid.Column="1" Classes="title" Theme="{StaticResource type-body-strong}" TextWrapping="Wrap" Text="{Binding Title}"/>
+                <TextBlock Grid.Column="2" Classes="number" Theme="{StaticResource type-card}" FontFeatures="+tnum" MinWidth="24" TextAlignment="Right" Text="{Binding CountText}"/>
+                <Grid Grid.Row="1" Grid.Column="1" Grid.ColumnSpan="2" ColumnDefinitions="Auto,*" Height="18" Margin="0,3,0,0">
+                  <TextBlock Theme="{StaticResource code}" Foreground="{DynamicResource ink-2}" MinWidth="58" VerticalAlignment="Center" Text="{Binding RuleId}"/>
+                  <review:FractionBar Grid.Column="1" Margin="10,0,0,0" Fraction="{Binding Fraction}" Fill="{DynamicResource block}"
+                                      IsVisible="{Binding ShowsBlockBar}"/>
+                  <review:FractionBar Grid.Column="1" Margin="10,0,0,0" Fraction="{Binding Fraction}" Fill="{DynamicResource warn}"
+                                      IsVisible="{Binding ShowsWarnBar}"/>
+                </Grid>
+              </Grid>
+            </Button>
+          </DataTemplate>
+        </ItemsControl.ItemTemplate>
+      </ItemsControl>
+    </StackPanel>
+  </Border>
+  </StackPanel>
+
+</UserControl>

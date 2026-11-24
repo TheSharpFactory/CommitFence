@@ -1,0 +1,60 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:local="using:CF.App.Rules.Page"
+             xmlns:parts="using:CF.App.Parts"
+             x:Class="CF.App.Rules.Page.ComparisonPanel"
+             x:ClassModifier="internal"
+             x:DataType="local:ComparisonPickerViewModel">
+
+  <!-- The panel of a comparison token: 340 wide; the comparisons that fit, a hairline,
+       then the value: two entries for true or false, the possible values for a list, a field for a number or a text. -->
+  <Border Name="Surface" Classes="picker" Width="340" AutomationProperties.Name="Comparison and value">
+    <StackPanel>
+
+      <ItemsControl ItemsSource="{Binding Comparisons}">
+        <ItemsControl.ItemTemplate>
+          <DataTemplate DataType="local:PickerEntryViewModel" x:DataType="local:PickerEntryViewModel">
+            <Button Classes="pick" Classes.highlight="{Binding IsHighlighted}"
+                    Command="{Binding $parent[ItemsControl].((local:ComparisonPickerViewModel)DataContext).ChooseComparisonCommand}"
+                    CommandParameter="{Binding}" AutomationProperties.Name="{Binding Name}">
+              <Grid ColumnDefinitions="*,16" ColumnSpacing="10">
+                <TextBlock Classes="entry-name" Classes.current="{Binding IsCurrent}" Theme="{StaticResource type-body}"
+                           Text="{Binding Name}" VerticalAlignment="Center"/>
+                <parts:Icon Grid.Column="1" IsVisible="{Binding IsCurrent}" Data="{StaticResource i-check}" Width="14"
+                            Height="14" Stroke="{DynamicResource ink}"/>
+              </Grid>
+            </Button>
+          </DataTemplate>
+        </ItemsControl.ItemTemplate>
+      </ItemsControl>
+
+      <Border Height="1" Margin="0,4" Background="{DynamicResource line}"/>
+
+      <ItemsControl IsVisible="{Binding ShowsEntries}" ItemsSource="{Binding ValueEntries}">
+        <ItemsControl.ItemTemplate>
+          <DataTemplate DataType="local:PickerEntryViewModel" x:DataType="local:PickerEntryViewModel">
+            <Button Classes="pick" Classes.highlight="{Binding IsHighlighted}"
+                    Command="{Binding $parent[ItemsControl].((local:ComparisonPickerViewModel)DataContext).ChooseValueCommand}"
+                    CommandParameter="{Binding}" AutomationProperties.Name="{Binding Name}">
+              <Grid ColumnDefinitions="*,16" ColumnSpacing="10">
+                <TextBlock Classes="entry-name" Classes.current="{Binding IsCurrent}" Theme="{StaticResource type-body}"
+                           Text="{Binding Name}" VerticalAlignment="Center"/>
+                <parts:Icon Grid.Column="1" IsVisible="{Binding IsCurrent}" Data="{StaticResource i-check}" Width="14"
+                            Height="14" Stroke="{DynamicResource ink}"/>
+              </Grid>
+            </Button>
+          </DataTemplate>
+        </ItemsControl.ItemTemplate>
+      </ItemsControl>
+
+      <!-- A number or a text: a field of 36 high with an edge of 2 in focus; Enter keeps, Esc drops, Up and Down change a
+           number by 1. -->
+      <Border IsVisible="{Binding ShowsField}" Height="36" Margin="4,0" CornerRadius="8" BorderThickness="2"
+              BorderBrush="{DynamicResource focus}" Padding="8,0">
+        <TextBox Name="Field" Classes="bare" Text="{Binding FieldText, Mode=TwoWay}" AutomationProperties.Name="{Binding FieldName}"/>
+      </Border>
+
+    </StackPanel>
+  </Border>
+
+</UserControl>

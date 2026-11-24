@@ -1,0 +1,24 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- The check program of the app (Tools/checks/app): it opens the app's real main window headless, saves pictures of it and
+       checks it against the command line. It is a tool of the repository, never shipped, and neither the app nor the command
+       line refers to it. -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <AssemblyName>CF.App.Check</AssemblyName>
+    <RootNamespace>CF.App.Check</RootNamespace>
+    <DisableTransitiveProjectReferences>true</DisableTransitiveProjectReferences>
+    <AvaloniaUseCompiledBindingsByDefault>true</AvaloniaUseCompiledBindingsByDefault>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Avalonia.Headless" Version="12.1.6" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\App\CF.App\CF.App.csproj" />
+    <ProjectReference Include="..\..\Dependencies\CF.Composition\CF.Composition.csproj" />
+    <ProjectReference Include="..\..\Dependencies\CF.Core\CF.Core.csproj" />
+  </ItemGroup>
+
+</Project>

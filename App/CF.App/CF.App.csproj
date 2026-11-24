@@ -1,0 +1,31 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <AssemblyName>commitfenceapp</AssemblyName>
+    <RootNamespace>CF.App</RootNamespace>
+    <DisableTransitiveProjectReferences>true</DisableTransitiveProjectReferences>
+    <AvaloniaUseCompiledBindingsByDefault>true</AvaloniaUseCompiledBindingsByDefault>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Avalonia" Version="12.1.6" />
+    <PackageReference Include="Avalonia.Desktop" Version="12.1.6" />
+    <PackageReference Include="Avalonia.Themes.Fluent" Version="12.1.6" />
+    <PackageReference Include="Avalonia.Fonts.Inter" Version="12.1.6" />
+    <PackageReference Include="Avalonia.AvaloniaEdit" Version="12.0.0" />
+    <PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.2" />
+  </ItemGroup>
+
+  <!-- the check program (Tools/CF.App.Check) opens the real window headless, so it sees what the app keeps internal -->
+  <ItemGroup>
+    <InternalsVisibleTo Include="CF.App.Check" />
+    <InternalsVisibleTo Include="CF.Tests" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\Dependencies\CF.Composition\CF.Composition.csproj" />
+    <ProjectReference Include="..\..\Dependencies\CF.Core\CF.Core.csproj" />
+  </ItemGroup>
+
+</Project>

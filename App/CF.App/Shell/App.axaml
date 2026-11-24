@@ -1,0 +1,27 @@
+<Application xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             x:Class="CF.App.Shell.App"
+             x:ClassModifier="internal"
+             RequestedThemeVariant="Default">
+
+  <!-- Light and dark follow the system's theme. Every colour comes from the token dictionaries;
+       no view writes a colour. -->
+  <Application.Resources>
+    <ResourceDictionary>
+      <ResourceDictionary.MergedDictionaries>
+        <ResourceInclude Source="/Styles/Tokens.axaml"/>
+        <ResourceInclude Source="/Styles/Icons.axaml"/>
+        <ResourceInclude Source="/Styles/Type.axaml"/>
+        <ResourceInclude Source="/Styles/ScrollBars.axaml"/>
+      </ResourceDictionary.MergedDictionaries>
+    </ResourceDictionary>
+  </Application.Resources>
+
+  <Application.Styles>
+    <FluentTheme />
+    <StyleInclude Source="avares://AvaloniaEdit/Themes/Fluent/AvaloniaEdit.xaml"/>
+    <StyleInclude Source="/Styles/Controls.axaml"/>
+    <StyleInclude Source="/Styles/Page.axaml"/>
+  </Application.Styles>
+
+</Application>

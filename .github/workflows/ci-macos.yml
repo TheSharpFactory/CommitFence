@@ -1,0 +1,26 @@
+name: CI macOS
+
+# The build and every test on macOS, apart from CI (ci.yml) and its badge: GitHub's macOS runners are often all busy,
+# and a run that gets none is cancelled after about 15 minutes. Re-run it from the Actions tab when that happens.
+on:
+  push:
+  pull_request:
+
+jobs:
+  build-and-test:
+    runs-on: macos-latest
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: 11.0.x
+
+      - name: Build
+        run: dotnet build CF.slnx -c Release
+
+      - name: Tests
+        run: dotnet test CF.slnx -c Release --no-build

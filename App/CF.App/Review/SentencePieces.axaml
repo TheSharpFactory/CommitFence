@@ -1,0 +1,74 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:review="using:CF.App.Review"
+             x:Class="CF.App.Review.SentencePieces"
+             x:ClassModifier="internal">
+
+  <!-- A rule written the way a finding writes it: plain words in type-body ink-2 and small tokens, 24
+       high with radius 7; a condition is two joined tokens. A piece, a word with its token or tokens, never breaks. -->
+  <UserControl.Styles>
+    <Style Selector="Border.token">
+      <Setter Property="Height" Value="24"/>
+      <Setter Property="Padding" Value="0,0,8,0"/>
+      <Setter Property="CornerRadius" Value="7"/>
+    </Style>
+    <Style Selector="Border.token.start">
+      <Setter Property="CornerRadius" Value="7,2,2,7"/>
+      <Setter Property="Padding" Value="8,0,8,0"/>
+    </Style>
+    <Style Selector="Border.token.end">
+      <Setter Property="CornerRadius" Value="2,7,7,2"/>
+      <Setter Property="Padding" Value="8,0,8,0"/>
+    </Style>
+    <Style Selector="Border.token.for">
+      <Setter Property="Background" Value="{DynamicResource for}"/>
+      <Setter Property="Padding" Value="8,0,8,0"/>
+    </Style>
+    <Style Selector="Border.token.for TextBlock">
+      <Setter Property="Foreground" Value="{DynamicResource for-ink}"/>
+    </Style>
+    <Style Selector="Border.token.where">
+      <Setter Property="Background" Value="{DynamicResource where}"/>
+    </Style>
+    <Style Selector="Border.token.where TextBlock">
+      <Setter Property="Foreground" Value="{DynamicResource where-ink}"/>
+    </Style>
+    <Style Selector="Border.token.req">
+      <Setter Property="Background" Value="{DynamicResource req}"/>
+    </Style>
+    <Style Selector="Border.token.req TextBlock">
+      <Setter Property="Foreground" Value="{DynamicResource req-ink}"/>
+    </Style>
+  </UserControl.Styles>
+
+  <ItemsControl Name="PieceList" Focusable="False">
+    <ItemsControl.ItemsPanel>
+      <ItemsPanelTemplate>
+        <WrapPanel Orientation="Horizontal"/>
+      </ItemsPanelTemplate>
+    </ItemsControl.ItemsPanel>
+    <ItemsControl.ItemTemplate>
+      <DataTemplate DataType="review:SentencePieceViewModel" x:DataType="review:SentencePieceViewModel">
+        <StackPanel Orientation="Horizontal" Spacing="6" Margin="0,0,10,6">
+          <TextBlock Theme="{StaticResource type-body}" Foreground="{DynamicResource ink-2}"
+                     VerticalAlignment="Center" Text="{Binding Lead}"/>
+          <Border Classes="token for" IsVisible="{Binding IsFor}">
+            <TextBlock Theme="{StaticResource type-body-strong}" VerticalAlignment="Center" Text="{Binding Text}"/>
+          </Border>
+          <StackPanel Orientation="Horizontal" Spacing="2" IsVisible="{Binding IsCondition}">
+            <Border Classes="token start" Classes.where="{Binding IsWhere}" Classes.req="{Binding IsRequire}">
+              <TextBlock Theme="{StaticResource type-body-strong}" VerticalAlignment="Center" Text="{Binding Text}"/>
+            </Border>
+            <Border Classes="token end" Classes.where="{Binding IsWhere}" Classes.req="{Binding IsRequire}">
+              <StackPanel Orientation="Horizontal" Spacing="5" VerticalAlignment="Center">
+                <TextBlock Theme="{StaticResource type-body}" Text="{Binding Comparison}"/>
+                <TextBlock Theme="{StaticResource type-body-strong}" Text="{Binding Value}"/>
+              </StackPanel>
+            </Border>
+          </StackPanel>
+        </StackPanel>
+      </DataTemplate>
+    </ItemsControl.ItemTemplate>
+  </ItemsControl>
+
+</UserControl>

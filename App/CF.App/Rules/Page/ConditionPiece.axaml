@@ -1,0 +1,66 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:local="using:CF.App.Rules.Page"
+             xmlns:parts="using:CF.App.Parts"
+             x:Class="CF.App.Rules.Page.ConditionPiece"
+             x:ClassModifier="internal"
+             ClipToBounds="False"
+             x:DataType="local:ConditionViewModel">
+
+  <!-- One condition of the sentence, one piece that never breaks: two tokens joined (the property, then the comparison and its
+       value), 2 apart, with the corners between them 3; the remove button, 4 after; then "and" when another condition
+       follows. The require clause draws the same piece with no remove button. -->
+  <StackPanel Orientation="Horizontal" Spacing="4" Height="36">
+
+    <StackPanel Orientation="Horizontal" Spacing="2">
+
+      <Panel>
+        <Button Name="PropertyButton" Classes="token start" Classes.where="{Binding IsWhereClause}"
+                Classes.req="{Binding !IsWhereClause}" Classes.empty="{Binding IsEmpty}"
+                Classes.invalid="{Binding IsInvalid}" Classes.open="{Binding PropertyPicker.IsOpen}"
+                Command="{Binding ChoosePropertyCommand}" ToolTip.Tip="{Binding PropertyTip}"
+                AutomationProperties.Name="{Binding PropertySpokenName}">
+          <StackPanel Orientation="Horizontal" Spacing="6">
+            <TextBlock Classes="word" Theme="{StaticResource type-token}" Text="{Binding PropertyWords}"/>
+            <parts:Icon Data="{StaticResource i-down}" Width="13" Height="13" StrokeThickness="1.8"
+                        Stroke="{Binding $parent[Button].Foreground}" VerticalAlignment="Center"/>
+          </StackPanel>
+        </Button>
+        <Popup IsOpen="{Binding PropertyPicker.IsOpen, Mode=TwoWay}" PlacementTarget="{Binding #PropertyButton}"
+               Placement="BottomEdgeAlignedLeft" VerticalOffset="6" IsLightDismissEnabled="True" ShouldUseOverlayLayer="True" PlacementConstraintAdjustment="SlideX, FlipY">
+          <local:PickerPanel DataContext="{Binding PropertyPicker}"/>
+        </Popup>
+      </Panel>
+
+      <Panel IsVisible="{Binding IsNotEmpty}">
+        <Button Name="ComparisonButton" Classes="token end comparison" Classes.where="{Binding IsWhereClause}"
+                Classes.req="{Binding !IsWhereClause}" Classes.invalid="{Binding IsInvalid}"
+                Classes.open="{Binding ComparisonPicker.IsOpen}" Command="{Binding ChooseComparisonCommand}"
+                ToolTip.Tip="Comparison and value" AutomationProperties.Name="{Binding ComparisonSpokenName}">
+          <StackPanel Orientation="Horizontal" Spacing="6">
+            <TextBlock Classes="comparison-word" Theme="{StaticResource type-token}" Text="{Binding ComparisonWord}"/>
+            <TextBlock Theme="{StaticResource type-token}" Text="{Binding ValueText}"/>
+            <parts:Icon Data="{StaticResource i-down}" Width="13" Height="13" StrokeThickness="1.8"
+                        Stroke="{Binding $parent[Button].Foreground}" VerticalAlignment="Center"/>
+          </StackPanel>
+        </Button>
+        <Popup IsOpen="{Binding ComparisonPicker.IsOpen, Mode=TwoWay}" PlacementTarget="{Binding #ComparisonButton}"
+               Placement="BottomEdgeAlignedLeft" VerticalOffset="6" IsLightDismissEnabled="True" ShouldUseOverlayLayer="True" PlacementConstraintAdjustment="SlideX, FlipY">
+          <local:ComparisonPanel DataContext="{Binding ComparisonPicker}"/>
+        </Popup>
+      </Panel>
+
+    </StackPanel>
+
+    <Button Classes="remove" IsVisible="{Binding CanRemove}" Command="{Binding RemoveCommand}"
+            ToolTip.Tip="Remove this condition" AutomationProperties.Name="{Binding RemoveSpokenName}">
+      <parts:Icon Data="{StaticResource i-x}" Width="14" Height="14" StrokeThickness="1.8"
+                  Stroke="{Binding $parent[Button].Foreground}"/>
+    </Button>
+
+    <TextBlock IsVisible="{Binding ShowsAnd}" Theme="{StaticResource type-sentence}" Foreground="{DynamicResource ink-2}"
+               VerticalAlignment="Center" Text="and"/>
+
+  </StackPanel>
+
+</UserControl>

@@ -36,13 +36,19 @@ internal sealed partial class DashboardViewModel(IStatsService? stats, OpenedFol
     public bool HasReviews { get { return !IsLoading && Report?.Oldest != null; } }
     public bool IsEmpty { get { return !IsLoading && Report?.Oldest == null && Report?.ReadError == null; } }
     public bool HasNotice { get { return !IsLoading && Notice != null; } }
+    public bool CanReadAgain { get { return Report?.ReadError != null; } }
     public string? Notice
     {
         get
         {
             var error = Report?.ReadErrorNotice;
             var unreadable = Report?.UnreadableNotice;
-            return error != null && unreadable != null ? error + "\n" + unreadable : error ?? unreadable;
+            if(error == null)
+                return unreadable;
+
+            // with nothing read there are no numbers on the page to warn about
+            var warning = Report?.Oldest == null ? error : error + " The numbers below may leave reviews out.";
+            return unreadable == null ? warning : warning + "\n" + unreadable;
         }
     }
     public string? Period { get { return HasReviews ? Report?.Period : null; } }
@@ -149,7 +155,7 @@ internal sealed partial class DashboardViewModel(IStatsService? stats, OpenedFol
         Counts = totals.Counts();
         var all = totals.Total == 0 ? totals.ReviewsText : $"{totals.ReviewsText}: {totals.CountsText()}";
         var scale = DashboardChart.ScaleLabel(DashboardChart.MaximumOf(Days));
-        ChartName = $"Reviews by day, the last 30 days. {scale}. {all}. Left and Right choose a day.";
+        ChartName = $"Reviews by day, the last 30 days. {scale.TrimEnd('.')}. {all}. Left and Right choose a day.";
         ReviewNote = $"{totals.Total} in 30 days, by the hook and on Review";
         TimingLine = DashboardTimeBand.Summary(report.Timing);
         Bands = DashboardTimeBand.Of(report.Timing);

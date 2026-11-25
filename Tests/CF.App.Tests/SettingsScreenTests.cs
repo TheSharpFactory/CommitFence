@@ -37,7 +37,7 @@ public sealed class SettingsScreenTests
         Assert.Equal(["Quiet", "Standard", "Strict"], model.Choices.Select(choice => choice.Label));
         Assert.Equal("Standard", model.SelectedChoice?.Label);
         Assert.Equal(["Standard"], model.Columns.Where(column => column.IsInForce).Select(column => column.Name));
-        Assert.StartsWith("With Standard, **41** rules of the file block a push, **6** only warn and **31** are off.", model.Sentence, StringComparison.Ordinal);
+        Assert.StartsWith("With Standard, **41** rules of the file block a push, **26** only warn and **11** are off.", model.Sentence, StringComparison.Ordinal);
         Assert.Equal("Files ending in .cs: 502 in invoicing. A full review builds them with the repository's .NET SDK.", Assert.Single(model.LanguageCards).Detail);
         Assert.Equal("Each language comes as a plug-in. This version has one.", model.LanguagesNote);
 
@@ -50,7 +50,7 @@ public sealed class SettingsScreenTests
         Assert.Equal(["Strict"], model.Choices.Where(choice => choice.IsCurrent).Select(choice => choice.Label));
         Assert.Equal("Blocks", model.Rows[1].Cells[2].Word);
         Assert.True(model.Rows[1].Cells[2].IsInForce);
-        Assert.StartsWith("With Strict, **47** rules of the file block a push, **0** only warn and **31** are off.", model.Sentence, StringComparison.Ordinal);
+        Assert.StartsWith("With Strict, **47** rules of the file block a push, **20** only warn and **11** are off.", model.Sentence, StringComparison.Ordinal);
         Assert.False(model.HasBanner);
 
         // the file cannot be written: the banner says why and the choice goes back to what the file says
@@ -75,6 +75,7 @@ public sealed class SettingsScreenTests
         Assert.Equal("Custom", model.SelectedChoice?.Label);
         Assert.Equal("Set in commitfence.json", model.Choices[3].Tip);
         Assert.Equal(["Custom"], model.Columns.Where(column => column.IsInForce).Select(column => column.Name));
+        Assert.StartsWith("With Custom, **6** rules of the file block a push, **20** only warn and **52** are off.", model.Sentence, StringComparison.Ordinal);
         model.SelectedChoice = model.Choices[0];
         await model.ChoiceSettledAsync();
         Assert.Equal("Custom", model.SelectedChoice?.Label);
@@ -115,16 +116,16 @@ public sealed class SettingsScreenTests
     [InlineData("NeverChecked", "Not checked yet.", "Check now")]
     [InlineData("Checking", "Checking for updates", "")]
     [InlineData("CouldNotCheck", "Could not check for updates. GitHub could not be reached.", "Try again")]
-    [InlineData("Available", "9.0.0.0 is available. You have 1.0.0.0.", "Update now")]
-    [InlineData("CannotUpdate", "9.0.0.0 is available. You have 1.0.0.0. This copy is not a release download, so it cannot update itself.", "Open the release page")]
+    [InlineData("Available", "9.0.0.0 is available. You have {installed}.", "Update now")]
+    [InlineData("CannotUpdate", "9.0.0.0 is available. You have {installed}. This copy is not a release download, so it cannot update itself.", "Open the release page")]
     [InlineData("Downloading", "Downloading 9.0.0.0 64%", "Cancel")]
     [InlineData("SizeNotKnown", "Downloading 9.0.0.0", "Cancel")]
     [InlineData("Cancelling", "Cancelling the update", "")]
     [InlineData("Replacing", "Replacing the files with 9.0.0.0 Too late to cancel.", "")]
     [InlineData("Installed", "9.0.0.0 is installed. Restarting.", "")]
     [InlineData("InstalledCouldNotRestart", "9.0.0.0 is installed. Close the app and start it again to use it.", "")]
-    [InlineData("Cancelled", "The update was cancelled. You still have 1.0.0.0.", "Check now")]
-    [InlineData("Failed", "The update failed. The download is damaged. Nothing was changed. You still have 1.0.0.0. Try again, or download it from the release page.", "Open the release page, Try again")]
+    [InlineData("Cancelled", "The update was cancelled. You still have {installed}.", "Check now")]
+    [InlineData("Failed", "The update failed. The download is damaged. Nothing was changed. You still have {installed}. Try again, or download it from the release page.", "Open the release page, Try again")]
     public async Task StatusRowSaysWhatItsTableSaysForEachStateWithItsButtons(string stateName, string words, string buttons)
     {
         var kind = Enum.Parse<UpdateStatusKind>(stateName);
@@ -133,7 +134,8 @@ public sealed class SettingsScreenTests
         await Reach(shell, kind);
 
         Assert.Equal(kind, status.Kind);
-        Assert.Equal(words.Replace("{time}", Samples.Now.ToLocalTime().ToString("HH:mm", System.Globalization.CultureInfo.InvariantCulture), StringComparison.Ordinal), status.SpokenText);
+        Assert.Equal(words.Replace("{time}", Samples.Now.ToLocalTime().ToString("HH:mm", System.Globalization.CultureInfo.InvariantCulture), StringComparison.Ordinal)
+            .Replace("{installed}", Samples.InstalledVersion, StringComparison.Ordinal), status.SpokenText);
         Assert.Equal(buttons, string.Join(", ", status.Buttons.Select(ButtonLabel)));
         Assert.Equal(kind is UpdateStatusKind.Downloading or UpdateStatusKind.SizeNotKnown, status.ShowsBar);
         Assert.Equal(kind == UpdateStatusKind.SizeNotKnown, status.BarFraction < 0);
@@ -184,7 +186,7 @@ public sealed class SettingsScreenTests
         shell.Updater.Result = new UpdateCheckResult { Status = UpdateCheckStatus.Failed, Problem = "GitHub could not be reached." };
         await status.CheckNowCommand.ExecuteAsync(null);
         Assert.Equal(UpdateStatusKind.Available, status.Kind);
-        Assert.Equal("9.0.0.0 is available. You have 1.0.0.0.", status.Lead + " " + status.Rest);
+        Assert.Equal($"9.0.0.0 is available. You have {Samples.InstalledVersion}.", status.Lead + " " + status.Rest);
         Assert.Equal("Could not check for updates. GitHub could not be reached.", status.Meta);
         Assert.Equal([UpdateStatusButton.UpdateNow], status.Buttons);
         shell.Updater.Result = FakeUpdater.Available("9.0.0.0", _notes);
@@ -281,7 +283,7 @@ public sealed class SettingsScreenTests
         var motion = Motion.ReducedOnThisMachine;
         try
         {
-            var model = new SettingsViewModel(shell.Services, Samples.Folder(shell.RepositoryPath), shell.Model.Updates, false);
+            var model = new SettingsViewModel(shell.Services, Samples.Folder(shell.RepositoryPath), shell.Model.Updates, Samples.InstallFolder, false);
             var row = model.Facts.Single(fact => fact.Name == "Motion");
             Assert.True(row.HasSwitch);
             Assert.Equal("Reduce motion", row.Value);
@@ -344,7 +346,7 @@ public sealed class SettingsScreenTests
             case UpdateStatusKind.NeverChecked:
                 return;
             case UpdateStatusKind.UpToDate:
-                updater.Result = new UpdateCheckResult { Status = UpdateCheckStatus.UpToDate, Release = new ReleaseInfo { Version = new Version(1, 0, 0, 0) } };
+                updater.Result = FakeUpdater.UpToDate();
                 await updates.CheckAsync(true);
                 updates.StatusText = null;
                 return;

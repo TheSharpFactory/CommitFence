@@ -36,7 +36,7 @@ internal sealed partial class SettingsViewModel : ObservableObject, IScreenModel
     private int _choicesWaiting;
     private StrictnessReport? _report;
 
-    public SettingsViewModel(CommitFenceServices services, OpenedFolder folder, UpdatesViewModel updates, bool? followsSystemMotion = null)
+    public SettingsViewModel(CommitFenceServices services, OpenedFolder folder, UpdatesViewModel updates, string installFolder, bool? followsSystemMotion = null)
     {
         _settings = services.Settings;
         _languageReports = services.LanguageReports;
@@ -49,7 +49,7 @@ internal sealed partial class SettingsViewModel : ObservableObject, IScreenModel
         Updates = updates;
         Status = new UpdateStatusViewModel(updates, services.UpdateChecks, services.Clock);
         Notes = new ReleaseNotesViewModel(updates, services.ProductInfo);
-        Facts = FactsOf();
+        Facts = FactsOf(installFolder);
         Status.PropertyChanged += (_, _) => AgainCommand.NotifyCanExecuteChanged();
         Notes.PropertyChanged += OnNotesChanged;
     }
@@ -344,11 +344,11 @@ internal sealed partial class SettingsViewModel : ObservableObject, IScreenModel
     /// <summary>
     /// The app's facts: where it runs from, how it looks for updates, how it moves, where it keeps its data.
     /// </summary>
-    private List<FactRowViewModel> FactsOf()
+    private List<FactRowViewModel> FactsOf(string installFolder)
     {
         return
         [
-            new FactRowViewModel("Folder", AppContext.BaseDirectory.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar), true),
+            new FactRowViewModel("Folder", installFolder, true),
             new FactRowViewModel("Updates", "Looks for a new version once a day while the app runs. A hook never does.", false),
             MotionRow(),
             new FactRowViewModel("Data", _machine.DataFolder, true, "The history of reviews and the private copies of repositories.")

@@ -35,10 +35,10 @@ internal static class ExemptionSamples
 
     private static readonly (string File, int Line, string Rule, string? Reason)[] _lines =
     [
-        ("Dependencies/CF.Adapters/Updates/ReleaseUpdater.cs", 208, "TEAM010", _copied),
-        ("Dependencies/CF.Adapters/Updates/ReleaseUpdater.cs", 241, "TEAM010", _copied),
-        ("Dependencies/CF.Adapters/Updates/ReleaseUpdater.cs", 263, "TEAM010", _copied),
-        ("Dependencies/CF.Adapters/Updates/ReleaseUpdater.cs", 302, "TEAM010", _copied),
+        ("Dependencies/CF.Adapters/Updates/ReleaseUpdater.cs", 208, "TEAM001", _copied),
+        ("Dependencies/CF.Adapters/Updates/ReleaseUpdater.cs", 241, "TEAM001", _copied),
+        ("Dependencies/CF.Adapters/Updates/ReleaseUpdater.cs", 263, "TEAM001", _copied),
+        ("Dependencies/CF.Adapters/Updates/ReleaseUpdater.cs", 302, "TEAM001", _copied),
         ("Dependencies/CF.Adapters/Updates/ReleaseUpdater.cs", 87, "TEAM011", _internal),
         ("App/CF.App/Rules/RulesViewModel.FileRules.cs", 31, "CA1822", "Kept for the plug-in contract"),
         ("App/CF.App/Rules/RulesViewModel.FileRules.cs", 58, "CA1822", "Kept for the plug-in contract"),
@@ -54,9 +54,9 @@ internal static class ExemptionSamples
         ("App/CF.App/Settings/MarkedText.cs", 63, "IDE0055", "Aligned to read as a table"),
         ("App/CF.App/Settings/MarkedText.cs", 91, "IDE0051", "Used by the style"),
         ("Dependencies/CF.Core/Review/SettingsInTree.cs", 52, "TEAM013", "Reads the text it is given"),
-        ("App/CF.Cli/Commands/ReviewArguments.cs", 110, "TEAM010", "One line reads better here"),
-        ("Dependencies/CF.Adapters/Updates/UpdateInstaller.cs", 55, "TEAM010", _copied),
-        ("App/CF.App/Review/ReviewViewModel.cs", 412, "TEAM010", null),
+        ("App/CF.Cli/Commands/ReviewArguments.cs", 110, "TEAM001", "One line reads better here"),
+        ("Dependencies/CF.Adapters/Updates/UpdateInstaller.cs", 55, "TEAM001", _copied),
+        ("App/CF.App/Review/ReviewViewModel.cs", 412, "TEAM001", null),
         ("Dependencies/CF.Adapters/Git/GitRunner.cs", 22, "TEAM011", null),
         ("App/CF.App/Shell/Program.cs", 14, "CA1822", "The entry point is called by the runtime"),
         ("App/CF.Cli/Commands/UsageText.cs", 9, "IDE0055", "Aligned to read as a list"),
@@ -78,7 +78,7 @@ internal static class ExemptionSamples
     /// </summary>
     public static ExemptionScan Many(int files, int perFile)
     {
-        var entries = Enumerable.Range(0, files).SelectMany(file => Enumerable.Range(1, perFile).Select(at => Entry(($"src/Area{file / 10}/File{file:000}.cs", (at * 10) + 5, "TEAM010", "Kept as it was"))));
+        var entries = Enumerable.Range(0, files).SelectMany(file => Enumerable.Range(1, perFile).Select(at => Entry(($"src/Area{file / 10}/File{file:000}.cs", (at * 10) + 5, "TEAM001", "Kept as it was"))));
         return ExemptionScan.Of("main", "4f2a91c".PadRight(40, '0'), entries.ToList());
     }
 

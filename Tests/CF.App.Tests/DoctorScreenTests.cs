@@ -82,10 +82,14 @@ public sealed class DoctorScreenTests
         var other = new OpenedFolder("/work/billing", "/work/billing/commitfence.json", false, "billing", "main", true);
         var held = new TaskCompletionSource();
         var entered = new TaskCompletionSource();
+        var firstHeld = new TaskCompletionSource();
         _doctor.Answer = folder =>
         {
             if(folder == "/work/billing")
                 return FakeDoctorService.Report(heading: "2 checks fail");
+
+            if(_doctor.Folders.Count == 1)
+                firstHeld.Task.Wait();
 
             if(!held.Task.IsCompleted && _doctor.Folders.Count > 1)
             {
@@ -98,8 +102,20 @@ public sealed class DoctorScreenTests
         var model = Create(Samples.Folder("/work/invoicing"));
         using var host = new ViewHost(new DoctorView { DataContext = model }, 1440, 900);
 
+        var first = model.ShownAsync();
+        try
+        {
+            Assert.Equal("Checking", model.Heading);
+            Assert.Equal("Checking whether this machine is ready for pushes.", string.Concat(model.Sentence.Select(part => part.Text)));
+            Assert.Null(model.CheckedText);
+        }
+        finally
+        {
+            firstHeld.SetResult();
+        }
+
         // the first report, then "Check again": the verdict says Checking, the rows keep their results behind the busy ring
-        await model.ShownAsync();
+        await first;
         host.Pump();
         Assert.Equal("Ready for pushes", model.Heading);
         Assert.True(model.AgainCommand.CanExecute(null));
@@ -107,7 +123,8 @@ public sealed class DoctorScreenTests
         await entered.Task;
         host.Pump();
         Assert.Equal("Checking", model.Heading);
-        Assert.Equal("3 checks of git, the program, C# and CommitFence.", string.Concat(model.Sentence.Select(part => part.Text)));
+        Assert.Equal("3 checks: Git and the hook, C#.", string.Concat(model.Sentence.Select(part => part.Text)));
+        Assert.Equal($"Last checked today, {Samples.Now.ToLocalTime():HH:mm}", model.CheckedText);
         Assert.False(model.AgainCommand.CanExecute(null));
         Assert.False(host.Find<Button>(button => Avalonia.Automation.AutomationProperties.GetName(button) == "Check again")!.IsEffectivelyEnabled);
         Assert.All(model.Groups.SelectMany(group => group.Checks), row => Assert.True(row.IsBusy && row.ShowsRing && !row.ShowsPass));
@@ -180,36 +197,38 @@ public sealed class DoctorScreenTests
         using var shell = new ShellHost();
         shell.Doctor.Answer = _ => FakeDoctorService.Report(hookFails: true);
         using var host = new ViewHost(new MainWindow { DataContext = shell.Model, Width = 1440, Height = 900 });
+        var model = shell.Model.Doctor;
         shell.Model.ShowDoctor();
-        while(shell.Model.Doctor.IsChecking || shell.Model.Doctor.Groups.Count == 0)
-        {
-            host.Pump();
-            await Task.Yield();
-        }
-
-        // the report may arrive after the last pump of the wait: lay the rows out before looking for a button of theirs
+        await Signals.Until(model, () => model.HasFacts);
         host.Pump();
 
         // F5 held down: the check that runs is the only one
         var held = new TaskCompletionSource();
+        var entered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         shell.Doctor.Answer = _ =>
         {
+            entered.TrySetResult();
             held.Task.Wait();
             return FakeDoctorService.Report();
         };
         var copy = host.Find<Button>(button => Avalonia.Automation.AutomationProperties.GetName(button) == "Copy the hook line")!;
         copy.Focus(NavigationMethod.Tab);
-        host.Press(PhysicalKey.F5);
-        host.Press(PhysicalKey.F5);
-        host.Press(PhysicalKey.F5);
-        Assert.Equal(2, shell.Doctor.Folders.Count);
-        held.SetResult();
-        while(shell.Model.Doctor.IsChecking)
+        try
         {
-            host.Pump();
-            await Task.Yield();
+            host.Press(PhysicalKey.F5);
+            await entered.Task.WaitAsync(TimeSpan.FromSeconds(60));
+            host.Press(PhysicalKey.F5);
+            host.Press(PhysicalKey.F5);
+            Assert.True(model.IsChecking);
+        }
+        finally
+        {
+            var finished = Signals.Until(model, () => !model.IsChecking);
+            held.SetResult();
+            await finished;
         }
 
+        Assert.Equal(2, shell.Doctor.Folders.Count);
         // the fix the keyboard was in is gone: the keyboard is on "Check again"
         host.Pump();
         var checkAgain = host.Find<Button>(button => Avalonia.Automation.AutomationProperties.GetName(button) == "Check again")!;
@@ -217,11 +236,11 @@ public sealed class DoctorScreenTests
 
         // a fix that goes away while the keyboard is elsewhere leaves the keyboard where it is
         shell.Doctor.Answer = _ => FakeDoctorService.Report(hookFails: true);
-        await shell.Model.Doctor.CheckAsync();
+        await model.CheckAsync();
         host.Pump();
         shell.Doctor.Answer = _ => FakeDoctorService.Report();
         host.Window.FocusManager?.Focus(null);
-        await shell.Model.Doctor.CheckAsync();
+        await model.CheckAsync();
         host.Pump();
         Assert.False(host.HasFocusWithin(checkAgain));
     }

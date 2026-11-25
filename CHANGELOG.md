@@ -3,6 +3,45 @@
 What changed in each published release of CommitFence, newest first. Each section is also the text of that release on
 GitHub, with its downloads.
 
+## 1.0.0.3 — 2026-11-25
+
+### Architecture
+
+- **The diagram is drawn again.** The lines of the chosen module run at right angles, each in its own place, and never
+  cross; the rows are numbered as the layers they are; a module not linked to the chosen one is a plain button with a
+  clear edge, and the chosen one has a blue edge.
+- **"Every direction" is a list by layer** in place of the table: one row per module with the modules it may use. A use
+  that breaks a direction is a red mark with the word "Breaks", first in its row. Directions are allowed and stopped in
+  the module's panel; the list does not edit.
+- **Modules that may use each other** are drawn with their lines, and the list says that they share a layer.
+- The panel's remove buttons and "Used by" rows are larger targets, and under "Allow this direction" a line says what
+  it writes to `commitfence.json`.
+
+### Dashboard
+
+- **The chart's axis stands on round numbers** (0, 5, 10, and round steps above that).
+- **A rule that found things and is off now** keeps its bar in "Most broken", in a neutral colour with the word "Off".
+- When the history of reviews could not be read, the notice says that the numbers may leave reviews out and offers
+  "Read again". On a day with more reviews than fit as boxes, the chart says why it draws blocks.
+
+### Settings and Doctor
+
+- **Settings shows an update once:** while Settings is open the update notice at the foot of the page steps back,
+  since the status row there has the same words and buttons.
+- **Doctor**, while it checks again, says "Last checked" with the time of the results it still shows.
+- The heading of an empty screen is the size of the screen's name.
+
+### Downloads
+
+| Download | What |
+|---|---|
+| `CommitFence-win-x64.zip`, `CommitFence-win-arm64.zip` | The app for Windows, with the command line beside it |
+| `CommitFence-osx-arm64.zip`, `CommitFence-osx-x64.zip` | The app for macOS (Apple silicon, Intel) |
+| `CommitFence-linux-x64.tar.gz` | The app for Linux |
+| `commitfence-cli-*` | The command line, `commitfence`, for the same systems |
+
+---
+
 ## 1.0.0.2 — 2026-11-24
 
 ### Fixed

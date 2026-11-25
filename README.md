@@ -67,7 +67,7 @@ most, which never fired, and how long a push waited.
 ![The Dashboard: a chart with one box per review by day, the rules that never fired, and the rules most broken](docs/images/dashboard-screen.png)
 
 **Architecture.** The modules of the repository in layers, each above the ones it may use, and the use that breaks a
-direction in red. Every direction is also a table, and each change is saved at once.
+direction in red. Every direction is also a list by layer, and each change is saved at once.
 
 ![The Architecture screen: eleven modules in layers, the chosen module's lines, and one use that breaks a direction](docs/images/architecture-screen.png)
 

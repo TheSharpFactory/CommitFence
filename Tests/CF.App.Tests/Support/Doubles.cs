@@ -92,9 +92,9 @@ internal sealed class ManualChanges : ISettingsChangeSource
 /// </summary>
 internal sealed class FakeUpdater : IUpdater
 {
-    public Version CurrentVersion { get; set; } = new Version(1, 0, 0, 0);
+    public Version CurrentVersion { get; } = Version.Parse(Samples.InstalledVersion);
 
-    public UpdateCheckResult Result { get; set; } = new UpdateCheckResult { Status = UpdateCheckStatus.UpToDate, Release = new ReleaseInfo { Version = new Version(1, 0, 0, 0) } };
+    public UpdateCheckResult Result { get; set; } = UpToDate();
 
     public string? Problem { get; set; }
 
@@ -197,6 +197,11 @@ internal sealed class FakeUpdater : IUpdater
             startInfo.ArgumentList.Add(argument);
 
         return startInfo;
+    }
+
+    public static UpdateCheckResult UpToDate()
+    {
+        return new UpdateCheckResult { Status = UpdateCheckStatus.UpToDate, Release = new ReleaseInfo { Version = Version.Parse(Samples.InstalledVersion) } };
     }
 
     public static UpdateCheckResult Available(string version, string? notes = null, bool withPage = true)

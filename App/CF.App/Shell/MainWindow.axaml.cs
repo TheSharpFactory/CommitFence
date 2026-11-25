@@ -4,6 +4,7 @@ using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Interactivity;
+using Avalonia.Threading;
 using Avalonia.VisualTree;
 using CF.App.Parts;
 
@@ -29,11 +30,14 @@ internal sealed partial class MainWindow : Window
         [Key.NumPad7] = Screen.Doctor
     };
 
+    private MainWindowViewModel? _model;
+
     public MainWindow()
     {
         InitializeComponent();
         AddHandler(KeyDownEvent, OnWindowKeyDown, RoutingStrategies.Tunnel);
         Opened += OnOpened;
+        DataContextChanged += OnDataContextChanged;
     }
 
     /// <summary>
@@ -47,6 +51,31 @@ internal sealed partial class MainWindow : Window
         Model.Updates.StartAndExit = StartAndExit;
         Model.Updates.OpenUri = OpenUri;
         Model.Updates.Start();
+    }
+
+    private void OnDataContextChanged(object? sender, EventArgs e)
+    {
+        if(_model != null)
+            _model.PropertyChanging -= OnModelChanging;
+
+        _model = Model;
+        if(_model != null)
+            _model.PropertyChanging += OnModelChanging;
+    }
+
+    private void OnModelChanging(object? sender, PropertyChangingEventArgs e)
+    {
+        if(e.PropertyName != nameof(MainWindowViewModel.CurrentScreen) || FocusManager?.GetFocusedElement() is not Control focused)
+            return;
+
+        if(!focused.GetVisualAncestors().Contains(Notice) && !focused.GetVisualAncestors().Contains(SettingsScreen))
+            return;
+
+        Dispatcher.UIThread.Post(() =>
+        {
+            if(!focused.IsEffectivelyVisible && FocusManager.GetFocusedElement() is not Control { IsEffectivelyVisible: true })
+                FirstStop(Rail)?.Focus(NavigationMethod.Tab);
+        }, DispatcherPriority.Loaded);
     }
 
     private bool StartAndExit(ProcessStartInfo startInfo)
@@ -160,7 +189,7 @@ internal sealed partial class MainWindow : Window
     /// </summary>
     private void UpdateNow()
     {
-        if(Model == null || !(Model.Updates.ShowsUpdateNow || (Model.CurrentScreen == Screen.Settings && Model.Settings.Status.ShowsUpdateNow)))
+        if(Model == null || !(Model.ShowsSettings ? Model.Settings.Status.ShowsUpdateNow : Model.Updates.ShowsUpdateNow))
             return;
 
         if(Model.Updates.UpdateNowCommand.CanExecute(null))

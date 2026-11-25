@@ -209,21 +209,6 @@ internal sealed partial class ArchitectureViewModel : ObservableObject, IScreenM
         return !ListsAreAbsent && FindModule(from)?.MayUse.Contains(to) == true;
     }
 
-    public void ToggleDirection(string from, string to)
-    {
-        if(!CanEdit)
-            return;
-
-        if(DirectionRefusal(from, to) is { } refusal)
-        {
-            Notice = refusal;
-            Publish();
-            return;
-        }
-
-        SetDirection(from, to, !IsAllowed(from, to));
-    }
-
     public void SetDirection(string from, string to, bool allow)
     {
         if(allow && DirectionRefusal(from, to) is { } refusal)

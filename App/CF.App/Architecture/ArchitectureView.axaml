@@ -10,35 +10,77 @@
              x:DataType="screen:ArchitectureViewModel">
 
   <UserControl.Styles>
-    <Style Selector="Button.arch-remove">
+    <Style Selector="Button.arch-more">
       <Setter Property="Width" Value="28"/>
       <Setter Property="Padding" Value="0"/>
+    </Style>
+    <!-- The remove button of a row of the panel: 36 by 36, flush with the row's end; hover is the line colour with the mark in ink. -->
+    <Style Selector="Button.remove.arch-remove">
+      <Setter Property="Width" Value="36"/>
+    </Style>
+    <Style Selector="Button.remove.arch-remove:pointerover /template/ Border#Surface">
+      <Setter Property="Background" Value="{DynamicResource line}"/>
+    </Style>
+    <Style Selector="Border.arch-line">
+      <Setter Property="Background" Value="Transparent"/>
+      <Setter Property="CornerRadius" Value="10"/>
+      <Setter Property="MinHeight" Value="36"/>
+      <Setter Property="Padding" Value="6,0,0,0"/>
+    </Style>
+    <Style Selector="Border.arch-line:pointerover">
+      <Setter Property="Background" Value="{DynamicResource hover}"/>
+    </Style>
+    <!-- A Used by row: one button across the panel, 36 high, its ring a line of 2 inside its edge. -->
+    <Style Selector="Button.arch-use">
+      <Setter Property="Height" Value="36"/>
+      <Setter Property="Padding" Value="6,0,0,0"/>
+      <Setter Property="HorizontalAlignment" Value="Stretch"/>
+      <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+      <Setter Property="VerticalContentAlignment" Value="Center"/>
+      <Setter Property="Template">
+        <ControlTemplate>
+          <Panel>
+            <Border Name="Surface" CornerRadius="10" Background="Transparent" Padding="{TemplateBinding Padding}">
+              <ContentPresenter Content="{TemplateBinding Content}" HorizontalContentAlignment="Stretch" VerticalContentAlignment="Center"/>
+            </Border>
+            <Border Name="Ring" IsVisible="False" IsHitTestVisible="False" CornerRadius="10" BorderThickness="2"
+                    BorderBrush="{DynamicResource focus}"/>
+          </Panel>
+        </ControlTemplate>
+      </Setter>
+    </Style>
+    <Style Selector="Button.arch-use:pointerover /template/ Border#Surface">
+      <Setter Property="Background" Value="{DynamicResource hover}"/>
+    </Style>
+    <Style Selector="Button.arch-use:pressed /template/ Border#Surface">
+      <Setter Property="Background" Value="{DynamicResource line}"/>
+    </Style>
+    <Style Selector="Button.arch-use:focus-visible /template/ Border#Ring">
+      <Setter Property="IsVisible" Value="True"/>
     </Style>
     <Style Selector="Button.arch-module">
       <Setter Property="Background" Value="{DynamicResource page}"/>
       <Setter Property="BorderBrush" Value="{DynamicResource ink-3}"/>
-      <Setter Property="Padding" Value="0"/>
+      <Setter Property="Padding" Value="10,0"/>
     </Style>
     <Style Selector="Button.arch-module.unlinked">
-      <Setter Property="Background" Value="{DynamicResource line}"/>
-      <Setter Property="BorderBrush" Value="{DynamicResource line}"/>
+      <Setter Property="BorderBrush" Value="{DynamicResource line-control}"/>
+    </Style>
+    <Style Selector="Button.arch-module.unlinked:pointerover">
+      <Setter Property="BorderBrush" Value="{DynamicResource ink-3}"/>
     </Style>
     <Style Selector="Button.arch-module:pointerover">
       <Setter Property="Background" Value="{DynamicResource hover}"/>
     </Style>
-    <Style Selector="Button.arch-module.unlinked:pointerover">
-      <Setter Property="Background" Value="{DynamicResource line-strong}"/>
-    </Style>
     <Style Selector="Button.arch-module.current">
-      <Setter Property="BorderBrush" Value="{DynamicResource ink}"/>
+      <Setter Property="BorderBrush" Value="{DynamicResource here}"/>
       <Setter Property="BorderThickness" Value="2"/>
     </Style>
-    <Style Selector="Button.arch-cell">
-      <Setter Property="Padding" Value="0"/>
-      <Setter Property="CornerRadius" Value="0"/>
+    <Style Selector="Button.arch-module.current /template/ Border#Surface">
+      <Setter Property="BoxShadow" Value="{DynamicResource shadow-raised}"/>
     </Style>
-    <Style Selector="Button.arch-cell:pointerover">
-      <Setter Property="Background" Value="{DynamicResource hover}"/>
+    <Style Selector="Button.arch-row.chosen">
+      <Setter Property="Background" Value="{DynamicResource page}"/>
     </Style>
     <Style Selector="StackPanel.arch-key > TextBlock">
       <Setter Property="Theme" Value="{StaticResource type-meta}"/>
@@ -115,8 +157,11 @@
               <parts:WrapRow ItemSpacing="12" LineSpacing="8" MinHeight="36">
                 <parts:SegmentedList Name="Mode" Classes="segmented" SelectedIndex="0"
                                      AutomationProperties.Name="Show the modules as" SelectionChanged="OnModeChanged">
+                  <parts:SegmentedList.ItemsPanel>
+                    <ItemsPanelTemplate><StackPanel Orientation="Horizontal"/></ItemsPanelTemplate>
+                  </parts:SegmentedList.ItemsPanel>
                   <ListBoxItem Height="28"><TextBlock Name="DiagramLabel" Classes="segment" Theme="{StaticResource type-meta}" Text="Diagram"/></ListBoxItem>
-                  <ListBoxItem Height="28"><TextBlock Classes="segment" Theme="{StaticResource type-meta}" Text="Table"/></ListBoxItem>
+                  <ListBoxItem Height="28"><TextBlock Classes="segment" Theme="{StaticResource type-meta}" Text="Every direction"/></ListBoxItem>
                 </parts:SegmentedList>
                 <Button Name="SwitchModule" Classes="cf outlined" Click="OnSwitchModule" KeyDown="OnSwitchKey"
                         AutomationProperties.Name="Choose a module" Padding="12,0,10,0">
@@ -126,10 +171,10 @@
                     <parts:Icon Data="{StaticResource i-down}" Width="13" Height="13" Stroke="{DynamicResource ink-2}"/>
                   </StackPanel>
                 </Button>
-                <WrapPanel Name="Legend" parts:WrapRow.AtEnd="True" ItemSpacing="18" LineSpacing="6" VerticalAlignment="Center"/>
+                <StackPanel Name="Legend" Orientation="Horizontal" Spacing="18" Margin="8,0,0,0" parts:WrapRow.AtEnd="True" VerticalAlignment="Center"/>
               </parts:WrapRow>
               <screen:ModuleDiagram Name="Diagram"/>
-              <screen:DirectionTable Name="Table" IsVisible="False"/>
+              <screen:DirectionList Name="Every" IsVisible="False"/>
               <TextBlock Name="Foot" Theme="{StaticResource type-meta}" Foreground="{DynamicResource ink-2}" TextWrapping="Wrap"/>
               <StackPanel Name="ScrollCue" Orientation="Horizontal" Spacing="6" IsVisible="False">
                 <parts:Icon Data="{StaticResource i-right}" Width="14" Height="14" Stroke="{DynamicResource ink}"/>
@@ -149,7 +194,7 @@
           <TextBlock IsVisible="{Binding !EditingName}" Theme="{StaticResource code-h3}" Text="{Binding SelectedName}"
                      VerticalAlignment="Center" TextWrapping="Wrap"/>
           <TextBox Name="NameField" IsVisible="{Binding EditingName}" IsEnabled="{Binding IsWritable}" AutomationProperties.Name="Module name" KeyDown="OnNameKey"/>
-          <Button Grid.Column="1" Name="More" IsEnabled="{Binding CanEdit}" Classes="cf quiet small arch-remove"
+          <Button Grid.Column="1" Name="More" IsEnabled="{Binding CanEdit}" Classes="cf quiet small arch-more"
                   AutomationProperties.Name="{Binding MoreName}">
             <parts:Icon Data="{StaticResource i-more}" Width="16" Height="16" Stroke="{DynamicResource ink}"/>
             <Button.Flyout>
@@ -191,6 +236,7 @@
                 <TextBlock Theme="{StaticResource type-meta-strong}" Text="Allow this direction"/>
               </Button>
             </WrapPanel>
+            <screen:AllowNote Margin="0,2,0,0" Breach="{Binding SelectedBreach}"/>
           </StackPanel>
         </Border>
 
@@ -199,14 +245,16 @@
           <ItemsControl ItemsSource="{Binding Selected.Parts}">
             <ItemsControl.ItemTemplate>
               <DataTemplate x:DataType="core:StructurePart">
-                <Grid ColumnDefinitions="76,*,28" ColumnSpacing="8" MinHeight="36" Margin="6,0,4,0">
-                  <TextBlock Theme="{StaticResource type-meta}" Foreground="{DynamicResource ink-2}" Text="{Binding Kind}" VerticalAlignment="Center"/>
-                  <TextBlock Grid.Column="1" Theme="{StaticResource code}" Text="{Binding Pattern}" TextWrapping="Wrap" VerticalAlignment="Center"/>
-                  <Button Grid.Column="2" Classes="cf quiet small arch-remove" IsEnabled="{Binding $parent[ItemsControl].((screen:ArchitectureViewModel)DataContext).CanEdit}"
-                          Click="OnRemovePart" KeyDown="OnDelete" AutomationProperties.Name="{Binding StringFormat='Remove {0}'}" ToolTip.Tip="Remove this part">
-                    <parts:Icon Data="{StaticResource i-x}" Width="14" Height="14" Stroke="{DynamicResource ink-3}"/>
-                  </Button>
-                </Grid>
+                <Border Classes="arch-line">
+                  <Grid ColumnDefinitions="76,*,36" ColumnSpacing="8">
+                    <TextBlock Theme="{StaticResource type-meta}" Foreground="{DynamicResource ink-2}" Text="{Binding Kind}" VerticalAlignment="Center"/>
+                    <TextBlock Grid.Column="1" Theme="{StaticResource code}" Text="{Binding Pattern}" TextWrapping="Wrap" VerticalAlignment="Center"/>
+                    <Button Grid.Column="2" Classes="remove arch-remove" IsEnabled="{Binding $parent[ItemsControl].((screen:ArchitectureViewModel)DataContext).CanEdit}"
+                            Click="OnRemovePart" KeyDown="OnDelete" AutomationProperties.Name="{Binding StringFormat='Remove {0}'}" ToolTip.Tip="Remove this part">
+                      <parts:Icon Data="{StaticResource i-x}" Width="16" Height="16" StrokeThickness="1.6" Stroke="{Binding $parent[Button].Foreground}"/>
+                    </Button>
+                  </Grid>
+                </Border>
               </DataTemplate>
             </ItemsControl.ItemTemplate>
           </ItemsControl>
@@ -229,13 +277,15 @@
           <ItemsControl ItemsSource="{Binding MayUse}">
             <ItemsControl.ItemTemplate>
               <DataTemplate x:DataType="x:String">
-                <Grid ColumnDefinitions="*,28" MinHeight="36" Margin="6,0,4,0">
-                  <TextBlock Theme="{StaticResource code}" Text="{Binding}" TextWrapping="Wrap" VerticalAlignment="Center"/>
-                  <Button Grid.Column="1" Classes="cf quiet small arch-remove" IsEnabled="{Binding $parent[ItemsControl].((screen:ArchitectureViewModel)DataContext).CanEdit}"
-                          Click="OnStopAllowing" KeyDown="OnDelete" AutomationProperties.Name="{Binding StringFormat='Stop allowing {0}'}" ToolTip.Tip="Stop allowing">
-                    <parts:Icon Data="{StaticResource i-x}" Width="14" Height="14" Stroke="{DynamicResource ink-3}"/>
-                  </Button>
-                </Grid>
+                <Border Classes="arch-line">
+                  <Grid ColumnDefinitions="*,36">
+                    <TextBlock Theme="{StaticResource code}" Text="{Binding}" TextWrapping="Wrap" VerticalAlignment="Center"/>
+                    <Button Grid.Column="1" Classes="remove arch-remove" IsEnabled="{Binding $parent[ItemsControl].((screen:ArchitectureViewModel)DataContext).CanEdit}"
+                            Click="OnStopAllowing" KeyDown="OnDelete" AutomationProperties.Name="{Binding StringFormat='Stop allowing {0}'}" ToolTip.Tip="Stop allowing">
+                      <parts:Icon Data="{StaticResource i-x}" Width="16" Height="16" StrokeThickness="1.6" Stroke="{Binding $parent[Button].Foreground}"/>
+                    </Button>
+                  </Grid>
+                </Border>
               </DataTemplate>
             </ItemsControl.ItemTemplate>
           </ItemsControl>
@@ -257,11 +307,10 @@
           <ItemsControl ItemsSource="{Binding UsedBy}">
             <ItemsControl.ItemTemplate>
               <DataTemplate x:DataType="x:String">
-                <Button Classes="cf quiet" HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch" Padding="6,0,4,0"
-                        Click="OnChooseUser" AutomationProperties.Name="{Binding StringFormat='Choose {0}'}">
-                  <Grid ColumnDefinitions="*,28">
-                    <TextBlock Theme="{StaticResource code}" Text="{Binding}" VerticalAlignment="Center" TextWrapping="Wrap"/>
-                    <parts:Icon Grid.Column="1" Width="14" Height="14" Data="{StaticResource i-right}"
+                <Button Classes="arch-use" Click="OnChooseUser" AutomationProperties.Name="{Binding StringFormat='Choose {0}'}">
+                  <Grid ColumnDefinitions="*,36">
+                    <TextBlock Theme="{StaticResource code}" Foreground="{DynamicResource ink}" Text="{Binding}" VerticalAlignment="Center" TextWrapping="Wrap"/>
+                    <parts:Icon Grid.Column="1" Width="16" Height="16" StrokeThickness="1.6" Data="{StaticResource i-right}"
                                 Stroke="{DynamicResource ink-3}" HorizontalAlignment="Center"/>
                   </Grid>
                 </Button>

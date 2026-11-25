@@ -50,8 +50,8 @@ public sealed class ExemptionsScreenTests
 
         // each form, and no reason: an allow comment with none is a finding; a pragma or an attribute with none is not
         shell.Exemptions.Answer = () => ExemptionScan.Of("main", new string('a', 40), [
-            Entry("src/A.cs", 5, "TEAM010", ExemptionForm.AllowComment, "Generated code keeps its braces"),
-            Entry("src/A.cs", 9, "TEAM010", ExemptionForm.AllowComment, null),
+            Entry("src/A.cs", 5, "TEAM001", ExemptionForm.AllowComment, "Generated code keeps its braces"),
+            Entry("src/A.cs", 9, "TEAM001", ExemptionForm.AllowComment, null),
             Entry("src/A.cs", 20, "CA1822", ExemptionForm.Pragma, null),
             Entry("src/A.cs", 30, "CA1031", ExemptionForm.SuppressMessage, "The caller reports it")]);
         await model.ShownAsync();
@@ -61,12 +61,12 @@ public sealed class ExemptionsScreenTests
         Assert.Equal([null, null, "#pragma warning disable", "[SuppressMessage]"], rows.Select(row => row.FormText));
         Assert.Equal("No reason given", rows[1].NoReason);
         Assert.Equal("A finding: an exemption needs a reason", rows[1].FindingLead);
-        Assert.Equal("Write why after the rule: `// commitfence:allow TEAM010: ` and the reason. Until then this line is a finding of its own.", rows[1].HintMarked);
+        Assert.Equal("Write why after the rule: `// commitfence:allow TEAM001: ` and the reason. Until then this line is a finding of its own.", rows[1].HintMarked);
         Assert.False(rows[3].Rule.IsKnown);
 
         // "Open at line n" resolves the path against the top of the working tree the scan read, not the folder the app was opened on
         var work = Path.Combine(Path.GetTempPath(), "shop-top");
-        shell.Exemptions.Answer = () => ExemptionScan.Of("main", new string('a', 40), [Entry("src/A.cs", 5, "TEAM010", ExemptionForm.AllowComment, "Kept")], work);
+        shell.Exemptions.Answer = () => ExemptionScan.Of("main", new string('a', 40), [Entry("src/A.cs", 5, "TEAM001", ExemptionForm.AllowComment, "Kept")], work);
         await model.ShownAsync();
         var opened = new List<(string Path, int Line)>();
         model.OpenLineRequested += (path, line) => opened.Add((path, line));
@@ -109,12 +109,12 @@ public sealed class ExemptionsScreenTests
         Assert.Equal(17, model.Items.OfType<ExemptionFileViewModel>().Count());
 
         // a rule chosen in the panel: the other rows keep their words, the files are its own, and "The rule chosen" shows
-        model.RuleRows.Single(row => row.RuleId == "TEAM010").ChooseCommand.Execute(null);
+        model.RuleRows.Single(row => row.RuleId == "TEAM001").ChooseCommand.Execute(null);
         host.Pump();
-        Assert.Equal("**7** lines set TEAM010 aside, in **4** files", model.SummaryMarked);
+        Assert.Equal("**7** lines set TEAM001 aside, in **4** files", model.SummaryMarked);
         Assert.Equal("1 of 8 rules shown", model.RulesHead);
-        Assert.Equal("4 files with exemptions of TEAM010, most first", model.FilesLine);
-        Assert.Equal(["TEAM010"], model.RuleRows.Where(row => row.IsChosen).Select(row => row.RuleId));
+        Assert.Equal("4 files with exemptions of TEAM001, most first", model.FilesLine);
+        Assert.Equal(["TEAM001"], model.RuleRows.Where(row => row.IsChosen).Select(row => row.RuleId));
         Assert.Equal(7, model.RuleRows.Count(row => row.IsSteppedBack));
         Assert.Equal("1 without a reason", model.RuleRows.Single(row => row.RuleId == "TEAM011").WithoutReasonText);
         var chosen = model.Chosen!;
@@ -149,14 +149,14 @@ public sealed class ExemptionsScreenTests
         shell.Model.CurrentScreen = Screen.Exemptions;
         await model.ScanAsync();
         host.Pump();
-        model.RuleRows.Single(row => row.RuleId == "TEAM010").ChooseCommand.Execute(null);
+        model.RuleRows.Single(row => row.RuleId == "TEAM001").ChooseCommand.Execute(null);
 
         // the rule opens on Rules, selected, with one empty condition added to its where clause, its property picker open, and the strip
         model.Chosen!.ActCommand.Execute(null);
         host.Pump();
         Assert.Equal(Screen.Rules, shell.Model.CurrentScreen);
         var page = shell.Model.Rules.CurrentPage!;
-        Assert.Equal("TEAM010", page.Id);
+        Assert.Equal("TEAM001", page.Id);
         Assert.Equal("**From Exemptions.** 7 lines set this rule aside, 5 of them in Dependencies/CF.Adapters/Updates. Add a condition so it stops reaching them; nothing is saved until Save rule.", page.OriginText);
         var conditions = page.WhereFlow.OfType<ConditionViewModel>().ToList();
         Assert.Equal(3, conditions.Count);
@@ -171,7 +171,7 @@ public sealed class ExemptionsScreenTests
         await model.ScanAsync();
         host.Pump();
         Assert.Equal(Screen.Exemptions, shell.Model.CurrentScreen);
-        Assert.Equal("TEAM010", model.Chosen?.RuleId);
+        Assert.Equal("TEAM001", model.Chosen?.RuleId);
 
         // discarding the edit takes the strip away
         shell.Model.ShowRules();

@@ -10,6 +10,9 @@ namespace CF.App.Tests.Support;
 /// </summary>
 internal sealed class FakeSettingsService : ISettingsService
 {
+    private static readonly (string Word, int Count)[] _words =
+        [("error", 41), ("warning", 6), ("suggestion", 20), ("silent, none", 11)];
+
     private Strictness _current = Strictness.Standard;
 
     /// <summary>
@@ -33,11 +36,10 @@ internal sealed class FakeSettingsService : ISettingsService
         if(Custom != null)
             mappings.Add(Custom);
 
-        var words = new[] { "error", "warning", "suggestion", "silent, none" };
-        var rows = words.Select(word => new StrictnessRow(word, mappings.Select(mapping => mapping.EffectOf(word)).ToList())).ToList();
-        var blocking = 41 + (current.Warning == Severity.Block ? 6 : 0);
-        var warning = current.Warning == Severity.Block ? 0 : 6;
-        return new StrictnessReport(current, mappings.Select(mapping => mapping.Preset).ToList(), rows, blocking, warning, 31);
+        var rows = _words.Select(word => new StrictnessRow(word.Word, mappings.Select(mapping => mapping.EffectOf(word.Word)).ToList())).ToList();
+        var counts = _words.ToLookup(word => current.EffectOf(word.Word), word => word.Count);
+        return new StrictnessReport(current, mappings.Select(mapping => mapping.Preset).ToList(), rows,
+            counts[Severity.Block].Sum(), counts[Severity.Warn].Sum(), counts[null].Sum());
     }
 
     public Strictness SetStrictness(string folder, StrictnessPreset preset)
@@ -71,7 +73,7 @@ internal sealed class FakeLanguageService : ILanguageService
 /// </summary>
 internal sealed class MemoryMachineSettings : CF.Core.Ports.IMachineSettings
 {
-    public string DataFolder { get; set; } = "/data/CommitFence";
+    public string DataFolder { get; set; } = Samples.DataFolder;
 
     public bool ReduceMotion { get; set; }
 

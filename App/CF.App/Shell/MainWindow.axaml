@@ -101,7 +101,9 @@
           <doctor:DoctorView Name="DoctorScreen" DataContext="{Binding Doctor}"/>
         </Panel>
       </Panel>
-      <updates:UpdateNoticeView Name="Notice" Grid.Row="1" DataContext="{Binding Updates}"/>
+      <Panel Grid.Row="1" IsVisible="{Binding !ShowsSettings}">
+        <updates:UpdateNoticeView Name="Notice" DataContext="{Binding Updates}"/>
+      </Panel>
     </Grid>
 
     <!-- The title strip: 36 high, across the whole window, it drags the window. It lies over the screens and under the

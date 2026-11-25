@@ -52,13 +52,13 @@ internal static class SettingsText
         """;
 
     /// <summary>
-    /// The four team rules the exemptions of the tests name; TEAM010 is the sentence of the picture of the screen.
+    /// The four team rules the exemptions of the tests name; TEAM001 is the sentence of the picture of the screen.
     /// </summary>
     public const string Exempted = """
         {
             "rules": [
                 {
-                    "id": "TEAM010",
+                    "id": "TEAM001",
                     "language": "csharp",
                     "for": "if-statement",
                     "severity": "block",
@@ -70,7 +70,7 @@ internal static class SettingsText
                     "id": "TEAM011",
                     "language": "csharp",
                     "for": "class",
-                    "severity": "warn",
+                    "severity": "block",
                     "title": "Only public and private methods inside an internal class",
                     "require": { "documentationPresent": true }
                 },

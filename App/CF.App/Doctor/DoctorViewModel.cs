@@ -144,7 +144,7 @@ internal sealed partial class DoctorViewModel : ObservableObject, IScreenModel
     }
 
     /// <summary>
-    /// "Checked today, 17:12, in 1.3 s": when the last report was made and how long it took.
+    /// The time of the last report, with its duration once checking has finished.
     /// </summary>
     public string? CheckedText
     {
@@ -155,7 +155,8 @@ internal sealed partial class DoctorViewModel : ObservableObject, IScreenModel
 
             var at = _report.CheckedAt.ToLocalTime();
             var day = at.Date == _clock.Now.ToLocalTime().Date ? "today" : at.ToString("d MMM", CultureInfo.InvariantCulture);
-            return $"Checked {day}, {at.ToString("HH:mm", CultureInfo.InvariantCulture)}, in {DurationText(_report.Duration)}";
+            var when = $"{day}, {at.ToString("HH:mm", CultureInfo.InvariantCulture)}";
+            return IsChecking ? $"Last checked {when}" : $"Checked {when}, in {DurationText(_report.Duration)}";
         }
     }
 
@@ -312,8 +313,11 @@ internal sealed partial class DoctorViewModel : ObservableObject, IScreenModel
 
     private DoctorTextPart CheckingSentence()
     {
-        var count = _report?.Checks.Count;
-        return count == null ? "Checks of git, the program, C# and CommitFence." : $"{CountText(count.Value)} of git, the program, C# and CommitFence.";
+        if(_report == null || Groups.Count == 0)
+            return "Checking whether this machine is ready for pushes.";
+
+        var groups = string.Join(", ", Groups.Select(group => group.Name).Distinct(StringComparer.Ordinal));
+        return $"{CountText(_report.Checks.Count)}: {groups}.";
     }
 
     private static string CountText(int count)

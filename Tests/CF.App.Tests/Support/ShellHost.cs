@@ -24,7 +24,7 @@ internal sealed class ShellHost : IDisposable
             Rules.FileListings = new List<FileRuleListing> { new FileRuleListing("csharp", ".editorconfig", fileRules, new List<string>()) };
 
         Services = new CommitFenceServices(new ProductInfoService(), Clock, new List<ILanguage>(), Rules, Review, null!, new FixedFolderService(Samples.Folder(RepositoryPath, name: repositoryName)), Updater, Record, Doctor, SettingsService, Structure, Languages, Machine, Exemptions, Stats);
-        Model = new MainWindowViewModel(Services, RepositoryPath);
+        Model = new MainWindowViewModel(Services, RepositoryPath, Samples.InstallFolder);
     }
 
     public CommitFenceServices Services { get; }

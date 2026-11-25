@@ -42,7 +42,7 @@ public sealed class UpdateNoticeTests
         {
             // nothing to say unless asked; and then it says the version
             Assert.False(automatic.IsNoticeVisible);
-            Assert.Equal("You have the latest version (1.0.0.0).", manual.StatusText);
+            Assert.Equal($"You have the latest version ({Samples.InstalledVersion}).", manual.StatusText);
             Assert.False(manual.CanUpdate);
             Assert.Equal(Samples.Now.UtcDateTime, _record.LastCheckUtc);
 
@@ -65,7 +65,7 @@ public sealed class UpdateNoticeTests
             {
                 Assert.True(updates.IsNoticeVisible);
                 Assert.Equal("CommitFence 9.0.0.0 is available.", updates.Title);
-                Assert.Equal("You have 1.0.0.0. Nothing is downloaded until you say so.", updates.Line);
+                Assert.Equal($"You have {Samples.InstalledVersion}. Nothing is downloaded until you say so.", updates.Line);
                 Assert.True(updates.CanUpdate);
                 Assert.True(updates.CanDismiss);
                 Assert.True(updates.HasNotes);
@@ -187,7 +187,7 @@ public sealed class UpdateNoticeTests
 
             Assert.Equal(UpdateNoticeState.Cancelled, updates.NoticeState);
             Assert.Equal("The update was cancelled.", updates.Title);
-            Assert.Equal("You still have 1.0.0.0.", updates.Line);
+            Assert.Equal($"You still have {Samples.InstalledVersion}.", updates.Line);
         }
         else
         {
@@ -198,7 +198,7 @@ public sealed class UpdateNoticeTests
             Assert.Equal(UpdateNoticeState.Failed, updates.NoticeState);
             Assert.Equal("The update failed.", updates.Title);
             Assert.Contains("damaged", updates.Line, StringComparison.Ordinal);
-            Assert.EndsWith(" You still have 1.0.0.0.", updates.Line, StringComparison.Ordinal);
+            Assert.EndsWith($" You still have {Samples.InstalledVersion}.", updates.Line, StringComparison.Ordinal);
         }
 
         // reports that were held back reach the app after the install has ended: they change nothing that is shown
@@ -248,16 +248,16 @@ public sealed class UpdateNoticeTests
     }
 
     [AvaloniaTheory]
-    [InlineData("Available", "CommitFence 9.0.0.0 is available.", "You have 1.0.0.0. Nothing is downloaded until you say so.", "none", "Later, What's new, Update now")]
-    [InlineData("CannotUpdate", "CommitFence 9.0.0.0 is available.", "You have 1.0.0.0. This copy is not a release download, so it cannot update itself.", "none", "Later, Open the release page")]
+    [InlineData("Available", "CommitFence 9.0.0.0 is available.", "You have {installed}. Nothing is downloaded until you say so.", "none", "Later, What's new, Update now")]
+    [InlineData("CannotUpdate", "CommitFence 9.0.0.0 is available.", "You have {installed}. This copy is not a release download, so it cannot update itself.", "none", "Later, Open the release page")]
     [InlineData("Downloading", "Downloading 9.0.0.0", "The app restarts when it is in place.", "64%", "Cancel")]
     [InlineData("SizeNotKnown", "Downloading 9.0.0.0", "The app restarts when it is in place.", "moving", "Cancel")]
-    [InlineData("Cancelling", "Cancelling the update", "You will keep 1.0.0.0.", "none", "")]
+    [InlineData("Cancelling", "Cancelling the update", "You will keep {installed}.", "none", "")]
     [InlineData("Replacing", "Replacing the files with 9.0.0.0", "Too late to cancel. It takes a moment.", "none", "")]
     [InlineData("Installed", "9.0.0.0 is installed.", "Restarting.", "none", "")]
     [InlineData("InstalledCouldNotRestart", "9.0.0.0 is installed.", "Close the app and start it again to use it.", "none", "Close")]
-    [InlineData("Cancelled", "The update was cancelled.", "You still have 1.0.0.0.", "none", "Close")]
-    [InlineData("Failed", "The update failed.", "The download is damaged. Nothing was changed. You still have 1.0.0.0.", "none", "Close, Open the release page, Try again")]
+    [InlineData("Cancelled", "The update was cancelled.", "You still have {installed}.", "none", "Close")]
+    [InlineData("Failed", "The update failed.", "The download is damaged. Nothing was changed. You still have {installed}.", "none", "Close, Open the release page, Try again")]
     public async Task NoticeSaysWhatItsTableSaysForEachState(string stateName, string title, string line, string bar, string buttons)
     {
         var state = Enum.Parse<UpdateNoticeState>(stateName);
@@ -268,7 +268,7 @@ public sealed class UpdateNoticeTests
         Assert.Equal(state, updates.NoticeState);
         Assert.True(updates.IsNoticeVisible);
         Assert.Equal(title, updates.Title);
-        Assert.Equal(line, updates.Line);
+        Assert.Equal(line.Replace("{installed}", Samples.InstalledVersion, StringComparison.Ordinal), updates.Line);
         Assert.Equal(bar, updates.ShowsBar ? (updates.ShowsPercent ? updates.PercentText : "moving") : "none");
         Assert.Equal(buttons, string.Join(", ", updates.Buttons.Select(ButtonLabel)));
         Assert.Equal(state == UpdateNoticeState.SizeNotKnown, updates.BarFraction < 0);
@@ -276,7 +276,7 @@ public sealed class UpdateNoticeTests
     }
 
     [AvaloniaFact]
-    public async Task LaterSendsTheVersionAwayAndWhatsNewOpensSettingsWithTheNoticeStaying()
+    public async Task WhatsNewFocusesUpdateNowInSettingsAndTheNoticeReturnsOnOtherScreens()
     {
         using var shell = new ShellHost();
         shell.Updater.Result = FakeUpdater.Available("9.0.0.0");
@@ -296,13 +296,29 @@ public sealed class UpdateNoticeTests
 
         Assert.True(reached);
 
-        // "What's new" opens Settings and shows the notes; the notice stays
-        host.Find<Button>(button => button.Name == "WhatsNewButton" && button.IsEffectivelyVisible)!.Command!.Execute(null);
-        host.Pump();
+        // "What's new" opens Settings and shows the notes with the keyboard on its update button.
+        var whatsNew = host.Find<Button>(button => button.Name == "WhatsNewButton" && button.IsEffectivelyVisible)!;
+        Assert.True(whatsNew.Focus(NavigationMethod.Tab));
+        host.Press(PhysicalKey.Enter);
         Assert.Equal(Screen.Settings, shell.Model.CurrentScreen);
         Assert.True(shell.Model.Settings.ShowsNotes);
-        Assert.True(shell.Model.Updates.IsNoticeVisible);
-        Assert.True(notice.IsVisible);
+        Assert.False(notice.IsEffectivelyVisible);
+        var updateNow = Assert.Single(host.FindAll<Button>(button => button.Name == "UpdateNowButton" && button.IsEffectivelyVisible));
+        Assert.Same(updateNow, host.Window.FocusManager?.GetFocusedElement());
+
+        host.Press(PhysicalKey.Digit3, RawInputModifiers.Control);
+        Assert.Equal(Screen.Dashboard, shell.Model.CurrentScreen);
+        Assert.True(notice.IsEffectivelyVisible);
+        var rail = host.Find<ListBox>(list => list.Name == "Rail")!;
+        Assert.True(host.HasFocusWithin(rail));
+
+        Assert.True(whatsNew.Focus(NavigationMethod.Tab));
+        host.Press(PhysicalKey.Digit6, RawInputModifiers.Control);
+        Assert.False(notice.IsEffectivelyVisible);
+        Assert.True(host.HasFocusWithin(rail));
+
+        host.Press(PhysicalKey.Digit3, RawInputModifiers.Control);
+        Assert.True(notice.IsEffectivelyVisible);
 
         // "Later" sends the version away: the notice leaves, and the same version does not come back by itself
         host.Find<Button>(button => button.Name == "LaterButton" && button.IsEffectivelyVisible)!.Command!.Execute(null);

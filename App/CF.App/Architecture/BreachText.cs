@@ -60,7 +60,7 @@ internal sealed class BreachText : TextBlock
         Inlines.Add(new Run(", line " + breach.Line.ToString(CultureInfo.CurrentCulture) + "."));
     }
 
-    private static Run Code(string text, ControlTheme? theme)
+    public static Run Code(string text, ControlTheme? theme)
     {
         var run = new Run(text);
         if(theme == null)

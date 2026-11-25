@@ -77,9 +77,10 @@
     <parts:ScreenFrame.Main>
       <StackPanel>
         <Border IsVisible="{Binding HasNotice}" Background="{DynamicResource warn-tint}" CornerRadius="12" Padding="16,12" Margin="0,0,0,16">
-          <Grid ColumnDefinitions="Auto,*" ColumnSpacing="10">
+          <Grid ColumnDefinitions="Auto,*,Auto">
             <parts:EffectMark Classes="warn" Kind="Warn" Width="16" Height="16" VerticalAlignment="Top" Margin="0,2,0,0"/>
-            <TextBlock Grid.Column="1" Theme="{StaticResource type-body}" TextWrapping="Wrap" Text="{Binding Notice}" AutomationProperties.LiveSetting="Polite"/>
+            <TextBlock Grid.Column="1" Margin="10,0,0,0" Theme="{StaticResource type-body}" TextWrapping="Wrap" Text="{Binding Notice}" AutomationProperties.LiveSetting="Polite"/>
+            <Button Grid.Column="2" Margin="10,0,0,0" Classes="cf outlined small" IsVisible="{Binding CanReadAgain}" Command="{Binding AgainCommand}" Content="Read again"/>
           </Grid>
         </Border>
         <StackPanel IsVisible="{Binding HasReviews}">
@@ -218,13 +219,23 @@
                     AutomationProperties.Name="{Binding SpokenName}">
                 <parts:EffectMark Classes="block" Kind="Block" Width="15" Height="15" IsVisible="{Binding Blocks}" VerticalAlignment="Top" Margin="0,3,0,0"/>
                 <parts:EffectMark Classes="warn" Kind="Warn" Width="15" Height="15" IsVisible="{Binding Warns}" VerticalAlignment="Top" Margin="0,3,0,0"/>
-                <TextBlock Grid.Column="1" Theme="{StaticResource type-body-strong}" Classes.dashboard-unknown="{Binding Unlisted}"
-                           TextWrapping="Wrap" Text="{Binding Title}"/>
+                <parts:EffectMark Classes="off" Kind="Off" Width="15" Height="15" IsVisible="{Binding Off}" VerticalAlignment="Top" Margin="0,3,0,0"/>
+                <DockPanel Grid.Column="1">
+                  <TextBlock DockPanel.Dock="Left" Theme="{StaticResource type-meta}" Foreground="{DynamicResource ink-2}"
+                             VerticalAlignment="Top" Margin="0,2,6,0" IsVisible="{Binding Off}" Text="{Binding Effect}"/>
+                  <TextBlock Theme="{StaticResource type-body-strong}" Classes.dashboard-unknown="{Binding Unlisted}"
+                             TextWrapping="Wrap" Text="{Binding Title}"/>
+                </DockPanel>
                 <TextBlock Grid.Column="2" Theme="{StaticResource type-card}" FontFeatures="+tnum" MinWidth="24" TextAlignment="Right" Text="{Binding Count}"/>
-                <Grid Grid.Row="1" Grid.Column="1" Grid.ColumnSpan="2" ColumnDefinitions="Auto,*" Height="18" Margin="0,3,0,0" IsVisible="{Binding CanOpen}">
-                  <TextBlock Theme="{StaticResource code}" Foreground="{DynamicResource ink-2}" MinWidth="58" VerticalAlignment="Center" Text="{Binding Id}"/>
+                <Grid Grid.Row="1" Grid.Column="1" Grid.ColumnSpan="2" Height="18" Margin="0,3,0,0">
+                  <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" MinWidth="58"/>
+                    <ColumnDefinition Width="*"/>
+                  </Grid.ColumnDefinitions>
+                  <TextBlock Theme="{StaticResource code}" Foreground="{DynamicResource ink-2}" VerticalAlignment="Center" IsVisible="{Binding CanOpen}" Text="{Binding Id}"/>
                   <review:FractionBar Grid.Column="1" Margin="10,0,0,0" Fraction="{Binding Share}" Fill="{DynamicResource block}" IsVisible="{Binding Blocks}"/>
                   <review:FractionBar Grid.Column="1" Margin="10,0,0,0" Fraction="{Binding Share}" Fill="{DynamicResource warn}" IsVisible="{Binding Warns}"/>
+                  <review:FractionBar Grid.Column="1" Margin="10,0,0,0" Fraction="{Binding Share}" Fill="{DynamicResource data}" IsVisible="{Binding NeutralBar}"/>
                 </Grid>
               </Grid>
             </DataTemplate>

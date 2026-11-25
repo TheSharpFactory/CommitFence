@@ -19,7 +19,7 @@ internal sealed partial class App : Application
         {
             var services = CompositionRoot.Create();
             Motion.ReducedOnThisMachine = services.Machine.ReduceMotion;
-            var model = new MainWindowViewModel(services, FolderToWorkOn(desktop.Args));
+            var model = new MainWindowViewModel(services, FolderToWorkOn(desktop.Args), Path.TrimEndingDirectorySeparator(AppContext.BaseDirectory));
             var window = new MainWindow
             {
                 DataContext = model

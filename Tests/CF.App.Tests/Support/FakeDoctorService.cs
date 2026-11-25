@@ -49,13 +49,14 @@ internal sealed class FakeDoctorService : IDoctorService
     /// </summary>
     public static DoctorReport Report(bool hookFails = false, string? heading = null)
     {
+        var program = Samples.InstallFolder + @"\commitfence.exe";
         var checks = new List<DoctorCheckResult>
         {
             hookFails ? FailingHook() : Passing("Git and the hook", "The pre-push hook runs CommitFence first", new DoctorText("Line 2 of ", DoctorTextPart.CodeText(".git/hooks/pre-push"), ", ending in ", DoctorTextPart.CodeText("|| exit $?"), ", so it can stop a push.")),
-            Passing("Git and the hook", "Git finds the program", new DoctorText(DoctorTextPart.CodeText("commitfence.path"), " is ", DoctorTextPart.CodeText("C:\\Tools\\CommitFence\\commitfence.exe"), ", version 1.0.0.0.")),
+            Passing("Git and the hook", "Git finds the program", new DoctorText(DoctorTextPart.CodeText("commitfence.path"), " is ", DoctorTextPart.CodeText(program), $", version {Samples.InstalledVersion}.")),
             Passing("C#", "The .NET SDK the repository needs is installed", new DoctorText("No global.json, so the newest: 11.0.100, which builds net11.0."))
         };
-        var machine = new DoctorMachineFacts("C:\\Tools\\CommitFence\\commitfence.exe", "1.0.0.0", "2.47.1.windows.1", "11.0.100", "C:\\Users\\dev\\AppData\\Local\\CommitFence");
+        var machine = new DoctorMachineFacts(program, Samples.InstalledVersion, "2.47.1.windows.1", "11.0.100", Samples.DataFolder);
         var verdict = hookFails ? new DoctorText("Until it is fixed, a push that sends a commit ends as Review incomplete and is refused.") : new DoctorText("Every check passes. A push from this machine is reviewed before it leaves.");
         return new DoctorReport(checks, machine, Samples.Now, TimeSpan.FromSeconds(1.3), heading ?? (hookFails ? "1 check fails" : "Ready for pushes"), verdict);
     }

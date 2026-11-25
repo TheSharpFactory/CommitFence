@@ -39,7 +39,8 @@ public sealed class ScreenshotTests
                 RulesHost.FileRule("CA1822", "Mark members as static", FileRuleState.On, Severity.Warn, 8, "warning"),
                 RulesHost.FileRule("IDE0005", "Remove unnecessary usings", FileRuleState.Off, null, 12, "silent")
             };
-            using var shell = new ShellHost(fileRules: fileRules);
+            using var reviewShell = new ShellHost(fileRules: fileRules);
+            var shell = reviewShell;
             shell.Review.Result = _ => RefusedPush();
             var arrived = Signals.FileRulesArrived(shell.Model.Rules);
             var window = new MainWindow
@@ -102,6 +103,10 @@ public sealed class ScreenshotTests
             host.Save(folder, $"review-places-{theme}-760.png");
             window.Width = 1440;
             window.Height = 900;
+            using var cleanShell = new ShellHost(fileRules: fileRules);
+            shell = cleanShell;
+            window.DataContext = shell.Model;
+
             // an empty screen in the frame of the five screens: the head with the screen's name and an empty sheet, then with a panel
             // that the test gives it, at 1440 and at 760
             shell.Model.CurrentScreen = Screen.Dashboard;
@@ -123,9 +128,10 @@ public sealed class ScreenshotTests
             window.Width = 1440;
             window.Height = 900;
 
+            var update = FakeUpdater.Available(Samples.WaitingVersion, "The app\n\n### The app\n\n- **Rules** keep their order.\n- Settings shows what the strictness does.\n\n### Fixes\n\n- A review of a folder with no commit says so.\n\n### Downloads\n\n| a | b |");
             // the notice of a newer version, over the screen
             shell.Model.ShowRules();
-            shell.Updater.Result = FakeUpdater.Available("1.1.0.0", "The first update.\n\n### What's new\n\n- Automatic updates. The program looks for a newer release.\n- The command line comes with the app.\n\n### Downloads\n\n| a | b |");
+            shell.Updater.Result = update;
             await shell.Model.Updates.CheckAsync(true);
             Assert.True(shell.Model.Updates.CanUpdate);
             host.Save(folder, $"update-{theme}-1440x900.png");
@@ -202,7 +208,7 @@ public sealed class ScreenshotTests
             shell.Updater.Delivery = ProgressDelivery.Before;
             shell.Updater.InstallFailure = null;
             shell.Updater.HoldInstall = null;
-            shell.Updater.Result = new UpdateCheckResult { Status = UpdateCheckStatus.UpToDate, Release = new ReleaseInfo { Version = new Version(1, 0, 0, 0) } };
+            shell.Updater.Result = FakeUpdater.UpToDate();
             shell.Model.CurrentScreen = Screen.Settings;
             await shell.Model.Updates.CheckAsync(true);
             await shell.Model.Settings.RefreshAsync();
@@ -227,7 +233,7 @@ public sealed class ScreenshotTests
             host.Save(folder, $"settings-custom-{theme}-1440.png");
             shell.SettingsService.Custom = null;
             await shell.Model.Settings.RefreshAsync();
-            shell.Updater.Result = FakeUpdater.Available("1.0.1.0", "The app\n\n### The app\n\n- **Rules** keep their order.\n- Settings shows what the strictness does.\n\n### Fixes\n\n- A review of a folder with no commit says so.\n\n### Downloads\n\n| a | b |");
+            shell.Updater.Result = update;
             await shell.Model.Updates.CheckAsync(true);
             host.Pump();
             host.Save(folder, $"settings-available-{theme}-1440.png");
@@ -278,8 +284,8 @@ public sealed class ScreenshotTests
         using var shell = new ShellHost(SettingsText.Exempted, [
             RulesHost.FileRule("CA1822", "Mark members as static", FileRuleState.On, Severity.Warn, 8, "warning"),
             RulesHost.FileRule("IDE0055", "Fix formatting", FileRuleState.On, Severity.Block, 14),
-            RulesHost.FileRule("CA1051", "Do not declare visible instance fields", FileRuleState.On, Severity.Warn, 20),
-            RulesHost.FileRule("IDE0051", "Remove unused private members", FileRuleState.On, Severity.Warn, 26)
+            RulesHost.FileRule("CA1051", "Do not declare visible instance fields", FileRuleState.On, Severity.Warn, 20, "warning"),
+            RulesHost.FileRule("IDE0051", "Remove unused private members", FileRuleState.On, Severity.Warn, 26, "warning")
         ]);
         var window = new MainWindow
         {
@@ -303,7 +309,7 @@ public sealed class ScreenshotTests
         window.Height = 900;
 
         // a rule chosen, then "Narrow the rule" on Rules
-        model.RuleRows.Single(row => row.RuleId == "TEAM010").ChooseCommand.Execute(null);
+        model.RuleRows.Single(row => row.RuleId == "TEAM001").ChooseCommand.Execute(null);
         host.Pump();
         host.Save(folder, $"exemptions-rule-{theme}-1440.png");
         model.Chosen!.ActCommand.Execute(null);

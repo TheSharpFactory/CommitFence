@@ -1,6 +1,7 @@
 using Avalonia.Styling;
 using CF.App.Architecture;
 using CF.App.Shell;
+using CF.Core.Ports;
 using CF.Core.Review;
 
 namespace CF.App.Tests.Support;
@@ -55,6 +56,22 @@ internal static class ArchitecturePictures
         window.Height = 1000;
         host.Save(folder, $"architecture-troubletable-{theme}-1440.png");
         view.Mode.SelectedIndex = 0;
+
+        var other = new StructureJudgment(Samples.Now, null,
+            [new StructureBreach("csharp", "core-rules", "CSharpReader.Read", "RuleSet", "Dependencies/CF.Languages.CSharp/CSharpReader.cs", 41)]);
+        shell.Structure.Report = StructureSamples.Own(other);
+        shell.Review.Result = _ => new ReviewResult(ReviewOutcome.Blocked, [], [], [], "The push is blocked.", TimeSpan.Zero)
+        {
+            StructureJudgment = other
+        };
+        shell.Model.ShowReview();
+        await shell.Model.Review.RunCommand.ExecuteAsync(null);
+        shell.Model.CurrentScreen = Screen.Architecture;
+        model.AgainCommand.Execute(null);
+        model.Choose("csharp");
+        window.Width = 1440;
+        window.Height = 900;
+        host.Save(folder, $"architecture-other-{theme}-1440.png");
 
         shell.Structure.Report = StructureSamples.Large(StructureSamples.Clean());
         model.AgainCommand.Execute(null);

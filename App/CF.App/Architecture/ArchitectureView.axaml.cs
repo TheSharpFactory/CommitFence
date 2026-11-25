@@ -133,46 +133,86 @@ internal sealed partial class ArchitectureView : UserControl
             return;
 
         var onePane = Frame.IsOnePane;
-        var showsTable = Mode.SelectedIndex == 1;
-        DiagramLabel.Text = onePane ? "List" : "Diagram";
-        SwitchModule.IsVisible = onePane && !showsTable;
-        Table.IsVisible = showsTable;
-        Diagram.IsVisible = !onePane && !showsTable;
+        var showsList = Mode.SelectedIndex == 1;
+        DiagramLabel.Text = onePane ? "One module" : "Diagram";
+        SwitchModule.IsVisible = onePane && !showsList;
+        Every.IsVisible = showsList;
+        Diagram.IsVisible = !onePane && !showsList;
         ScrollCue.IsVisible = Diagram.IsVisible && _diagramWider;
-        Table.Show(_model);
+        Every.Show(_model, onePane);
         Diagram.Show(_model);
-        WriteLegend(_model, showsTable, onePane);
+        WriteLegend(_model, showsList, onePane);
         FitPanel();
     }
 
-    private void WriteLegend(ArchitectureViewModel model, bool showsTable, bool onePane)
+    private void WriteLegend(ArchitectureViewModel model, bool showsList, bool onePane)
     {
         Legend.Children.Clear();
         var name = model.SelectedName;
-        if(showsTable)
+        if(showsList)
         {
-            AddKey(ArchitectureVisuals.Fill("solid", 12, 12, 3), "Row may use column");
-            if(model.DrawnBreach != null)
-                AddKey(ArchitectureVisuals.Fill("block", 12, 12, 3), "Breaks");
-
-            Foot.Text = $"Every direction: {model.Directions.Count}. A heavier line starts each layer; an allowed direction always points to a layer below, right of the dashes." +
-                (model.DrawnBreach == null ? string.Empty : " The red mark is the use that breaks one.");
+            WriteListLegend(model, name);
             return;
         }
 
         if(onePane)
         {
-            Foot.Text = $"The diagram needs a wide window. Here {name} is shown as its list, below: choose another module above, or in Used by.";
+            Foot.Text = $"The diagram needs a wider window. Below, {name} as a list.";
             return;
         }
 
         AddKey(LineSample("ink", 2), name + " may use");
         AddKey(LineSample("ink-2", 1.75, true), "Uses " + name);
         if(model.DrawnBreach != null)
-            AddKey(LineSample("block", 3), "Breaks");
+            AddKey(LineSample("block", 3), "Breaks a direction");
 
-        AddKey(ArchitectureVisuals.Fill("line", 22, 14, 4), "Not linked to " + name);
-        Foot.Text = $"Each module stands above the ones it may use. The lines of {name} are drawn; choose a module to see its own, or the table to see every direction.";
+        AddKey(NotLinkedSample(), "Not linked");
+        var rows = model.Layers.Rows.Count;
+        var layers = rows == 1 ? "The row is layer 1" : $"The rows are the layers 1 to {rows}";
+        Foot.Text = $"{layers} of Every direction: each module stands above the ones it may use. The lines of {name} are drawn; choose any module to see its own.";
+    }
+
+    private void WriteListLegend(ArchitectureViewModel model, string name)
+    {
+        AddKey(KeyToken(name, false), "Uses " + name);
+        if(model.DrawnBreach != null)
+            AddKey(KeyToken("Breaks", true), "A use that breaks a direction");
+
+        Foot.Text = ListFoot.Text(model.Layers, model.Directions.Count, model.ActiveBreaches);
+    }
+
+    /// <summary>The key of the list: the chosen module's token, or the red token of a use that breaks a direction.</summary>
+    private static Border KeyToken(string text, bool breaks)
+    {
+        var token = new Border { Height = 20, CornerRadius = new CornerRadius(6), Padding = new Thickness(6, 0) };
+        if(breaks)
+        {
+            token.Bind(Border.BackgroundProperty, token.GetResourceObservable("block"));
+            var mark = new EffectMark { Width = 14, Height = 14, Kind = EffectKind.Block, VerticalAlignment = VerticalAlignment.Center };
+            mark.Bind(EffectMark.ShapeProperty, mark.GetResourceObservable("on-block"));
+            mark.Bind(EffectMark.SignProperty, mark.GetResourceObservable("block"));
+            var word = ArchitectureVisuals.Text(text, "type-label", "on-block");
+            token.Child = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 6, Children = { mark, word } };
+            return token;
+        }
+
+        token.BorderThickness = new Thickness(1.5);
+        token.Bind(Border.BackgroundProperty, token.GetResourceObservable("page"));
+        token.Bind(Border.BorderBrushProperty, token.GetResourceObservable("ink"));
+        token.Child = ArchitectureVisuals.Text(text, "code-strong", "ink");
+        return token;
+    }
+
+    /// <summary>A small module that is not linked: the white button with the control edge and a word in it, as a module is drawn.</summary>
+    private static Border NotLinkedSample()
+    {
+        var sample = new Border { Height = 20, CornerRadius = new CornerRadius(6), Padding = new Thickness(6, 0), BorderThickness = new Thickness(1) };
+        sample.Bind(Border.BackgroundProperty, sample.GetResourceObservable("page"));
+        sample.Bind(Border.BorderBrushProperty, sample.GetResourceObservable("line-control"));
+        var word = ArchitectureVisuals.Text("module", "code", "ink");
+        word.LineHeight = 18;
+        sample.Child = word;
+        return sample;
     }
 
     private void AddKey(Control mark, string text)

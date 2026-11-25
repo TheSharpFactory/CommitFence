@@ -6,7 +6,7 @@
 
   <!-- The state of a screen with nothing to show yet, as Review draws it: one block across the pane, at most 520 wide and in the
        middle, its middle at 40 percent of the pane's height and its top at least 32 below the pane's top. The logo 56, the
-       heading in type-verdict, a lead in type-lead ink-2, what the screen puts between, and the main button. Nothing but its button
+       heading in type-title (the step of the screen's name above it), a lead in type-lead ink-2, what the screen puts between, and the main button. Nothing but its button
        takes the keyboard. -->
   <Panel Name="Room">
     <StackPanel Name="Body" MaxWidth="520" HorizontalAlignment="Center" VerticalAlignment="Top" Margin="32,32,32,0">
@@ -14,7 +14,7 @@
         <parts:LogoMark/>
       </Viewbox>
       <ContentPresenter Name="EmblemHost" IsVisible="False" HorizontalAlignment="Center" Margin="0,0,0,20"/>
-      <TextBlock Name="HeadingText" Theme="{StaticResource type-verdict}" TextAlignment="Center" TextWrapping="Wrap"/>
+      <TextBlock Name="HeadingText" Theme="{StaticResource type-title}" TextAlignment="Center" TextWrapping="Wrap"/>
       <TextBlock Name="LeadText" Theme="{StaticResource type-lead}" Foreground="{DynamicResource ink-2}" TextAlignment="Center" TextWrapping="Wrap"
                  Margin="0,8,0,0"/>
       <ContentPresenter Name="ExtraHost" HorizontalAlignment="Center" Margin="0,16,0,0"/>

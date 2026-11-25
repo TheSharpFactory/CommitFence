@@ -25,7 +25,7 @@ internal sealed partial class MainWindowViewModel : ObservableObject, IDisposabl
     [NotifyPropertyChangedFor(nameof(RailIndex), nameof(ShowsRules), nameof(ShowsReview), nameof(ShowsDashboard), nameof(ShowsExemptions), nameof(ShowsArchitecture), nameof(ShowsSettings), nameof(ShowsDoctor), nameof(CurrentModel))]
     public partial Screen CurrentScreen { get; set; } = Screen.Rules;
 
-    public MainWindowViewModel(CommitFenceServices services, string folder)
+    public MainWindowViewModel(CommitFenceServices services, string folder, string installFolder)
     {
         var opened = services.Folders.Open(folder);
         Folder = opened;
@@ -42,7 +42,7 @@ internal sealed partial class MainWindowViewModel : ObservableObject, IDisposabl
                 if(Review.ShowStructureJudgment(judgment))
                     ShowReview();
             });
-        Settings = new SettingsViewModel(services, opened, Updates);
+        Settings = new SettingsViewModel(services, opened, Updates, installFolder);
         Doctor = new DoctorViewModel(services.Doctor, services.Clock, opened);
         Updates.WhatsNewRequested += ShowVersionNotes;
         Rules.FileRulesArrived += ShowRulesLine;
@@ -286,7 +286,7 @@ internal sealed partial class MainWindowViewModel : ObservableObject, IDisposabl
     }
 
     /// <summary>
-    /// "What's new" in the update notice: Settings opens at the version row with the notes shown. The notice stays.
+    /// "What's new" in the update notice: Settings opens at the version row with the notes shown.
     /// </summary>
     private void ShowVersionNotes()
     {

@@ -51,7 +51,8 @@ public sealed class RealGitReviewTests
 
             var text = push.Output + push.Error;
             Assert.NotEqual(0, push.ExitCode);
-            Assert.Contains($"src/Core.cs({ReviewSources.LineOf(_breach, "if(x > 0)")},", text, StringComparison.Ordinal);
+            var location = $"src/Core.cs({ReviewSources.LineOf(_breach, "if(x > 0)")},";
+            Assert.True(text.Contains(location, StringComparison.Ordinal), $"Expected a finding at {location} in the push output:{Environment.NewLine}{text}");
             Assert.Contains("TEAM010", text, StringComparison.Ordinal);
             Assert.Contains("refs/heads/main", text, StringComparison.Ordinal);
             Assert.Contains("refs/heads/clean-topic", text, StringComparison.Ordinal);
@@ -76,7 +77,7 @@ public sealed class RealGitReviewTests
 
             var review = sandbox.RunProgram(repository.Folder, "review", "--staged");
 
-            Assert.Equal(1, review.ExitCode);
+            Assert.True(review.ExitCode == 1, $"Expected the staged review to block with a finding, but it exited with {review.ExitCode}:{Environment.NewLine}{review.Output}{review.Error}");
             Assert.Contains($"src/Core.cs({ReviewSources.LineOf(_breach, "if(x > 0)")},", review.Output, StringComparison.Ordinal);
             Assert.Contains("TEAM010", review.Output, StringComparison.Ordinal);
             Assert.Equal(stateBefore, repository.CaptureDeveloperState());

@@ -48,13 +48,23 @@ internal static class DashboardPictures
             host.Save(folder, "dashboard-full-760.png");
 
             var days = shell.Stats.Report.Days.ToList();
-            days[^1] = days[^1] with { Refused = 9, Incomplete = 2, Allowed = 30 };
-            shell.Stats.Report = shell.Stats.Report with { Days = days, ReadError = "The read was interrupted" };
+            var lastDay = days[^1];
+            days[^1] = lastDay with { Refused = 9, Incomplete = 2, Allowed = 30 };
+            var timing = shell.Stats.Report.Timing;
+            var bands = timing.Bands.ToList();
+            bands[1] = bands[1] with { Count = bands[1].Count + days[^1].Total - lastDay.Total };
+            shell.Stats.Report = shell.Stats.Report with { Days = days, Timing = timing with { Bands = bands }, ReadError = "The read was interrupted" };
             await shell.Model.Dashboard.AgainCommand.ExecuteAsync(null);
             window.Width = 1440;
             window.Height = 900;
             host.Save(folder, "dashboard-busy-day-read-error-1440.png");
             shell.Stats.Report = Month();
+            await shell.Model.Dashboard.AgainCommand.ExecuteAsync(null);
+            shell.Model.Dashboard.ShowBrokenCommand.Execute(null);
+            host.Pump();
+            var dashboard = host.Find<DashboardView>(view => view.IsEffectivelyVisible)!;
+            dashboard.BrokenList.ScrollIntoView(shell.Model.Dashboard.BrokenRows.Count - 1);
+            host.Save(folder, "dashboard-all-broken-1440.png");
         }
 
         shell.Stats.Report = shell.Stats.Report with { Oldest = null };
@@ -86,14 +96,14 @@ internal static class DashboardPictures
         var most = new List<StatsFindingCount>
         {
             Broken("IDE0055", "Fix formatting", 31, Severity.Block),
-            Broken("TEAM010", "No braces around a single-line if", 17, Severity.Block),
-            Broken("CA1822", "Mark members as static", 12, Severity.Block),
-            Broken("IDE0005", "Remove unnecessary usings", 9, Severity.Warn),
+            Broken("TEAM001", "No braces around a single-line if", 17, Severity.Block),
+            Broken("CA1822", "Mark members as static", 12, Severity.Warn),
+            Broken("IDE0005", "Remove unnecessary usings", 9, null),
             Broken("TEAM011", "Only public and private methods inside an internal class", 6, Severity.Block),
-            Broken("IDE0051", "Remove unused private members", 4, Severity.Block),
+            Broken("IDE0051", "Remove unused private members", 4, Severity.Warn),
             Broken("CA1068", "CancellationToken parameters must come last", 3, Severity.Warn),
             Broken("TEAM012", "Use IClock, not DateTime.Now", 2, Severity.Block),
-            Broken("CA1000", "Do not declare static members on generic types", 1, Severity.Warn),
+            Broken("CA1000", "Do not declare static members on generic types", 1, Severity.Block),
             Broken("CA1024", "Use properties where appropriate", 1, Severity.Warn),
             Broken("CA1816", "Call GC.SuppressFinalize correctly", 1, Severity.Warn),
             new StatsFindingCount("OLD001", 1, null)
@@ -108,7 +118,7 @@ internal static class DashboardPictures
         return new StatsReport(days, _start, 0, timing, most, never, 47);
     }
 
-    private static StatsFindingCount Broken(string id, string title, long count, Severity effect)
+    private static StatsFindingCount Broken(string id, string title, long count, Severity? effect)
     {
         return new StatsFindingCount(id, count, new StatsRule(id, title, !id.StartsWith("TEAM", StringComparison.Ordinal), effect));
     }

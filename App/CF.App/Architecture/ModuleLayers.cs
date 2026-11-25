@@ -18,13 +18,14 @@ internal sealed class ModuleLayers
             Height(group, lower, levels);
 
         Level = names.ToDictionary(name => name, name => levels[groups[name]], StringComparer.Ordinal);
-        var rows = names.GroupBy(name => Level[name]).OrderByDescending(row => row.Key).Select(row => row.ToList()).ToList();
-        if(rows.Count > 0)
-            rows[0].Sort(StringComparer.Ordinal);
-
-        var above = report.AllowedDirections.Where(edge => Level[edge.From] > Level[edge.To])
-            .ToLookup(edge => edge.To, edge => edge.From, StringComparer.Ordinal);
-        OrderRows(rows, above);
+        Cycles = names.GroupBy(name => groups[name]).Where(group => group.Count() > 1).Select(group => (IReadOnlyList<string>)group.Order(StringComparer.Ordinal).ToList())
+            .OrderBy(group => group[0], StringComparer.Ordinal).ToList();
+        var rows = names.GroupBy(name => Level[name]).OrderByDescending(row => row.Key)
+            .Select(row => row.Order(StringComparer.Ordinal).ToList()).ToList();
+        var linked = report.AllowedDirections.Where(edge => edge.From != edge.To && Level.ContainsKey(edge.From) && Level.ContainsKey(edge.To))
+            .SelectMany(edge => new List<(string Name, string Other)> { (edge.From, edge.To), (edge.To, edge.From) })
+            .ToLookup(pair => pair.Name, pair => pair.Other, StringComparer.Ordinal);
+        OrderRows(rows, linked);
         Rows = rows;
         Order = rows.SelectMany(row => row).ToList();
     }
@@ -34,6 +35,9 @@ internal sealed class ModuleLayers
     public IReadOnlyList<string> Order { get; }
 
     public IReadOnlyDictionary<string, int> Level { get; }
+
+    /// <summary>The groups of modules that may use each other, directly or through others. Each group shares a layer.</summary>
+    public IReadOnlyList<IReadOnlyList<string>> Cycles { get; }
 
     private static HashSet<string> Reach(string start, ILookup<string, string> edges)
     {
@@ -63,26 +67,38 @@ internal sealed class ModuleLayers
         return level;
     }
 
-    private static void OrderRows(List<List<string>> rows, ILookup<string, string> above)
+    /// <summary>
+    /// Four sweeps (down, up, down, up) sort each row by the mean place of the modules each one is linked to, in either
+    /// direction. A module linked to none keeps its own place, and equal keys keep their order, so the result does not
+    /// depend on which module is chosen.
+    /// </summary>
+    private static void OrderRows(List<List<string>> rows, ILookup<string, string> linked)
     {
         var place = new Dictionary<string, double>(StringComparer.Ordinal);
         foreach(var row in rows)
             SavePlaces(row, place);
 
-        for(var pass = 0; pass < 2; pass++)
+        for(var pass = 0; pass < 4; pass++)
         {
-            for(var i = 1; i < rows.Count; i++)
+            var sequence = pass % 2 == 0 ? Enumerable.Range(0, rows.Count) : Enumerable.Range(0, rows.Count).Reverse();
+            foreach(var index in sequence)
             {
-                var row = rows[i].OrderBy(name => above[name].Any() ? above[name].Average(parent => place[parent]) + (place[name] * .01) : place[name]).ToList();
-                rows[i] = row;
+                var row = rows[index].OrderBy(name => KeyOf(name, linked, place)).ThenBy(name => place[name]).ToList();
+                rows[index] = row;
                 SavePlaces(row, place);
             }
         }
     }
 
+    private static double KeyOf(string name, ILookup<string, string> linked, Dictionary<string, double> place)
+    {
+        var others = linked[name].Select(other => place[other]).ToList();
+        return others.Count == 0 ? place[name] : others.Sum() / others.Count;
+    }
+
     private static void SavePlaces(List<string> row, Dictionary<string, double> place)
     {
         for(var i = 0; i < row.Count; i++)
-            place[row[i]] = (double)i / Math.Max(1, row.Count - 1);
+            place[row[i]] = (i + 0.5) / row.Count;
     }
 }

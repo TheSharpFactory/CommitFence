@@ -251,6 +251,10 @@
   <Style Selector="Button.pick.highlight /template/ Border#Surface">
     <Setter Property="Background" Value="{DynamicResource hover}"/>
   </Style>
+  <!-- The entries' name is set by a style, not on the text itself, so that a picker can set its own face (the module switcher's names are code). -->
+  <Style Selector="Button.pick TextBlock.entry-name">
+    <Setter Property="Theme" Value="{StaticResource type-body}"/>
+  </Style>
   <Style Selector="Button.pick TextBlock.entry-name.current">
     <Setter Property="FontWeight" Value="SemiBold"/>
   </Style>

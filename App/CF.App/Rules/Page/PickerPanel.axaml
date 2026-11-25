@@ -37,8 +37,7 @@
                       Command="{Binding $parent[ItemsControl].((local:PickerViewModel)DataContext).ChooseCommand}"
                       CommandParameter="{Binding}" AutomationProperties.Name="{Binding Name}">
                 <Grid ColumnDefinitions="*,Auto,16" ColumnSpacing="10">
-                  <TextBlock Classes="entry-name" Classes.current="{Binding IsCurrent}" Theme="{StaticResource type-body}"
-                             Text="{Binding Name}" VerticalAlignment="Center"/>
+                  <TextBlock Classes="entry-name" Classes.current="{Binding IsCurrent}" Text="{Binding Name}" VerticalAlignment="Center"/>
                   <TextBlock Grid.Column="1" Theme="{StaticResource type-meta}" Foreground="{DynamicResource ink-2}"
                              Text="{Binding KindText}" VerticalAlignment="Center"/>
                   <parts:Icon Grid.Column="2" IsVisible="{Binding IsCurrent}" Data="{StaticResource i-check}" Width="14"

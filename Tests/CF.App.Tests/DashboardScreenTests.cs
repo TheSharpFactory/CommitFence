@@ -2,7 +2,10 @@ using Avalonia.Automation;
 using Avalonia.Controls;
 using Avalonia.Headless.XUnit;
 using Avalonia.Input;
+using Avalonia.VisualTree;
 using CF.App.Dashboard;
+using CF.App.Parts;
+using CF.App.Review;
 using CF.App.Shell;
 using CF.App.Tests.Support;
 using CF.Core.Changes;
@@ -16,6 +19,44 @@ namespace CF.App.Tests;
 /// <summary>The Dashboard presents history and uses the ordinary Review and Rules entry points.</summary>
 public sealed class DashboardScreenTests
 {
+    [Theory]
+    [InlineData(7, 5, 10)]
+    [InlineData(10, 5, 10)]
+    [InlineData(11, 10, 20)]
+    [InlineData(41, 25, 50)]
+    public void TheChartAxisUsesRoundTicks(int busiestDay, long middle, long top)
+    {
+        Assert.Equal(new List<long> { 0, middle, top }, DashboardChart.AxisTicks(busiestDay));
+    }
+
+    [AvaloniaFact]
+    public async Task MostBrokenShowsAnOffRuleWithItsHistoricalShare()
+    {
+        using var shell = new ShellHost();
+        shell.Stats.Report = DashboardPictures.Month();
+        shell.Model.CurrentScreen = Screen.Dashboard;
+        var model = shell.Model.Dashboard;
+        await model.AgainCommand.ExecutionTask!;
+        var view = new DashboardView { DataContext = model };
+        using var host = new ViewHost(view, 1352, 1100);
+
+        var rule = Assert.Single(model.BrokenRows, row => row.Id == "IDE0005");
+        Assert.Equal(9.0 / 31, rule.Share);
+        var row = Assert.IsType<ListBoxItem>(view.BrokenList.ContainerFromIndex(3));
+        var content = Assert.Single(row.GetVisualDescendants(), visual =>
+            AutomationProperties.GetName(visual) == "IDE0005 Remove unnecessary usings, Off, 9 findings");
+        Assert.Contains(content.GetVisualDescendants().OfType<TextBlock>(), text => text.IsEffectivelyVisible && text.Text == "Off");
+        Assert.Contains(content.GetVisualDescendants().OfType<EffectMark>(), mark => mark.IsEffectivelyVisible && mark.Kind == EffectKind.Off);
+        var bar = Assert.Single(content.GetVisualDescendants().OfType<FractionBar>(), bar => bar.IsEffectivelyVisible);
+        Assert.Equal(rule.Share, bar.Fraction);
+
+        model.ShowBrokenCommand.Execute(null);
+        host.Pump();
+        var removed = Assert.Single(model.BrokenRows, row => row.Id == "OLD001");
+        Assert.Equal(1.0 / 31, removed.Share);
+        Assert.False(removed.CanOpen);
+    }
+
     [AvaloniaFact]
     public async Task TheChartHasOneKeyboardStopAndShowAllKeepsAllRules()
     {
@@ -58,7 +99,7 @@ public sealed class DashboardScreenTests
 
     [AvaloniaTheory]
     [InlineData(40, "Each box is one review")]
-    [InlineData(41, "Each block is a day's reviews of one kind")]
+    [InlineData(41, "A day here has more reviews than fit as boxes: each block is a day's reviews of one kind.")]
     public async Task ChartNamesItsScaleAndProductFindingsOpenTheirScreens(int total, string chartLabel)
     {
         using var shell = new ShellHost();
@@ -115,13 +156,27 @@ public sealed class DashboardScreenTests
                 text.Text?.Contains("3 reviews in the history could not be read and are left out.", StringComparison.Ordinal) == true));
         }
 
+        var readAgain = host.Find<Button>(button => button.IsEffectivelyVisible && Equals(button.Content, "Read again"));
         if(readError != null)
         {
             Assert.NotNull(host.Find<TextBlock>(text => text.IsEffectivelyVisible &&
-                text.Text?.StartsWith($"The history of reviews could not be read: {readError.TrimEnd('.')}.", StringComparison.Ordinal) == true));
+                text.Text?.StartsWith($"The history of reviews could not be read: {readError.TrimEnd('.')}.{(hasReviews ? " The numbers below may leave reviews out." : string.Empty)}", StringComparison.Ordinal) == true));
+            Assert.Equal(hasReviews, model.Notice!.Contains("The numbers below", StringComparison.Ordinal));
             Assert.Null(host.Find<TextBlock>(text => text.IsEffectivelyVisible && text.Text == StatsReport.EmptyHeading));
+
+            shell.Stats.Report = report;
+            Assert.NotNull(readAgain);
+            Assert.True(readAgain.Focus(NavigationMethod.Tab));
+            host.Press(PhysicalKey.Enter);
+            await model.AgainCommand.ExecutionTask!;
+            host.Pump();
+            Assert.Same(report, model.Report);
+            Assert.False(model.HasNotice);
+            Assert.False(readAgain.IsEffectivelyVisible);
             return;
         }
+
+        Assert.Null(readAgain);
 
         if(hasReviews)
             return;

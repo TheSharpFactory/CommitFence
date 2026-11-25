@@ -3,6 +3,7 @@
              xmlns:rules="using:CF.App.Rules"
              xmlns:local="using:CF.App.Rules.Page"
              xmlns:parts="using:CF.App.Parts"
+             xmlns:settings="using:CF.App.Settings"
              x:Class="CF.App.Rules.Page.RulePageView"
              x:ClassModifier="internal"
              x:DataType="local:RulePageViewModel">
@@ -140,6 +141,22 @@
             <TextBlock Theme="{StaticResource type-meta}" FontWeight="Medium" Text="Rename"/>
           </Button>
         </StackPanel>
+
+        <!-- Sent here from another screen to be narrowed: where from, and the way back. It goes when the rule is saved or discarded. -->
+        <Border IsVisible="{Binding HasOrigin}" Margin="0,4,0,16" Background="{DynamicResource side}" CornerRadius="12" Padding="14,8,8,8">
+          <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="10">
+            <parts:Icon Data="{StaticResource i-exempt}" Width="15" Height="15" Stroke="{DynamicResource ink-3}" VerticalAlignment="Center"/>
+            <settings:MarkedText Grid.Column="1" Theme="{StaticResource type-meta}" Foreground="{DynamicResource ink-2}" VerticalAlignment="Center"
+                                 Marked="{Binding OriginText}"/>
+            <Button Grid.Column="2" Classes="cf quiet small" VerticalAlignment="Center" Command="{Binding BackToOriginCommand}"
+                    AutomationProperties.Name="Back to Exemptions">
+              <StackPanel Orientation="Horizontal" Spacing="6">
+                <parts:Icon Data="{StaticResource i-left}" Width="14" Height="14" Stroke="{Binding $parent[Button].Foreground}"/>
+                <TextBlock Theme="{StaticResource type-meta-strong}" Text="Back to Exemptions"/>
+              </StackPanel>
+            </Button>
+          </Grid>
+        </Border>
 
         <!-- The sentence: a panel of well; one grid for every clause, a label column of 90, 12, then the flow. -->
         <Border Background="{DynamicResource well}" CornerRadius="16" Padding="24,16">

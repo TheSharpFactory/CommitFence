@@ -44,8 +44,16 @@ internal sealed class MeaningFactReader
         var assembly = closing[2];
         var declarations = new List<MeaningDeclaration>();
         var uses = new List<MeaningUse>();
+        var foreign = 0;
         foreach(var line in factLines)
-            ReadFact(line, assembly, declarations, uses);
+        {
+            if(!ReadFact(line, assembly, declarations, uses))
+                foreign++;
+        }
+
+        // a log none of whose facts names a file of the tree was written about another place, and cannot be relied on
+        if(foreign > 0 && foreign == factLines.Count)
+            throw new MeaningLogException($"the meaning analyzer named no file inside the private copy ({_treeFolder}), so what it says cannot be placed in the repository");
 
         return new UnitFacts(partKey, factLines, closingLines[0], declarations, uses);
     }
@@ -90,27 +98,41 @@ internal sealed class MeaningFactReader
         return Convert.ToHexString(hash).ToLowerInvariant();
     }
 
-    private void ReadFact(string line, string assembly, List<MeaningDeclaration> declarations, List<MeaningUse> uses)
+    /// <summary>
+    /// Takes one fact in, and says whether it was about a file of the tree. A fact about a file from outside it, such as
+    /// a source file that a package adds to the compile, is not the repository's and is left out.
+    /// </summary>
+    private bool ReadFact(string line, string assembly, List<MeaningDeclaration> declarations, List<MeaningUse> uses)
     {
         var fields = FactLine.Split(line);
-        if(fields[0] == "D" && fields.Length == _declarationFields)
-            declarations.Add(ReadDeclaration(fields, assembly));
-        else if(fields[0] == "U" && fields.Length == _useFields)
-            uses.Add(ReadUse(fields, assembly));
-        else
+        var isDeclaration = fields[0] == "D" && fields.Length == _declarationFields;
+        if(!isDeclaration && !(fields[0] == "U" && fields.Length == _useFields))
             throw new MeaningLogException("a fact of the meaning analyzer is not written as expected");
+
+        var file = RelativeFile(fields[1]);
+        if(file == null)
+            return false;
+
+        if(isDeclaration)
+            declarations.Add(ReadDeclaration(fields, file, assembly));
+        else
+            uses.Add(ReadUse(fields, file, assembly));
+
+        return true;
     }
 
-    private MeaningDeclaration ReadDeclaration(string[] fields, string assembly)
+    private static MeaningDeclaration ReadDeclaration(string[] fields, string file, string assembly)
     {
         var start = new SourcePoint(FactLine.ReadNumber(fields[2], "a line"), FactLine.ReadNumber(fields[3], "a column"));
-        return new MeaningDeclaration(RelativeFile(fields[1]), start, fields[4], fields[5], assembly, fields[6], fields[7]);
+        return new MeaningDeclaration(file, start, fields[4], fields[5], assembly, fields[6], fields[7]);
     }
 
-    private MeaningUse ReadUse(string[] fields, string assembly)
+    private MeaningUse ReadUse(string[] fields, string file, string assembly)
     {
         var places = fields[9].Split(',').Select(ReadPlace).ToList();
-        return new MeaningUse(RelativeFile(fields[1]), fields[2], fields[3], assembly, fields[4], fields[5], fields[6], fields[7], RelativeFile(fields[8]), places);
+
+        // what is used may be declared in a file from outside the tree: then it has no file of the repository
+        return new MeaningUse(file, fields[2], fields[3], assembly, fields[4], fields[5], fields[6], fields[7], RelativeFile(fields[8]) ?? string.Empty, places);
     }
 
     private static SourcePoint ReadPlace(string text)
@@ -122,16 +144,16 @@ internal sealed class MeaningFactReader
         return new SourcePoint(FactLine.ReadNumber(parts[0], "a line"), FactLine.ReadNumber(parts[1], "a column"));
     }
 
-    private string RelativeFile(string path)
+    /// <summary>
+    /// The file's path from the top of the tree; nothing for a file that is not inside the tree.
+    /// </summary>
+    private string? RelativeFile(string path)
     {
         if(path.Length == 0)
             return string.Empty;
 
-        // a file that is not inside the tree cannot be placed in the repository, and a fact about it must not be taken for one about no file
         var relative = ToolchainPaths.RelativeTo(_treeFolder, path);
-        if(Path.IsPathRooted(relative))
-            throw new MeaningLogException($"the meaning analyzer named the file {path}, which is not inside the private copy ({_treeFolder}), so what it says about that file cannot be placed in the repository");
 
-        return relative;
+        return Path.IsPathRooted(relative) ? null : relative;
     }
 }

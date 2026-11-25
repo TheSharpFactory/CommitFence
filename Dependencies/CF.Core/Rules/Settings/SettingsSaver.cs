@@ -23,6 +23,22 @@ internal sealed class SettingsSaver
         _reader = reader;
     }
 
+    public static IDisposable TakeLock(ISettingsLock settingsLock, string settingsPath)
+    {
+        try
+        {
+            return settingsLock.Take(settingsPath);
+        }
+        catch(TimeoutException)
+        {
+            throw new RuleChangeException($"Another command is changing {settingsPath}. Run this one again.");
+        }
+        catch(Exception exception) when(exception is IOException || exception is UnauthorizedAccessException)
+        {
+            throw new RuleChangeException("The settings file could not be locked, and it is unchanged: " + exception.Message);
+        }
+    }
+
     /// <summary>
     /// Judges settings as a save would, before anything is written: the text they would be written as must read back the
     /// same. Throws the same <see cref="RuleChangeException" /> a save would.
@@ -32,9 +48,30 @@ internal sealed class SettingsSaver
         CheckReadsBack(new SettingsWriter(newline).Write(settings), settings);
     }
 
-    public void Save(string settingsPath, string textRead, RuleSettings settings, string newline)
+    public void Save(string settingsPath, string textRead, RuleSettings settings)
     {
-        var text = new SettingsWriter(newline).Write(settings);
+        SaveText(settingsPath, textRead, WriterFor(textRead).Write(settings), settings);
+    }
+
+    public string SaveStructure(string settingsPath, string textRead, RuleSettings settings)
+    {
+        var text = WriterFor(textRead).ReplaceStructure(textRead, settings.Structure);
+        SaveText(settingsPath, textRead, text, settings);
+        return text;
+    }
+
+    public void Restore(string settingsPath, string textRead, string original)
+    {
+        SaveText(settingsPath, textRead, original, _reader.Read(original));
+    }
+
+    private static SettingsWriter WriterFor(string textRead)
+    {
+        return new SettingsWriter(textRead.Contains("\r\n", StringComparison.Ordinal) ? "\r\n" : "\n");
+    }
+
+    private void SaveText(string settingsPath, string textRead, string text, RuleSettings settings)
+    {
         CheckReadsBack(text, settings);
 
         var temporaryPath = $"{settingsPath}.{Guid.NewGuid():N}{_temporarySuffix}";
@@ -85,7 +122,8 @@ internal sealed class SettingsSaver
             throw new RuleChangeException(exception.Message);
         }
 
-        if(readBack.Structure.Describe() != expected.Structure.Describe() || readBack.Rules.Count != expected.Rules.Count)
+        var sameStructure = readBack.Structure.Describe() == expected.Structure.Describe();
+        if(!sameStructure || readBack.Rules.Count != expected.Rules.Count || readBack.ConfiguredStrictness != expected.ConfiguredStrictness)
             throw new RuleChangeException("The settings would not read back the same, so nothing was written.");
     }
 }

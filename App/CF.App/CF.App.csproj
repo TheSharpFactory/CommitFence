@@ -6,6 +6,7 @@
     <RootNamespace>CF.App</RootNamespace>
     <DisableTransitiveProjectReferences>true</DisableTransitiveProjectReferences>
     <AvaloniaUseCompiledBindingsByDefault>true</AvaloniaUseCompiledBindingsByDefault>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
   </PropertyGroup>
 
   <ItemGroup>

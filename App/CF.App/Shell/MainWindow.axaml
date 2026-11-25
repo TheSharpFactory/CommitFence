@@ -5,6 +5,11 @@
         xmlns:review="using:CF.App.Review"
         xmlns:parts="using:CF.App.Parts"
         xmlns:updates="using:CF.App.Updates"
+        xmlns:dashboard="using:CF.App.Dashboard"
+        xmlns:exemptions="using:CF.App.Exemptions"
+        xmlns:architecture="using:CF.App.Architecture"
+        xmlns:settings="using:CF.App.Settings"
+        xmlns:doctor="using:CF.App.Doctor"
         x:Class="CF.App.Shell.MainWindow"
         x:DataType="shell:MainWindowViewModel"
         x:ClassModifier="internal"
@@ -21,26 +26,26 @@
        buttons. -->
   <Grid ColumnDefinitions="88,*">
 
-    <!-- The rail: 88 wide, side. Padding top 10, bottom 12. The logo, then five screens; Settings and Doctor stand at the
-         bottom, apart. A screen not built yet is disabled. -->
+    <!-- The rail: 88 wide, side. Padding top 10, bottom 12. The logo, then one list of seven screens with one selection and one
+         tab stop: five at the top, and Settings and Doctor at the bottom, apart. No item is ever drawn disabled. -->
     <Border Grid.Column="0" Background="{DynamicResource side}">
       <DockPanel Margin="0,10,0,12">
-        <ListBox DockPanel.Dock="Bottom" Classes="rail" IsEnabled="False" HorizontalAlignment="Center"
-                 AutomationProperties.Name="App screens, not built yet">
+        <parts:LogoMark DockPanel.Dock="Top" Margin="0,0,0,10" HorizontalAlignment="Center"/>
+        <ListBox Name="Rail" Classes="rail" HorizontalAlignment="Center" SelectedIndex="{Binding RailIndex, Mode=TwoWay}"
+                 AutomationProperties.Name="Screens">
+          <ListBox.ItemsPanel>
+            <ItemsPanelTemplate>
+              <parts:RailPanel LowerCount="2"/>
+            </ItemsPanelTemplate>
+          </ListBox.ItemsPanel>
+          <ListBoxItem Tag="{StaticResource i-rules}"><TextBlock Theme="{StaticResource type-rail}" Text="Rules"/></ListBoxItem>
+          <ListBoxItem Tag="{StaticResource i-review}"><TextBlock Theme="{StaticResource type-rail}" Text="Review"/></ListBoxItem>
+          <ListBoxItem Tag="{StaticResource i-dash}"><TextBlock Theme="{StaticResource type-rail}" Text="Dashboard"/></ListBoxItem>
+          <ListBoxItem Tag="{StaticResource i-exempt}"><TextBlock Theme="{StaticResource type-rail}" Text="Exemptions"/></ListBoxItem>
+          <ListBoxItem Tag="{StaticResource i-arch}"><TextBlock Theme="{StaticResource type-rail}" Text="Architecture"/></ListBoxItem>
           <ListBoxItem Tag="{StaticResource i-set}"><TextBlock Theme="{StaticResource type-rail}" Text="Settings"/></ListBoxItem>
           <ListBoxItem Tag="{StaticResource i-doc}"><TextBlock Theme="{StaticResource type-rail}" Text="Doctor"/></ListBoxItem>
         </ListBox>
-        <StackPanel Spacing="10" HorizontalAlignment="Center">
-          <parts:LogoMark Margin="0,0,0,0"/>
-          <ListBox Name="Rail" Classes="rail" SelectedIndex="{Binding ScreenIndex, Mode=TwoWay}"
-                   AutomationProperties.Name="Screens">
-            <ListBoxItem Tag="{StaticResource i-rules}"><TextBlock Theme="{StaticResource type-rail}" Text="Rules"/></ListBoxItem>
-            <ListBoxItem Tag="{StaticResource i-review}"><TextBlock Theme="{StaticResource type-rail}" Text="Review"/></ListBoxItem>
-            <ListBoxItem Tag="{StaticResource i-dash}" IsEnabled="False"><TextBlock Theme="{StaticResource type-rail}" Text="Dashboard"/></ListBoxItem>
-            <ListBoxItem Tag="{StaticResource i-exempt}" IsEnabled="False"><TextBlock Theme="{StaticResource type-rail}" Text="Exemptions"/></ListBoxItem>
-            <ListBoxItem Tag="{StaticResource i-arch}" IsEnabled="False"><TextBlock Theme="{StaticResource type-rail}" Text="Architecture"/></ListBoxItem>
-          </ListBox>
-        </StackPanel>
       </DockPanel>
     </Border>
 
@@ -70,18 +75,34 @@
       </StackPanel>
     </Button>
 
-    <Panel Grid.Column="1">
-      <Panel IsVisible="{Binding ShowsRules}">
-        <rules:RulesView Name="RulesScreen" DataContext="{Binding Rules}"/>
+    <!-- The page, right of the rail, has two rows: the screen, and the update notice while there is one. The screen's sheet ends
+         at the notice's top edge, so the notice covers nothing. -->
+    <Grid Grid.Column="1" RowDefinitions="*,Auto">
+      <Panel Name="ScreenHost">
+        <Panel IsVisible="{Binding ShowsRules}">
+          <rules:RulesView Name="RulesScreen" DataContext="{Binding Rules}"/>
+        </Panel>
+        <Panel IsVisible="{Binding ShowsReview}">
+          <review:ReviewView Name="ReviewScreen" DataContext="{Binding Review}"/>
+        </Panel>
+        <Panel IsVisible="{Binding ShowsDashboard}">
+          <dashboard:DashboardView Name="DashboardScreen" DataContext="{Binding Dashboard}"/>
+        </Panel>
+        <Panel IsVisible="{Binding ShowsExemptions}">
+          <exemptions:ExemptionsView Name="ExemptionsScreen" DataContext="{Binding Exemptions}"/>
+        </Panel>
+        <Panel IsVisible="{Binding ShowsArchitecture}">
+          <architecture:ArchitectureView Name="ArchitectureScreen" DataContext="{Binding Architecture}"/>
+        </Panel>
+        <Panel IsVisible="{Binding ShowsSettings}">
+          <settings:SettingsView Name="SettingsScreen" DataContext="{Binding Settings}"/>
+        </Panel>
+        <Panel IsVisible="{Binding ShowsDoctor}">
+          <doctor:DoctorView Name="DoctorScreen" DataContext="{Binding Doctor}"/>
+        </Panel>
       </Panel>
-      <Panel IsVisible="{Binding ShowsReview}">
-        <review:ReviewView Name="ReviewScreen" DataContext="{Binding Review}"/>
-      </Panel>
-    </Panel>
-
-    <!-- The notice of an update: over the bottom of the screen, above everything but the title strip's buttons. -->
-    <updates:UpdateNoticeView Grid.Column="1" DataContext="{Binding Updates}" HorizontalAlignment="Stretch" VerticalAlignment="Bottom"
-                              Margin="16,0,16,16" ZIndex="4"/>
+      <updates:UpdateNoticeView Name="Notice" Grid.Row="1" DataContext="{Binding Updates}"/>
+    </Grid>
 
     <!-- The title strip: 36 high, across the whole window, it drags the window. It lies over the screens and under the
          repository button. -->

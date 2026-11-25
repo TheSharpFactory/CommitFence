@@ -1,0 +1,396 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:parts="using:CF.App.Parts"
+             xmlns:review="using:CF.App.Review"
+             xmlns:settings="using:CF.App.Settings"
+             xmlns:screen="using:CF.App.Exemptions"
+             x:Class="CF.App.Exemptions.ExemptionsView"
+             x:ClassModifier="internal"
+             x:DataType="screen:ExemptionsViewModel">
+
+  <!-- The Exemptions screen: Review's page turned round. The head of the screen that stays, and the sheet, which is one recycling list
+       of four kinds of entry as the list of Review is: the head (the summary with "2 have no reason", the rule chosen, the search, the
+       line above the files), each file's line, each exemption, and the tail. From 1304 wide the panel "By rule" stands beside it and
+       keeps its place; in one pane it stands in the head as one line. -->
+  <UserControl.Styles>
+    <Style Selector="screen|ExemptionsView Border.pagerow">
+      <Setter Property="Padding" Value="32,0,20,0"/>
+    </Style>
+    <Style Selector="screen|ExemptionsView.onepane Border.pagerow">
+      <Setter Property="Padding" Value="24,0,12,0"/>
+    </Style>
+    <Style Selector="screen|ExemptionsView Border.pageframe">
+      <Setter Property="MaxWidth" Value="1292"/>
+    </Style>
+    <Style Selector="screen|ExemptionsView Border.pagecolumn">
+      <Setter Property="MaxWidth" Value="1292"/>
+      <Setter Property="Padding" Value="0,0,372,0"/>
+    </Style>
+    <Style Selector="screen|ExemptionsView.onepane Border.pagecolumn">
+      <Setter Property="MaxWidth" Value="760"/>
+      <Setter Property="Padding" Value="0"/>
+    </Style>
+
+    <Style Selector="screen|ExemptionsView Button.exfile">
+      <Setter Property="MinHeight" Value="44"/>
+      <Setter Property="Padding" Value="8,11,12,11"/>
+      <Setter Property="Background" Value="Transparent"/>
+      <Setter Property="HorizontalAlignment" Value="Stretch"/>
+      <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+      <Setter Property="Cursor" Value="Hand"/>
+      <Setter Property="Template">
+        <ControlTemplate>
+          <Panel>
+            <Border Name="Surface" Background="{TemplateBinding Background}" Padding="{TemplateBinding Padding}">
+              <ContentPresenter Content="{TemplateBinding Content}" HorizontalContentAlignment="Stretch" VerticalContentAlignment="Center"/>
+            </Border>
+            <Border Name="Ring" IsVisible="False" IsHitTestVisible="False" CornerRadius="8" BorderThickness="2"
+                    BorderBrush="{DynamicResource focus}"/>
+          </Panel>
+        </ControlTemplate>
+      </Setter>
+    </Style>
+    <Style Selector="screen|ExemptionsView Button.exfile:pointerover /template/ Border#Surface">
+      <Setter Property="Background" Value="{DynamicResource well}"/>
+    </Style>
+    <Style Selector="screen|ExemptionsView Button.exfile:pressed /template/ Border#Surface">
+      <Setter Property="Background" Value="{DynamicResource hover}"/>
+    </Style>
+    <Style Selector="screen|ExemptionsView Button.exfile:focus-visible /template/ Border#Ring">
+      <Setter Property="IsVisible" Value="True"/>
+    </Style>
+
+    <Style Selector="screen|ExemptionsView Button.exrow">
+      <Setter Property="Padding" Value="8,11,12,11"/>
+      <Setter Property="Background" Value="Transparent"/>
+      <Setter Property="HorizontalAlignment" Value="Stretch"/>
+      <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+      <Setter Property="Cursor" Value="Hand"/>
+      <Setter Property="Template">
+        <ControlTemplate>
+          <Panel>
+            <Border Name="Surface" Background="{TemplateBinding Background}" Padding="{TemplateBinding Padding}">
+              <ContentPresenter Content="{TemplateBinding Content}" HorizontalContentAlignment="Stretch"/>
+            </Border>
+            <Border Name="Ring" IsVisible="False" IsHitTestVisible="False" CornerRadius="8" BorderThickness="2"
+                    BorderBrush="{DynamicResource focus}"/>
+          </Panel>
+        </ControlTemplate>
+      </Setter>
+    </Style>
+    <Style Selector="screen|ExemptionsView Button.exrow:pointerover /template/ Border#Surface">
+      <Setter Property="Background" Value="{DynamicResource well}"/>
+    </Style>
+    <Style Selector="screen|ExemptionsView Button.exrow:pressed /template/ Border#Surface">
+      <Setter Property="Background" Value="{DynamicResource hover}"/>
+    </Style>
+    <Style Selector="screen|ExemptionsView Button.exrow:focus-visible /template/ Border#Ring">
+      <Setter Property="IsVisible" Value="True"/>
+    </Style>
+
+    <Style Selector="screen|ExemptionsView parts|Icon.chevron">
+      <Setter Property="RenderTransform" Value="rotate(0deg)"/>
+    </Style>
+    <Style Selector="screen|ExemptionsView parts|Icon.chevron.open">
+      <Setter Property="RenderTransform" Value="rotate(90deg)"/>
+    </Style>
+
+    <Style Selector="screen|ExemptionsView StackPanel.exbody">
+      <Setter Property="Margin" Value="92,2,12,18"/>
+    </Style>
+    <Style Selector="screen|ExemptionsView.onepane StackPanel.exbody">
+      <Setter Property="Margin" Value="8,2,12,18"/>
+    </Style>
+
+    <Style Selector="screen|ExemptionsView Border.piece">
+      <Setter Property="Height" Value="34"/>
+      <Setter Property="CornerRadius" Value="10"/>
+      <Setter Property="Padding" Value="12,0,4,0"/>
+      <Setter Property="Background" Value="{DynamicResource hover}"/>
+    </Style>
+    <Style Selector="screen|ExemptionsView Button.clearfilter">
+      <Setter Property="Width" Value="26"/>
+      <Setter Property="Height" Value="26"/>
+      <Setter Property="Padding" Value="0"/>
+      <Setter Property="Background" Value="Transparent"/>
+      <Setter Property="Cursor" Value="Hand"/>
+      <Setter Property="Template">
+        <ControlTemplate>
+          <Panel>
+            <Border Name="Surface" Background="{TemplateBinding Background}" CornerRadius="7">
+              <parts:Icon Data="{StaticResource i-x}" Width="16" Height="16" Stroke="{DynamicResource ink-2}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+            </Border>
+            <Border Name="Ring" IsVisible="False" IsHitTestVisible="False" CornerRadius="7" BorderThickness="2" BorderBrush="{DynamicResource focus}"/>
+          </Panel>
+        </ControlTemplate>
+      </Setter>
+    </Style>
+    <Style Selector="screen|ExemptionsView Button.clearfilter:pointerover /template/ Border#Surface">
+      <Setter Property="Background" Value="{DynamicResource line-strong}"/>
+    </Style>
+    <Style Selector="screen|ExemptionsView Button.clearfilter:focus-visible /template/ Border#Ring">
+      <Setter Property="IsVisible" Value="True"/>
+    </Style>
+
+    <Style Selector="screen|ExemptionsView Border.search:pointerover">
+      <Setter Property="BorderBrush" Value="{DynamicResource line-strong}"/>
+    </Style>
+    <Style Selector="screen|ExemptionsView Border.search:focus-within">
+      <Setter Property="BorderBrush" Value="{DynamicResource focus}"/>
+      <Setter Property="BorderThickness" Value="2"/>
+      <Setter Property="Padding" Value="11,0"/>
+    </Style>
+  </UserControl.Styles>
+
+  <Grid RowDefinitions="36,Auto,*" Background="{DynamicResource page}">
+
+    <parts:ScreenHead Name="Head" Grid.Row="1" Title="Exemptions" Meta="{Binding Meta}"/>
+
+    <!-- The page: one recycling list. Every entry stands in the one frame of the sheet: sides 32 (24 in one pane), the frame at most 1292
+         wide (760 in one pane) and in the middle, the main column taking what the panel's column (340 and 32) leaves. -->
+    <Panel Grid.Row="2" IsVisible="{Binding !ShowsEmptyBlock}">
+      <ItemsControl Name="Rows" ItemsSource="{Binding Items}" Padding="0,24,0,32">
+        <ItemsControl.Template>
+          <ControlTemplate>
+            <ScrollViewer HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Visible" AllowAutoHide="False">
+              <ItemsPresenter ItemsPanel="{TemplateBinding ItemsPanel}" Margin="{TemplateBinding Padding}"/>
+            </ScrollViewer>
+          </ControlTemplate>
+        </ItemsControl.Template>
+        <ItemsControl.ItemsPanel>
+          <ItemsPanelTemplate>
+            <VirtualizingStackPanel/>
+          </ItemsPanelTemplate>
+        </ItemsControl.ItemsPanel>
+        <ItemsControl.DataTemplates>
+
+          <!-- The head: the summary, the panel in one pane, the rule chosen, the search, the line above the files. -->
+          <DataTemplate DataType="screen:ExemptionHeadViewModel" x:DataType="screen:ExemptionHeadViewModel">
+            <Border Classes="pagerow">
+              <Border Classes="pagecolumn">
+                <StackPanel DataContext="{Binding Model}" x:DataType="screen:ExemptionsViewModel">
+
+                  <!-- The summary: how many lines set how many rules aside, with "2 have no reason" (or the piece of the view that is chosen)
+                       after it. While the scan has run long, the busy ring and what it does stand in its place. -->
+                  <WrapPanel Name="SummaryRow" Orientation="Horizontal" ItemSpacing="16" LineSpacing="8" MinHeight="34" IsVisible="{Binding ShowsSummary}">
+                    <settings:MarkedText Theme="{StaticResource type-lead}" Foreground="{DynamicResource ink-2}" FontFeatures="+tnum" VerticalAlignment="Center"
+                                         Marked="{Binding SummaryMarked}"/>
+                    <Button Name="WithoutReasonButton" Classes="cf outlined small" IsVisible="{Binding HasButton}" Command="{Binding ShowWithoutReasonCommand}"
+                            VerticalAlignment="Center" AutomationProperties.Name="{Binding ButtonText}">
+                      <StackPanel Orientation="Horizontal" Spacing="6">
+                        <parts:EffectMark Classes="block" Kind="Block" Width="14" Height="14" VerticalAlignment="Center"/>
+                        <TextBlock Theme="{StaticResource type-meta-strong}" Text="{Binding ButtonText}"/>
+                      </StackPanel>
+                    </Button>
+                    <Border Name="FilterPiece" Classes="piece" IsVisible="{Binding HasFilter}" VerticalAlignment="Center">
+                      <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                        <TextBlock Theme="{StaticResource type-body}" FontWeight="500" VerticalAlignment="Center" Text="Only"/>
+                        <TextBlock IsVisible="{Binding FilterIsRule}" Theme="{StaticResource code-strong}" VerticalAlignment="Center" Text="{Binding FilterText}"/>
+                        <TextBlock IsVisible="{Binding FilterIsWithoutReason}" Theme="{StaticResource type-body}" FontWeight="500" VerticalAlignment="Center" Text="{Binding FilterText}"/>
+                        <Button Name="ClearFilterButton" Classes="clearfilter" Command="{Binding ClearFilterCommand}" AutomationProperties.Name="{Binding ClearName}"/>
+                      </StackPanel>
+                    </Border>
+                  </WrapPanel>
+                  <StackPanel Name="ScanningRow" Orientation="Horizontal" Spacing="10" MinHeight="34" IsVisible="{Binding ShowsScanning}" AutomationProperties.LiveSetting="Polite">
+                    <parts:TurningRing Width="16" Height="16" VerticalAlignment="Center"/>
+                    <TextBlock Theme="{StaticResource type-body}" Foreground="{DynamicResource ink-2}" VerticalAlignment="Center" Text="Reading the last commit"/>
+                  </StackPanel>
+
+                  <!-- In one pane the count by rule stands here as one line until it is asked for. -->
+                  <screen:ExemptionRulesPanel IsVisible="{Binding IsOnePane}" Margin="0,20,0,0"/>
+
+                  <!-- The rule chosen: its tag, id and title, the rule as its sentence, how many lines set it aside, and the one button that acts on it. -->
+                  <Panel IsVisible="{Binding HasChosen}" Margin="0,20,0,0">
+                    <Border Name="ChosenBox" Background="{DynamicResource well}" CornerRadius="16" Padding="20,16"
+                            DataContext="{Binding Chosen}" x:DataType="screen:ChosenRuleViewModel">
+                      <StackPanel Spacing="10">
+                        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
+                          <WrapPanel Orientation="Horizontal" ItemSpacing="10" LineSpacing="6" VerticalAlignment="Center">
+                            <Border Height="24" CornerRadius="7" Padding="7,0,9,0" Background="{DynamicResource hover}" VerticalAlignment="Center">
+                              <StackPanel Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
+                                <parts:Icon IsVisible="{Binding IsCustom}" Data="{StaticResource i-pen}" Width="12" Height="12" Stroke="{DynamicResource ink-2}"/>
+                                <parts:Icon IsVisible="{Binding IsFromFile}" Data="{StaticResource i-file}" Width="12" Height="12" Stroke="{DynamicResource ink-2}"/>
+                                <TextBlock Theme="{StaticResource type-label}" Foreground="{DynamicResource ink-2}" Text="{Binding TagText}"/>
+                              </StackPanel>
+                            </Border>
+                            <TextBlock Theme="{StaticResource code-strong}" VerticalAlignment="Center" Text="{Binding RuleId}"/>
+                            <TextBlock IsVisible="{Binding HasTitle}" Theme="{StaticResource type-body-strong}" TextWrapping="Wrap" VerticalAlignment="Center" Text="{Binding Title}"/>
+                          </WrapPanel>
+                          <Button Name="ChosenButton" Grid.Column="1" Classes="cf outlined" IsVisible="{Binding HasButton}" Command="{Binding ActCommand}"
+                                  VerticalAlignment="Center" AutomationProperties.Name="{Binding ButtonText}">
+                            <StackPanel Orientation="Horizontal" Spacing="8">
+                              <parts:Icon Data="{StaticResource i-rules}" Width="16" Height="16" Stroke="{Binding $parent[Button].Foreground}"/>
+                              <TextBlock Theme="{StaticResource type-body-strong}" Text="{Binding ButtonText}"/>
+                            </StackPanel>
+                          </Button>
+                        </Grid>
+                        <review:SentencePieces Pieces="{Binding Sentence}" IsVisible="{Binding HasSentence}"/>
+                        <TextBlock IsVisible="{Binding HasSetIn}" Theme="{StaticResource type-body}" Foreground="{DynamicResource ink-2}" Text="{Binding SetIn}"/>
+                        <TextBlock Theme="{StaticResource type-body}" Foreground="{DynamicResource ink-2}" MaxWidth="640" HorizontalAlignment="Left" TextWrapping="Wrap" Text="{Binding Aside}"/>
+                      </StackPanel>
+                    </Border>
+                  </Panel>
+
+                  <!-- The search: as wide as the column; it narrows the files and their exemptions at each keystroke. -->
+                  <Border Name="SearchBox" Classes="search" Height="36" CornerRadius="12" Margin="0,20,0,0" Background="{DynamicResource page}"
+                          BorderBrush="{DynamicResource line}" BorderThickness="1" Padding="12,0">
+                    <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="8">
+                      <parts:Icon Data="{StaticResource i-search}" Width="16" Height="16" Stroke="{DynamicResource ink-3}"/>
+                      <TextBox Name="Search" Grid.Column="1" Classes="bare" Text="{Binding SearchText, Mode=TwoWay}"
+                               PlaceholderText="Search by rule, file or reason" AutomationProperties.Name="Search by rule, file or reason"/>
+                      <Panel Grid.Column="2" VerticalAlignment="Center">
+                        <Border IsVisible="{Binding !HasSearch}" BorderBrush="{DynamicResource line-strong}" BorderThickness="1" CornerRadius="4" Padding="5,0" IsHitTestVisible="False">
+                          <TextBlock Theme="{StaticResource type-label}" FontWeight="Medium" Foreground="{DynamicResource ink-3}" Text="Ctrl+F"/>
+                        </Border>
+                        <Button Classes="cf quiet round" IsVisible="{Binding HasSearch}" Command="{Binding ClearSearchCommand}" AutomationProperties.Name="Clear the search">
+                          <parts:Icon Data="{StaticResource i-x}" Width="12" Height="12" Stroke="{Binding $parent[Button].Foreground}"/>
+                        </Button>
+                      </Panel>
+                    </Grid>
+                  </Border>
+
+                  <!-- The line above the files. -->
+                  <Grid IsVisible="{Binding HasFiles}" ColumnDefinitions="*,Auto" MinHeight="36" Margin="8,16,0,4">
+                    <TextBlock Theme="{StaticResource type-meta}" Foreground="{DynamicResource ink-2}" VerticalAlignment="Center" Text="{Binding FilesLine}"/>
+                    <Button Name="OpenAllButton" Grid.Column="1" Classes="cf quiet small" Command="{Binding ToggleAllCommand}" AutomationProperties.Name="{Binding OpenAllText}">
+                      <TextBlock Theme="{StaticResource type-meta-strong}" Text="{Binding OpenAllText}"/>
+                    </Button>
+                  </Grid>
+
+                  <!-- Nothing found: in place of the files. -->
+                  <StackPanel Name="NothingFound" IsVisible="{Binding HasNothingFound}" Margin="0,48,0,0" HorizontalAlignment="Center" AutomationProperties.LiveSetting="Polite">
+                    <TextBlock Theme="{StaticResource type-body}" Foreground="{DynamicResource ink-2}" TextAlignment="Center" Text="No exemption matches"/>
+                    <TextBlock Theme="{StaticResource type-body}" Foreground="{DynamicResource ink-2}" TextAlignment="Center" TextWrapping="Wrap" Text="{Binding NothingFoundText}"/>
+                    <Button Classes="cf quiet" HorizontalAlignment="Center" Margin="0,12,0,0" Command="{Binding ClearSearchCommand}" AutomationProperties.Name="Clear the search">
+                      <TextBlock Theme="{StaticResource type-body-strong}" Text="Clear the search"/>
+                    </Button>
+                  </StackPanel>
+
+                </StackPanel>
+              </Border>
+            </Border>
+          </DataTemplate>
+
+          <!-- A file's line. -->
+          <DataTemplate DataType="screen:ExemptionFileViewModel" x:DataType="screen:ExemptionFileViewModel">
+            <Border Classes="pagerow">
+              <Border Classes="pagecolumn">
+                <Border BorderBrush="{DynamicResource line}" BorderThickness="0,1,0,0">
+                  <Button Classes="exfile" Command="{Binding ToggleCommand}" AutomationProperties.Name="{Binding SpokenName}">
+                    <Grid ColumnDefinitions="Auto,Auto,*,Auto" ColumnSpacing="10">
+                      <parts:Icon Classes="chevron" Classes.open="{Binding IsOpen}" Data="{StaticResource i-right}" Width="16" Height="16"
+                                  Stroke="{DynamicResource ink-3}" VerticalAlignment="Top" Margin="0,2,0,0"/>
+                      <parts:Icon Grid.Column="1" Data="{StaticResource i-file}" Width="16" Height="16" Stroke="{DynamicResource ink-3}"
+                                  VerticalAlignment="Top" Margin="0,2,0,0"/>
+                      <TextBlock Grid.Column="2" Theme="{StaticResource code}" TextWrapping="Wrap" VerticalAlignment="Center">
+                        <Run Foreground="{DynamicResource ink-2}" Text="{Binding Folders}"/><Run FontWeight="SemiBold" Foreground="{DynamicResource ink}" Text="{Binding Name}"/>
+                      </TextBlock>
+                      <StackPanel Grid.Column="3" Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
+                        <parts:Icon Data="{StaticResource i-exempt}" Width="14" Height="14" Stroke="{DynamicResource ink-3}" VerticalAlignment="Center"/>
+                        <TextBlock Theme="{StaticResource type-meta-strong}" FontFeatures="+tnum" VerticalAlignment="Center" Text="{Binding TallyNumber}"/>
+                        <TextBlock Theme="{StaticResource type-meta}" Foreground="{DynamicResource ink-2}" VerticalAlignment="Center" Text="{Binding TallyWords}"/>
+                      </StackPanel>
+                    </Grid>
+                  </Button>
+                </Border>
+              </Border>
+            </Border>
+          </DataTemplate>
+
+          <!-- An exemption, under its file's line. -->
+          <DataTemplate DataType="screen:ExemptionRowViewModel" x:DataType="screen:ExemptionRowViewModel">
+            <Border Classes="pagerow">
+              <Border Classes="pagecolumn">
+                <Border Margin="26,0,0,0" BorderBrush="{DynamicResource line}" BorderThickness="0,1,0,0">
+                  <StackPanel>
+                    <Button Classes="exrow" Command="{Binding ToggleCommand}" AutomationProperties.Name="{Binding SpokenName}">
+                      <Grid ColumnDefinitions="72,*,Auto,Auto" ColumnSpacing="12">
+                        <TextBlock Theme="{StaticResource code-strong}" TextWrapping="Wrap" VerticalAlignment="Top" Margin="0,1,0,0" Text="{Binding RuleId}"/>
+                        <StackPanel Grid.Column="1" Spacing="2">
+                          <TextBlock IsVisible="{Binding HasReason}" Theme="{StaticResource type-body-strong}" TextWrapping="Wrap" Text="{Binding Reason}"/>
+                          <StackPanel IsVisible="{Binding IsFinding}" Orientation="Horizontal" Spacing="8">
+                            <parts:EffectMark Classes="block" Kind="Block" Width="15" Height="15" VerticalAlignment="Center"/>
+                            <TextBlock Theme="{StaticResource type-body-strong}" VerticalAlignment="Center" Text="{Binding NoReason}"/>
+                          </StackPanel>
+                          <TextBlock IsVisible="{Binding HasQuietNoReason}" Theme="{StaticResource type-body}" Foreground="{DynamicResource ink-2}" Text="{Binding NoReason}"/>
+                          <WrapPanel Orientation="Horizontal" ItemSpacing="8" LineSpacing="2">
+                            <TextBlock IsVisible="{Binding IsFinding}" Theme="{StaticResource type-effect}" VerticalAlignment="Center" Text="{Binding FindingLead}"/>
+                            <TextBlock IsVisible="{Binding HasRuleTitle}" Theme="{StaticResource type-meta}" Foreground="{DynamicResource ink-2}" TextWrapping="Wrap"
+                                       VerticalAlignment="Center" Text="{Binding RuleTitle}"/>
+                            <TextBlock IsVisible="{Binding HasForm}" Theme="{StaticResource code}" Foreground="{DynamicResource ink-3}" VerticalAlignment="Center" Text="{Binding FormText}"/>
+                          </WrapPanel>
+                        </StackPanel>
+                        <TextBlock Grid.Column="2" Theme="{StaticResource code}" Foreground="{DynamicResource ink-2}" VerticalAlignment="Top" Text="{Binding LineText}"/>
+                        <parts:Icon Grid.Column="3" Classes="chevron" Classes.open="{Binding IsOpen}" Data="{StaticResource i-right}" Width="16" Height="16"
+                                    Stroke="{DynamicResource ink-3}" VerticalAlignment="Top"/>
+                      </Grid>
+                    </Button>
+                    <StackPanel Classes="exbody" IsVisible="{Binding IsOpen}">
+                      <settings:MarkedText IsVisible="{Binding IsFinding}" Theme="{StaticResource type-body}" Foreground="{DynamicResource ink-2}" Margin="0,0,0,12"
+                                           Marked="{Binding HintMarked}"/>
+                      <Border CornerRadius="12" BorderThickness="1" BorderBrush="{DynamicResource line}" Padding="0,8" ClipToBounds="True" Background="{DynamicResource page}">
+                        <parts:FileLines ItemsSource="{Binding Lines}" NumberWidth="44" NumberGap="14"/>
+                      </Border>
+                      <WrapPanel Orientation="Horizontal" ItemSpacing="8" LineSpacing="8" Margin="0,12,0,0">
+                        <Button Classes="cf outlined small" Command="{Binding OpenLineCommand}" AutomationProperties.Name="{Binding OpenLineText}">
+                          <StackPanel Orientation="Horizontal" Spacing="6">
+                            <parts:Icon Data="{StaticResource i-open}" Width="14" Height="14" Stroke="{Binding $parent[Button].Foreground}"/>
+                            <TextBlock Theme="{StaticResource type-meta-strong}" Text="{Binding OpenLineText}"/>
+                          </StackPanel>
+                        </Button>
+                        <Button Classes="cf outlined small" IsVisible="{Binding CanOpenRule}" Command="{Binding OpenRuleCommand}" AutomationProperties.Name="Open the rule">
+                          <StackPanel Orientation="Horizontal" Spacing="6">
+                            <parts:Icon Data="{StaticResource i-rules}" Width="14" Height="14" Stroke="{Binding $parent[Button].Foreground}"/>
+                            <TextBlock Theme="{StaticResource type-meta-strong}" Text="Open the rule"/>
+                          </StackPanel>
+                        </Button>
+                      </WrapPanel>
+                    </StackPanel>
+                  </StackPanel>
+                </Border>
+              </Border>
+            </Border>
+          </DataTemplate>
+
+          <!-- The end of the list: the line that closes the files, and, while files are cut by "Show", the rest. -->
+          <DataTemplate DataType="screen:ExemptionTailViewModel" x:DataType="screen:ExemptionTailViewModel">
+            <Border Classes="pagerow">
+              <Border Classes="pagecolumn">
+                <StackPanel>
+                  <Border BorderBrush="{DynamicResource line}" BorderThickness="0,1,0,0"/>
+                  <StackPanel IsVisible="{Binding HasText}" Margin="0,16,0,0" Spacing="8">
+                    <TextBlock Margin="8,0" Theme="{StaticResource type-meta}" Foreground="{DynamicResource ink-2}" TextWrapping="Wrap" Text="{Binding Text}"/>
+                    <Button Classes="cf outlined small" HorizontalAlignment="Left" Margin="8,0,0,0" Command="{Binding ShowCommand}" AutomationProperties.Name="{Binding ButtonText}">
+                      <TextBlock Theme="{StaticResource type-meta-strong}" Text="{Binding ButtonText}"/>
+                    </Button>
+                  </StackPanel>
+                </StackPanel>
+              </Border>
+            </Border>
+          </DataTemplate>
+
+        </ItemsControl.DataTemplates>
+      </ItemsControl>
+
+      <!-- The panel stands over the page, in the frame's second column, and keeps its place 24 under the head while the page scrolls;
+           the view moves it up when the page ends. In one pane it is in the head instead. -->
+      <Border Classes="pagerow" VerticalAlignment="Top" Margin="0,24,12,0" IsVisible="{Binding !IsOnePane}">
+        <Border Classes="pageframe">
+          <screen:ExemptionRulesPanel Name="SidePanel" HorizontalAlignment="Right" Width="340"/>
+        </Border>
+      </Border>
+    </Panel>
+
+    <!-- A state with no list: no exemption, no commit yet, or a commit that could not be read. -->
+    <parts:EmptyBlock Name="Block" Grid.Row="2" IsVisible="{Binding ShowsEmptyBlock}" ShowsEmblem="False" Heading="{Binding EmptyHeading}" Lead="{Binding EmptyLead}">
+      <parts:EmptyBlock.Extra>
+        <Border Name="ExampleBox" IsVisible="{Binding ShowsNoExemption}" CornerRadius="12" BorderThickness="1" BorderBrush="{DynamicResource line}"
+                Padding="16,10" Background="{DynamicResource page}">
+          <TextBlock Theme="{StaticResource code}" Foreground="{DynamicResource code-comment}" Text="{Binding EmptyExample}"/>
+        </Border>
+      </parts:EmptyBlock.Extra>
+    </parts:EmptyBlock>
+
+  </Grid>
+
+</UserControl>

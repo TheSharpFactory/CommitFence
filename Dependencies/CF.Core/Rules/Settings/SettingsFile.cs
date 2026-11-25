@@ -29,6 +29,12 @@ public sealed class SettingsFile
         return _reader.Read(ReadText(settingsPath));
     }
 
+    /// <summary>Reads settings when a file exists, applying the same validation as a required read.</summary>
+    public RuleSettings? ReadIfPresent(string settingsPath)
+    {
+        return _fileSystem.FileExists(settingsPath) ? Read(settingsPath) : null;
+    }
+
     /// <summary>
     /// The text of the file, which must exist. Throws a <see cref="SettingsException" /> when the file is missing or
     /// cannot be read.

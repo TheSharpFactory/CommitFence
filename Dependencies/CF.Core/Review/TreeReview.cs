@@ -19,11 +19,13 @@ public sealed class TreeReview
     private readonly IProgramLock _programLock;
     private readonly ChangeResolver _changeResolver;
     private readonly ChangeSetReview _changeSetReview;
+    private readonly IStructureJudgments? _structureJudgments;
+    private readonly IReviewHistory? _history;
 
     /// <summary>
     /// Creates the review.
     /// </summary>
-    public TreeReview(IClock clock, IGit git, IReviewLock reviewLock, IProgramLock programLock, ChangeResolver changeResolver, ChangeSetReview changeSetReview)
+    public TreeReview(IClock clock, IGit git, IReviewLock reviewLock, IProgramLock programLock, ChangeResolver changeResolver, ChangeSetReview changeSetReview, IStructureJudgments? structureJudgments = null, IReviewHistory? history = null)
     {
         _clock = clock;
         _git = git;
@@ -31,6 +33,8 @@ public sealed class TreeReview
         _programLock = programLock;
         _changeResolver = changeResolver;
         _changeSetReview = changeSetReview;
+        _structureJudgments = structureJudgments;
+        _history = history;
     }
 
     /// <summary>
@@ -52,7 +56,7 @@ public sealed class TreeReview
             {
                 using(_reviewLock.Acquire(repository))
                 {
-                    return ReviewLocked(repository, scope, settingsPath, started);
+                    return FinishLocked(repository, scope, settingsPath, started);
                 }
             }
         }
@@ -62,18 +66,72 @@ public sealed class TreeReview
         }
     }
 
-    private ReviewResult ReviewLocked(RepositoryLocation repository, ReviewScope scope, string? settingsPath, DateTimeOffset started)
+    private ReviewResult FinishLocked(RepositoryLocation repository, ReviewScope scope, string? settingsPath, DateTimeOffset started)
     {
         var run = new ReviewRun();
-        foreach(var changeSet in _changeResolver.Resolve(repository, scope))
-            _changeSetReview.Review(repository, changeSet, settingsPath, run);
+        ReviewResult result;
+        DateTimeOffset ended;
+        try
+        {
+            result = ReviewLocked(repository, scope, settingsPath, started, run, out ended);
+        }
+        catch(Exception exception) when(exception is ScopeException or GitException or TimeoutException)
+        {
+            ended = _clock.Now;
+            result = CreateIncompleteResult(FailureText.Describe(exception), started, ended);
+        }
 
-        return run.ToResult(_clock.Now - started);
+        if(scope.Kind == ScopeKind.Push && _history != null)
+            Record(repository, scope.Source, result, ended, run.RanBuild);
+
+        return result;
     }
 
-    private ReviewResult CreateIncompleteResult(string reason, DateTimeOffset started)
+    private void Record(RepositoryLocation repository, ReviewSource source, ReviewResult result, DateTimeOffset ended, bool full)
+    {
+        try
+        {
+            var files = result.Coverage.Where(entry => entry.Kind == CoverageKind.File && entry.Status == CoverageStatus.Reviewed)
+                .Select(entry => entry.What).Distinct(StringComparer.Ordinal).Count();
+            var counts = result.CountByRule().Select(count => new RecordedRuleCount(count.RuleId, count.Count)).ToList();
+            var outcome = result.Outcome switch
+            {
+                ReviewOutcome.Clean => RecordedReviewOutcome.Clean,
+                ReviewOutcome.Warned => RecordedReviewOutcome.Warned,
+                ReviewOutcome.Blocked => RecordedReviewOutcome.Blocked,
+                ReviewOutcome.Incomplete => RecordedReviewOutcome.Incomplete,
+                _ => throw new ArgumentOutOfRangeException(nameof(result))
+            };
+            _history!.Append(repository, new ReviewRecord(ReviewRecord.CurrentFormat, ended.ToUniversalTime(), source, outcome,
+                Math.Max(0, (long)result.Duration.TotalMilliseconds), full, files, counts));
+        }
+        catch(Exception)
+        {
+            // Storage failure must never change the finished result of a push review.
+        }
+    }
+
+    private ReviewResult ReviewLocked(RepositoryLocation repository, ReviewScope scope, string? settingsPath, DateTimeOffset started, ReviewRun run, out DateTimeOffset ended)
+    {
+        string? wholeFolder = null;
+        foreach(var changeSet in _changeResolver.Resolve(repository, scope))
+        {
+            _changeSetReview.Review(repository, changeSet, settingsPath, run);
+            wholeFolder = changeSet.WholeFolder;
+        }
+
+        ended = _clock.Now;
+        var folder = wholeFolder == string.Empty ? Path.GetFileName(repository.WorkFolder) : wholeFolder;
+        var judgment = run.StructureJudgedAt(ended, folder);
+        if(judgment != null)
+            _structureJudgments?.Save(repository, judgment);
+
+        return run.ToResult(ended - started, judgment);
+    }
+
+    private ReviewResult CreateIncompleteResult(string reason, DateTimeOffset started, DateTimeOffset? ended = null)
     {
         var coverage = new List<Coverage> { new Coverage("review scope", CoverageStatus.Failed, string.IsNullOrWhiteSpace(reason) ? "no reason was given" : reason) };
-        return new ReviewResult(ReviewOutcome.Incomplete, new List<Finding>(), coverage, new List<string>(), "The review is incomplete.", _clock.Now - started);
+        return new ReviewResult(ReviewOutcome.Incomplete, new List<Finding>(), coverage, new List<string>(), "The review is incomplete.", (ended ?? _clock.Now) - started);
     }
 }

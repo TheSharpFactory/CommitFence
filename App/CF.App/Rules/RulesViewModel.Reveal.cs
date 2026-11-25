@@ -20,6 +20,29 @@ internal sealed partial class RulesViewModel
         IsPageOpen = true;
     }
 
+    /// <summary>
+    /// Opens a team rule that another screen sends here to be narrowed: it is shown as <see cref="Reveal"/> shows it, the strip says where
+    /// it came from, and one empty condition is added with its property picker open. Nothing is saved.
+    /// </summary>
+    public void Narrow(string ruleId, NarrowOrigin origin)
+    {
+        EndNarrowing();
+        Reveal(ruleId);
+        if(!_pages.TryGetValue(ruleId, out var page) || !ReferenceEquals(CurrentPage, page))
+            return;
+
+        _narrowed = page;
+        page.BeginNarrowing(origin);
+    }
+
+    private void EndNarrowing()
+    {
+        if(_narrowed != null)
+            _narrowed.Origin = null;
+
+        _narrowed = null;
+    }
+
     private static bool IsRule(RuleListItemViewModel item, string ruleId)
     {
         if(item is TeamRuleRowViewModel team)

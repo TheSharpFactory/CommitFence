@@ -1,0 +1,69 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:parts="using:CF.App.Parts"
+             x:Class="CF.App.Parts.FileLines"
+             x:ClassModifier="internal">
+
+  <!-- The lines of a file: one row per line, rows 20 high at least, in code. A number column (52 wide and 16 to its right on the
+       page of a file rule, 44 and 14 on Exemptions), right-aligned, in ink-3. The line in force is marked: a bar 4 wide in here at
+       the left edge, its number and text in ink at weight 600, and (when the box bands it) the row's background hover. A line that does
+       not fit wraps, its rest set in 4 characters; nothing is cut. -->
+  <UserControl.Styles>
+    <Style Selector="parts|FileLines Border.fileline.current.band">
+      <Setter Property="Background" Value="{DynamicResource hover}"/>
+    </Style>
+    <Style Selector="parts|FileLines Border.fileline Border.bar">
+      <Setter Property="IsVisible" Value="False"/>
+    </Style>
+    <Style Selector="parts|FileLines Border.fileline.current Border.bar">
+      <Setter Property="IsVisible" Value="True"/>
+    </Style>
+    <Style Selector="parts|FileLines Border.fileline TextBlock.number">
+      <Setter Property="Foreground" Value="{DynamicResource ink-3}"/>
+    </Style>
+    <Style Selector="parts|FileLines Border.fileline TextBlock.text">
+      <Setter Property="Foreground" Value="{DynamicResource ink-3}"/>
+    </Style>
+    <Style Selector="parts|FileLines Border.fileline TextBlock.text.colored">
+      <Setter Property="Foreground" Value="{DynamicResource ink}"/>
+    </Style>
+    <Style Selector="parts|FileLines Border.fileline TextBlock.text.context">
+      <Setter Property="Foreground" Value="{DynamicResource ink-2}"/>
+    </Style>
+    <Style Selector="parts|FileLines Border.fileline TextBlock.text.comment">
+      <Setter Property="Foreground" Value="{DynamicResource code-comment}"/>
+    </Style>
+    <Style Selector="parts|FileLines Border.fileline.current TextBlock.number">
+      <Setter Property="FontWeight" Value="SemiBold"/>
+      <Setter Property="Foreground" Value="{DynamicResource ink}"/>
+    </Style>
+    <Style Selector="parts|FileLines Border.fileline.current TextBlock.text">
+      <Setter Property="Foreground" Value="{DynamicResource ink}"/>
+      <Setter Property="FontWeight" Value="SemiBold"/>
+    </Style>
+  </UserControl.Styles>
+
+  <ItemsControl Name="Rows">
+    <ItemsControl.ItemTemplate>
+      <DataTemplate DataType="parts:FileLineViewModel" x:DataType="parts:FileLineViewModel">
+        <Border Classes="fileline" Classes.current="{Binding IsCurrent}"
+                Classes.band="{Binding $parent[parts:FileLines].BandsCurrent}"
+                MinHeight="20" IsVisible="{Binding IsPresent}" AutomationProperties.Name="{Binding SpokenName}">
+          <Panel>
+            <Border Classes="bar" Width="4" CornerRadius="2" HorizontalAlignment="Left" Background="{DynamicResource here}"/>
+            <Grid ColumnDefinitions="Auto,*" Margin="0,0,12,0">
+              <Border Width="{Binding $parent[parts:FileLines].NumberWidth}" VerticalAlignment="Top">
+                <TextBlock Classes="number" Theme="{StaticResource code}" HorizontalAlignment="Right"
+                           IsVisible="{Binding HasNumber}" Text="{Binding Number}"/>
+              </Border>
+              <parts:HangingText Grid.Column="1" Classes="text" Classes.context="{Binding IsHeaderOrGap}" Classes.comment="{Binding IsComment}"
+                                 Classes.colored="{Binding IsColored}" Theme="{StaticResource code}"
+                                 Margin="{Binding $parent[parts:FileLines].GapMargin}" Line="{Binding Text}" Segments="{Binding Segments}"/>
+            </Grid>
+          </Panel>
+        </Border>
+      </DataTemplate>
+    </ItemsControl.ItemTemplate>
+  </ItemsControl>
+
+</UserControl>

@@ -6,7 +6,7 @@ namespace CF.Core.Changes;
 /// </summary>
 public sealed class ChangeSet
 {
-    private ChangeSet(string label, string beforeTree, string tree, IReadOnlyList<ChangedFile> files, IReadOnlyList<string> ruleFilesChanged, string note, bool isWholeReview, bool hasUncommittedWork = false)
+    private ChangeSet(string label, string beforeTree, string tree, IReadOnlyList<ChangedFile> files, IReadOnlyList<string> ruleFilesChanged, string note, string? wholeFolder, bool hasUncommittedWork = false)
     {
         Label = label;
         BeforeTree = beforeTree;
@@ -14,7 +14,7 @@ public sealed class ChangeSet
         Files = files;
         RuleFilesChanged = ruleFilesChanged;
         Note = note;
-        IsWholeReview = isWholeReview;
+        WholeFolder = wholeFolder;
         HasUncommittedWork = hasUncommittedWork;
     }
 
@@ -58,7 +58,13 @@ public sealed class ChangeSet
     /// what must say something else or look elsewhere: the words, which violations are in scope, the projects that
     /// depend on the files.
     /// </remarks>
-    public bool IsWholeReview { get; }
+    public bool IsWholeReview
+    {
+        get { return WholeFolder != null; }
+    }
+
+    /// <summary>The reviewed folder relative to the repository, empty for the root and null for a change.</summary>
+    public string? WholeFolder { get; }
 
     /// <summary>
     /// Whether the working folder holds changes that are not committed and so are not part of this review.
@@ -88,7 +94,7 @@ public sealed class ChangeSet
     /// </summary>
     public ChangeSet WithNote(string sentence)
     {
-        return new ChangeSet(Label, BeforeTree, Tree, Files, RuleFilesChanged, Note + " " + sentence, IsWholeReview, HasUncommittedWork);
+        return new ChangeSet(Label, BeforeTree, Tree, Files, RuleFilesChanged, Note + " " + sentence, WholeFolder, HasUncommittedWork);
     }
 
     /// <summary>
@@ -96,7 +102,7 @@ public sealed class ChangeSet
     /// </summary>
     public ChangeSet WithUncommittedWork(string sentence)
     {
-        return new ChangeSet(Label, BeforeTree, Tree, Files, RuleFilesChanged, Note + " " + sentence, IsWholeReview, true);
+        return new ChangeSet(Label, BeforeTree, Tree, Files, RuleFilesChanged, Note + " " + sentence, WholeFolder, true);
     }
 
     /// <summary>
@@ -104,16 +110,16 @@ public sealed class ChangeSet
     /// </summary>
     public static ChangeSet ForChanges(string label, string beforeTree, string tree, IReadOnlyList<ChangedFile> files, IReadOnlyList<string> ruleFilesChanged, string note)
     {
-        return new ChangeSet(label, beforeTree, tree, files, ruleFilesChanged, note, false);
+        return new ChangeSet(label, beforeTree, tree, files, ruleFilesChanged, note, null);
     }
 
     /// <summary>
     /// The whole of a folder of the tree, read against nothing: each file is an added file with every line touched.
     /// Nothing changed, so no rule file changed.
     /// </summary>
-    public static ChangeSet ForWholeReview(string label, string beforeTree, string tree, IReadOnlyList<ChangedFile> files, string note)
+    public static ChangeSet ForWholeReview(string label, string beforeTree, string tree, IReadOnlyList<ChangedFile> files, string note, string folder = "")
     {
-        return new ChangeSet(label, beforeTree, tree, files, new List<string>(), note, true);
+        return new ChangeSet(label, beforeTree, tree, files, new List<string>(), note, folder);
     }
 
     /// <summary>

@@ -89,17 +89,25 @@ internal sealed class EditorConfigRules : IRepositoryRules
         foreach(var setting in settings.Where(setting => primary == null || setting.Line >= primary.Line))
         {
             var pattern = patterns[setting.Section];
-            var place = new FileRulePlace(setting.Section, setting.Value, SeverityWords.StateOf(setting.Value), SeverityWords.SeverityOf(setting.Value), setting.Line,
+            var place = new FileRulePlace(setting.Section, setting.Value, FileRulePlace.StateOf(setting.Value), null, setting.Line,
                 Excerpt(lines, setting.Header, setting.Line), pattern.Matches);
             if(setting == primary)
                 main = place;
-            else if(main == null || place.Effect != main.Effect || (exceptions.Count > 0 && files.Overlaps(pattern, exceptions)))
+            else if(main == null || IsDifferentSetting(main, place) || (exceptions.Count > 0 && files.Overlaps(pattern, exceptions)))
                 exceptions.Add(place);
         }
 
         var named = primary ?? settings.First();
         var title = titles.Find(named.Id) ?? CommentTitle.From(named.TrailingComment) ?? CommentTitle.From(named.CommentAbove);
         return new FileRule(named.Id, title, _fileName, "C#", main, exceptions);
+    }
+
+    private static bool IsDifferentSetting(FileRulePlace main, FileRulePlace place)
+    {
+        if(main.State == FileRuleState.On || place.State == FileRuleState.On)
+            return !string.Equals(main.Setting, place.Setting, StringComparison.OrdinalIgnoreCase);
+
+        return main.State != place.State;
     }
 
     private static List<FileLine> Excerpt(IReadOnlyList<string> lines, int header, int setting)

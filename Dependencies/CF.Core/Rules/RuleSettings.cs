@@ -10,13 +10,23 @@ public sealed class RuleSettings
     /// <summary>
     /// Creates the settings.
     /// </summary>
-    public RuleSettings(string? requires, IReadOnlyList<RuleDefinition> rules, StructureRules structure)
+    public RuleSettings(string? requires, IReadOnlyList<RuleDefinition> rules, StructureRules structure, Strictness? configuredStrictness = null)
     {
         Requires = requires;
         Rules = rules;
         ActiveRules = rules.Where(rule => rule.Enabled).ToList();
         Structure = structure;
+        ConfiguredStrictness = configuredStrictness;
     }
+
+    /// <summary>The strictness in force, including the default when no key was written.</summary>
+    public Strictness Strictness
+    {
+        get { return ConfiguredStrictness ?? Strictness.Standard; }
+    }
+
+    /// <summary>The strictness explicitly written in the settings file, if any.</summary>
+    public Strictness? ConfiguredStrictness { get; }
 
     /// <summary>
     /// The lowest version of the product the repository accepts, as written; nothing when not stated.

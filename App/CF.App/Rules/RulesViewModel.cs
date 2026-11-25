@@ -40,6 +40,9 @@ internal sealed partial class RulesViewModel : ObservableObject, IRuleChanges, I
     private readonly Dictionary<string, FileRuleRowViewModel> _fileRows = new Dictionary<string, FileRuleRowViewModel>();
     private IReadOnlyList<RuleDefinition> _definitions = new List<RuleDefinition>();
     private RulePageViewModel? _draft;
+
+    // the page of the rule that was sent here from another screen to be narrowed, while its strip stands
+    private RulePageViewModel? _narrowed;
     private RuleDefinition? _removed;
     private string? _removedBefore;
     private bool _hasLoaded;
@@ -109,7 +112,7 @@ internal sealed partial class RulesViewModel : ObservableObject, IRuleChanges, I
         SelectedFilter = Filters[0];
         _watcher = watcher;
         if(_watcher != null)
-            _watcher.Changed += Reload;
+            _watcher.Changed += ReloadSettings;
 
         _fileWatcher = fileWatcher;
         if(_fileWatcher != null)
@@ -392,7 +395,7 @@ internal sealed partial class RulesViewModel : ObservableObject, IRuleChanges, I
         _undoTimer.Stop();
         if(_watcher != null)
         {
-            _watcher.Changed -= Reload;
+            _watcher.Changed -= ReloadSettings;
             _watcher.Dispose();
         }
 
@@ -545,6 +548,12 @@ internal sealed partial class RulesViewModel : ObservableObject, IRuleChanges, I
         Rebuild();
     }
 
+    private void ReloadSettings()
+    {
+        Reload();
+        ReloadFileRules();
+    }
+
     partial void OnSearchTextChanged(string value)
     {
         Rebuild();
@@ -559,6 +568,10 @@ internal sealed partial class RulesViewModel : ObservableObject, IRuleChanges, I
     {
         if(value != null)
             IsDraftOpen = false;
+
+        // another rule is opened: the strip of the rule that was sent here goes
+        if(_narrowed != null && !ReferenceEquals(CurrentPage, _narrowed))
+            EndNarrowing();
 
         if(value is FileRuleRowViewModel fileRow)
             FilePage.Show(fileRow.Rule);

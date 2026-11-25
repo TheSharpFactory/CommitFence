@@ -30,35 +30,6 @@
     <Style Selector="local|FileRulePageView.onepane Button.back">
       <Setter Property="IsVisible" Value="True"/>
     </Style>
-    <Style Selector="Border.fileline.current.band">
-      <Setter Property="Background" Value="{DynamicResource hover}"/>
-    </Style>
-    <Style Selector="Border.fileline Border.bar">
-      <Setter Property="IsVisible" Value="False"/>
-    </Style>
-    <Style Selector="Border.fileline.current Border.bar">
-      <Setter Property="IsVisible" Value="True"/>
-    </Style>
-    <Style Selector="Border.fileline TextBlock.number">
-      <Setter Property="Foreground" Value="{DynamicResource ink-3}"/>
-    </Style>
-    <Style Selector="Border.fileline TextBlock.text">
-      <Setter Property="Foreground" Value="{DynamicResource ink-3}"/>
-    </Style>
-    <Style Selector="Border.fileline TextBlock.text.context">
-      <Setter Property="Foreground" Value="{DynamicResource ink-2}"/>
-    </Style>
-    <Style Selector="Border.fileline TextBlock.text.comment">
-      <Setter Property="Foreground" Value="{DynamicResource code-comment}"/>
-    </Style>
-    <Style Selector="Border.fileline.current TextBlock.number">
-      <Setter Property="FontWeight" Value="SemiBold"/>
-      <Setter Property="Foreground" Value="{DynamicResource ink}"/>
-    </Style>
-    <Style Selector="Border.fileline.current TextBlock.text">
-      <Setter Property="Foreground" Value="{DynamicResource ink}"/>
-      <Setter Property="FontWeight" Value="SemiBold"/>
-    </Style>
     <Style Selector="Run.pattern">
       <Setter Property="FontFamily" Value="Cascadia Mono, Consolas, Menlo, DejaVu Sans Mono, monospace"/>
       <Setter Property="FontWeight" Value="SemiBold"/>
@@ -158,24 +129,7 @@
                           </StackPanel>
                         </Button>
                       </Grid>
-                      <ItemsControl Margin="0,0,0,10" ItemsSource="{Binding Lines}">
-                        <ItemsControl.ItemTemplate>
-                          <DataTemplate DataType="local:FileLineViewModel" x:DataType="local:FileLineViewModel">
-                            <Border Classes="fileline" Classes.current="{Binding IsCurrent}" Classes.band="{Binding $parent[ItemsControl].((local:FilePlaceViewModel)DataContext).IsException}" Height="20" IsVisible="{Binding IsPresent}" AutomationProperties.Name="{Binding SpokenName}">
-                              <Panel>
-                                <Border Classes="bar" Width="4" CornerRadius="2" HorizontalAlignment="Left" Background="{DynamicResource here}"/>
-                                <Grid ColumnDefinitions="52,16,*">
-                                  <TextBlock Grid.Column="0" Classes="number" Theme="{StaticResource code}"
-                                             HorizontalAlignment="Right" IsVisible="{Binding HasNumber}" Text="{Binding Number}"/>
-                                  <TextBlock Grid.Column="2" Classes="text" Classes.context="{Binding IsHeaderOrGap}" Classes.comment="{Binding IsComment}" Theme="{StaticResource code}"
-                                             TextWrapping="NoWrap" TextTrimming="CharacterEllipsis"
-                                             Text="{Binding Text}"/>
-                                </Grid>
-                              </Panel>
-                            </Border>
-                          </DataTemplate>
-                        </ItemsControl.ItemTemplate>
-                      </ItemsControl>
+                      <parts:FileLines Margin="0,0,0,10" ItemsSource="{Binding Lines}" BandsCurrent="{Binding IsException}"/>
                     </StackPanel>
                   </Border>
                 </DataTemplate>

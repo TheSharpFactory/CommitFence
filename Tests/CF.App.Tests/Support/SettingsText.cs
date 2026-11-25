@@ -52,6 +52,50 @@ internal static class SettingsText
         """;
 
     /// <summary>
+    /// The four team rules the exemptions of the tests name; TEAM010 is the sentence of the picture of the screen.
+    /// </summary>
+    public const string Exempted = """
+        {
+            "rules": [
+                {
+                    "id": "TEAM010",
+                    "language": "csharp",
+                    "for": "if-statement",
+                    "severity": "block",
+                    "title": "No braces around a single-line if",
+                    "where": { "statementsInBody": 1, "bodyFitsOnOneLine": true },
+                    "require": { "braces": false }
+                },
+                {
+                    "id": "TEAM011",
+                    "language": "csharp",
+                    "for": "class",
+                    "severity": "warn",
+                    "title": "Only public and private methods inside an internal class",
+                    "require": { "documentationPresent": true }
+                },
+                {
+                    "id": "TEAM012",
+                    "language": "csharp",
+                    "for": "method",
+                    "severity": "block",
+                    "title": "Use IClock, not DateTime.Now",
+                    "require": { "documentationPresent": true }
+                },
+                {
+                    "id": "TEAM013",
+                    "language": "csharp",
+                    "for": "class",
+                    "severity": "block",
+                    "title": "Core uses no file, process or network API",
+                    "where": { "isPartial": true },
+                    "forbid": true
+                }
+            ]
+        }
+        """;
+
+    /// <summary>
     /// A file that is not JSON.
     /// </summary>
     public const string Malformed = "{ \"rules\": [ not json";

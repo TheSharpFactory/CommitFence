@@ -1,4 +1,5 @@
 using CF.Core.Findings;
+using CF.Core.Ports;
 
 namespace CF.Core.Review;
 
@@ -51,6 +52,12 @@ public sealed class ReviewResult
     /// What was found.
     /// </summary>
     public IReadOnlyList<Finding> Findings { get; }
+
+    /// <summary>Findings set aside by allow comments, with the comments' lines and reasons.</summary>
+    public IReadOnlyList<ExemptedFinding> ExemptedFindings { get; init; } = [];
+
+    /// <summary>The completed judgment of layer directions, when the review judged them.</summary>
+    public StructureJudgment? StructureJudgment { get; internal init; }
 
     /// <summary>
     /// What was covered.

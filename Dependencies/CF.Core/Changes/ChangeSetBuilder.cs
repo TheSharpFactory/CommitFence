@@ -36,13 +36,13 @@ internal sealed class ChangeSetBuilder
     /// The files of the tree that are given, each an added file with every line touched. There is no diff to read: a
     /// whole review has no tree before.
     /// </summary>
-    public ChangeSet BuildWhole(string label, string commit, string afterTree, IReadOnlyList<string> paths)
+    public ChangeSet BuildWhole(string label, string commit, string afterTree, IReadOnlyList<string> paths, string folder)
     {
         var files = paths.Select(path => new ChangedFile(path, FindLanguage(path), ChangeStatus.Added, new List<LineRange> { LineRange.ForWholeFile() })).ToList();
         var noun = files.Count == 1 ? "file" : "files";
         var note = $"{label} at commit {commit[..Math.Min(10, commit.Length)]}: {files.Count} {noun}.";
 
-        return ChangeSet.ForWholeReview(label, _git.EmptyTree(_repository), afterTree, files, note);
+        return ChangeSet.ForWholeReview(label, _git.EmptyTree(_repository), afterTree, files, note, folder);
     }
 
     /// <summary>

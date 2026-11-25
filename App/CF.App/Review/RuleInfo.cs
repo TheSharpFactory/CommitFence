@@ -56,6 +56,8 @@ internal sealed class RuleInfo
                     return "From .editorconfig";
                 case FindingSource.Compiler:
                     return "From the compiler";
+                case FindingSource.Exemption:
+                    return "From an allow comment";
                 default:
                     return "From a rule pack";
             }

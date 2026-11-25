@@ -6,6 +6,7 @@ using Avalonia.Media;
 using Avalonia.Platform.Storage;
 using Avalonia.Threading;
 using Avalonia.VisualTree;
+using CF.App.Parts;
 
 namespace CF.App.Review;
 
@@ -15,17 +16,8 @@ namespace CF.App.Review;
 /// </summary>
 internal sealed partial class ReviewView : UserControl
 {
-    private const double _twoPanesFrom = 1304;
-    private const double _railWidth = 88;
-    private const double _oneColumnMost = 760;
-    private const double _twoColumnsMost = 1292;
-    private const double _sheetTop = 24;
-    private const double _sheetBottom = 32;
-    private const double _wheelStep = 50;
     private const double _folderButtonLeast = 180;
     private const double _folderButtonMost = 320;
-    private const double _blockMiddleAt = 0.4;
-    private const double _blockTopLeast = 32;
 
     private ReviewViewModel? _model;
 
@@ -33,7 +25,7 @@ internal sealed partial class ReviewView : UserControl
     {
         InitializeComponent();
         DataContextChanged += OnDataContextChanged;
-        SizeChanged += (_, e) => ApplyLayout(e.NewSize.Width + _railWidth);
+        SizeChanged += (_, e) => ApplyLayout(PageLayout.WindowWidthOf(e.NewSize.Width));
         Rows.AddHandler(ScrollViewer.ScrollChangedEvent, OnRowsScrolled);
         SidePanel.SizeChanged += (_, _) => KeepPanelInView();
         SidePanel.PointerWheelChanged += OnPanelWheel;
@@ -93,19 +85,19 @@ internal sealed partial class ReviewView : UserControl
             _ = _model.RefreshAsync();
         }
 
-        ApplyLayout(Bounds.Width + _railWidth);
+        ApplyLayout(PageLayout.WindowWidthOf(Bounds.Width));
     }
 
     private void ApplyLayout(double windowWidth)
     {
-        var twoPanes = windowWidth >= _twoPanesFrom;
+        var twoPanes = PageLayout.IsTwoPanes(windowWidth);
         Classes.Set("onepane", !twoPanes);
         if(_model != null)
             _model.IsOnePane = !twoPanes;
 
-        var side = twoPanes ? 32.0 : 24.0;
+        var side = PageLayout.Side(twoPanes);
         ((Border)Bar.Parent!).Padding = new Thickness(side, 4, side, 12);
-        Bar.MaxWidth = twoPanes ? _twoColumnsMost : _oneColumnMost;
+        Bar.MaxWidth = PageLayout.FrameMost(twoPanes);
         PlaceFolderButton(twoPanes);
     }
 
@@ -154,8 +146,7 @@ internal sealed partial class ReviewView : UserControl
         if(Scroller == null || !SidePanel.IsEffectivelyVisible)
             return;
 
-        var most = Math.Max(0, Scroller.Extent.Height - _sheetTop - _sheetBottom - SidePanel.Bounds.Height);
-        var shift = -Math.Max(0, Scroller.Offset.Y - most);
+        var shift = PageLayout.PanelShift(Scroller.Offset.Y, Scroller.Extent.Height, SidePanel.Bounds.Height);
         SidePanel.RenderTransform = new TranslateTransform(0, shift);
     }
 
@@ -168,7 +159,7 @@ internal sealed partial class ReviewView : UserControl
             return;
 
         var furthest = Math.Max(0, Scroller.Extent.Height - Scroller.Viewport.Height);
-        Scroller.Offset = new Vector(Scroller.Offset.X, Math.Clamp(Scroller.Offset.Y - (e.Delta.Y * _wheelStep), 0, furthest));
+        Scroller.Offset = new Vector(Scroller.Offset.X, Math.Clamp(Scroller.Offset.Y - (e.Delta.Y * PageLayout.WheelStep), 0, furthest));
         e.Handled = true;
     }
 
@@ -255,7 +246,7 @@ internal sealed partial class ReviewView : UserControl
         if(EmptyBlock.Bounds.Height <= 0 || EmptyBlockBody.Bounds.Height <= 0)
             return;
 
-        var top = Math.Max(_blockTopLeast, (EmptyBlock.Bounds.Height * _blockMiddleAt) - (EmptyBlockBody.Bounds.Height / 2));
+        var top = PageLayout.EmptyBlockTop(EmptyBlock.Bounds.Height, EmptyBlockBody.Bounds.Height);
         if(Math.Abs(EmptyBlockBody.Margin.Top - top) > 0.5)
             EmptyBlockBody.Margin = new Thickness(32, top, 32, 0);
     }

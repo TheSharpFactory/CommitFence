@@ -1,5 +1,6 @@
 using CF.Core.Code;
 using CF.Core.Ports;
+using CF.Core.Setup;
 using CF.Languages.CSharp.Catalog;
 using CF.Languages.CSharp.EditorConfig;
 using CF.Languages.CSharp.Meaning;
@@ -22,7 +23,9 @@ public sealed class CSharpLanguage : ILanguage
         var toolchain = new CSharpToolchain(processRunner, fileSystem, dataFolder);
         Toolchain = toolchain;
         Meaning = new CSharpMeaningSource(toolchain);
-        RepositoryRules = new EditorConfigRules(fileSystem, new DotnetTool(processRunner));
+        var dotnet = new DotnetTool(processRunner);
+        RepositoryRules = new EditorConfigRules(fileSystem, dotnet);
+        DoctorChecks = [new SdkDoctorCheck(Name, dotnet, fileSystem), new MeaningDoctorCheck(Name, fileSystem)];
     }
 
     /// <inheritdoc />
@@ -51,6 +54,24 @@ public sealed class CSharpLanguage : ILanguage
 
     /// <inheritdoc />
     public IRepositoryRules? RepositoryRules { get; }
+
+    /// <inheritdoc />
+    public IReadOnlyList<IDoctorCheck> DoctorChecks { get; }
+
+    /// <inheritdoc />
+    public IReadOnlyList<string> FileEndings { get; } = [".cs"];
+
+    /// <inheritdoc />
+    public string? FullReviewNote
+    {
+        get { return "A full review builds them with the repository's .NET SDK."; }
+    }
+
+    /// <inheritdoc />
+    public IReadOnlyList<SourceExemption> ReadExemptions(CodeFile file)
+    {
+        return CSharpExemptions.Read(file.Content);
+    }
 
     /// <inheritdoc />
     public bool OwnsFile(string path)

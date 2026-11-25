@@ -51,13 +51,13 @@ public sealed class RuleService : IRuleService
     /// <inheritdoc />
     public IReadOnlyList<FileRuleListing> ListFileRules(string settingsPath)
     {
-        return _fileRules.List(settingsPath);
+        return _fileRules.List(settingsPath, _settingsFile.ReadIfPresent(settingsPath)?.Strictness);
     }
 
     /// <inheritdoc />
     public FileRule? ShowFileRule(string settingsPath, string ruleId)
     {
-        return _fileRules.Find(settingsPath, ruleId);
+        return _fileRules.Find(settingsPath, ruleId, _settingsFile.ReadIfPresent(settingsPath)?.Strictness);
     }
 
     /// <inheritdoc />
@@ -203,7 +203,7 @@ public sealed class RuleService : IRuleService
 
     private RuleTryResult TryAfterChecking(string currentText, RuleSettings settings, IReadOnlyList<RuleDefinition> rules, RuleDefinition rule, string sourceText, string? fileName)
     {
-        _settingsSaver.CheckWouldSave(new RuleSettings(settings.Requires, rules, settings.Structure), NewlineOf(currentText));
+        _settingsSaver.CheckWouldSave(new RuleSettings(settings.Requires, rules, settings.Structure, settings.ConfiguredStrictness), NewlineOf(currentText));
 
         return Try(rule, sourceText, fileName);
     }
@@ -236,18 +236,8 @@ public sealed class RuleService : IRuleService
 
     private void WhileHoldingLock(string settingsPath, Action change)
     {
-        IDisposable held;
-        try
-        {
-            held = _settingsLock.Take(settingsPath);
-        }
-        catch(TimeoutException)
-        {
-            throw new RuleChangeException($"Another command is changing {settingsPath}. Run this one again.");
-        }
-
-        using(held)
-            change();
+        using var held = SettingsSaver.TakeLock(_settingsLock, settingsPath);
+        change();
     }
 
     private void Change(string settingsPath, string ruleId, Func<RuleDefinition, RuleDefinition> change)
@@ -272,7 +262,7 @@ public sealed class RuleService : IRuleService
 
     private void Save(string settingsPath, string currentText, RuleSettings settings, IReadOnlyList<RuleDefinition> rules)
     {
-        _settingsSaver.Save(settingsPath, currentText, new RuleSettings(settings.Requires, rules, settings.Structure), NewlineOf(currentText));
+        _settingsSaver.Save(settingsPath, currentText, new RuleSettings(settings.Requires, rules, settings.Structure, settings.ConfiguredStrictness));
     }
 
     private static string NewlineOf(string text)

@@ -31,9 +31,9 @@ internal static class Samples
         return new ReviewResult(outcome, findings ?? new List<Finding>(), coverage ?? new List<Coverage>(), new List<string>(), string.Empty, TimeSpan.FromSeconds(1.5), sources ?? new Dictionary<string, string>());
     }
 
-    public static OpenedFolder Folder(string path, bool insideRepository = true)
+    public static OpenedFolder Folder(string path, bool insideRepository = true, string name = "invoicing")
     {
-        return new OpenedFolder(path, Path.Combine(path, "commitfence.json"), File.Exists(Path.Combine(path, "commitfence.json")), "invoicing", insideRepository ? "main" : null, insideRepository);
+        return new OpenedFolder(path, Path.Combine(path, "commitfence.json"), File.Exists(Path.Combine(path, "commitfence.json")), name, insideRepository ? "main" : null, insideRepository);
     }
 
     /// <summary>

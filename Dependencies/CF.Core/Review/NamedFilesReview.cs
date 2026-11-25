@@ -47,6 +47,7 @@ public sealed class NamedFilesReview
             ReviewOne(file, settings.ActiveRules, run);
 
         ReportNotRun(settings, run);
+        run.ApplyPolicies(settings.Strictness);
 
         return run.ToResult(_clock.Now - started);
     }
@@ -69,6 +70,7 @@ public sealed class NamedFilesReview
         if(!settings.Structure.IsEmpty)
             run.AddNotRun(StructureRuleInfo.LayerDirectionId, "the layer directions compare the tree before a push with the tree after it, and a review of named files has neither");
 
+        StructureReview.ReportUnsupported(settings.Structure, run);
         AdviseHowToRunThem(run);
     }
 

@@ -62,6 +62,23 @@ internal sealed partial class RulePageViewModel : ObservableObject
     [ObservableProperty]
     public partial bool IsMoreOpen { get; set; }
 
+    /// <summary>
+    /// Where the rule was sent from to be narrowed, while it is: the strip above its sentence.
+    /// </summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasOrigin), nameof(OriginText))]
+    public partial NarrowOrigin? Origin { get; set; }
+
+    public bool HasOrigin
+    {
+        get { return Origin != null; }
+    }
+
+    public string OriginText
+    {
+        get { return Origin?.Text ?? string.Empty; }
+    }
+
     public RulePageViewModel(RuleCatalog catalog, IRuleChanges changes, string id, RuleDefinition? rule)
     {
         _catalog = catalog;
@@ -363,6 +380,28 @@ internal sealed partial class RulePageViewModel : ObservableObject
             DirtyChanged?.Invoke();
     }
 
+    /// <summary>
+    /// The rule is sent here from another screen to be narrowed: the strip says where from, and a new empty condition is added to its
+    /// where clause with its property picker open. Nothing is saved until "Save rule".
+    /// </summary>
+    public void BeginNarrowing(NarrowOrigin origin)
+    {
+        Origin = origin;
+        AddCondition();
+    }
+
+    [RelayCommand]
+    private void BackToOrigin()
+    {
+        foreach(var condition in WhereFlow.OfType<ConditionViewModel>())
+        {
+            condition.PropertyPicker.Close();
+            condition.ComparisonPicker.Close();
+        }
+
+        Origin?.Back();
+    }
+
     public void AddCondition()
     {
         var condition = new ConditionViewModel(this, ClauseKind.Where, null, false, new List<string>());
@@ -639,6 +678,7 @@ internal sealed partial class RulePageViewModel : ObservableObject
         _loading = false;
         _baselineSignature = Signature();
         RefreshPositions();
+        Origin = null;
         var changed = IsDirty;
         IsDirty = false;
         ErrorText = null;

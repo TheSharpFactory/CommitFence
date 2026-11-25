@@ -243,6 +243,13 @@ internal sealed class CSharpToolchain : IToolchain
         var restoreFailures = restorer.Restore(plan, graph, treeFolder);
         var evidenceKey = new EvidenceKey(_fileSystem, treeFolder, sdkVersion, _analyzer.Hash());
         var builder = new UnitBuilder(_fileSystem, _dotnet, treeFolder, logFolder, targetsPath, _analyzer.Path, evidenceKey, new KeptEvidence(_fileSystem, _dataFolder, treeFolder), isWholeReview);
-        new BuildWalker(builder, graph).Walk(plan, restoreFailures, report);
+        try
+        {
+            new BuildWalker(builder, graph).Walk(plan, restoreFailures, report);
+        }
+        finally
+        {
+            report.RanBuild = builder.RanBuild;
+        }
     }
 }

@@ -7,7 +7,7 @@ namespace CF.Adapters.Git;
 /// <summary>
 /// Answers the product's questions about a repository by running the git command, on git's own objects and refs.
 /// </summary>
-public sealed class GitCommandLine : IGit
+public sealed class GitCommandLine : IGit, IDoctorGit
 {
     private const string _endOfOptions = "--end-of-options";
     private const int _filesPerTextReading = 50;
@@ -326,6 +326,32 @@ public sealed class GitCommandLine : IGit
             return null;
 
         throw new GitException(GitRunner.Describe(new List<string> { "rev-parse" }, result));
+    }
+
+    /// <inheritdoc />
+    public string? ReadVersion()
+    {
+        return _git.ReadVersion();
+    }
+
+    /// <inheritdoc />
+    public string FindPrePushHook(RepositoryLocation repository)
+    {
+        var path = _git.RunChecked(repository, new List<string> { "rev-parse", "--path-format=absolute", "--git-path", "hooks/pre-push" });
+        return Path.GetFullPath(path.TrimEnd('\r', '\n'), repository.WorkFolder);
+    }
+
+    /// <inheritdoc />
+    public string? ReadHookSetting(RepositoryLocation repository, string key)
+    {
+        var arguments = new List<string> { "config", "--get", key };
+        var result = _git.Run(repository, arguments);
+        return result.ExitCode switch
+        {
+            0 => result.Output.TrimEnd('\r', '\n'),
+            1 => null,
+            _ => throw new GitException(GitRunner.Describe(arguments, result))
+        };
     }
 
     private static IReadOnlyList<string> SplitLines(string output)

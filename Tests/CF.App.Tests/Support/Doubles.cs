@@ -147,10 +147,18 @@ internal sealed class FakeUpdater : IUpdater
     /// </summary>
     public TaskCompletionSource InstallStarted { get; } = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
 
-    public Task<UpdateCheckResult> CheckAsync(CancellationToken cancellationToken)
+    /// <summary>
+    /// When set, a check waits for it before it answers.
+    /// </summary>
+    public TaskCompletionSource? HoldCheck { get; set; }
+
+    public async Task<UpdateCheckResult> CheckAsync(CancellationToken cancellationToken)
     {
         Checks++;
-        return Task.FromResult(Result);
+        if(HoldCheck != null)
+            await HoldCheck.Task;
+
+        return Result;
     }
 
     public string? FindProblem(ReleaseInfo release)

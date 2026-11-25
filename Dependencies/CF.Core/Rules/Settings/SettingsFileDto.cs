@@ -12,6 +12,9 @@ internal sealed class SettingsFileDto
     [JsonPropertyName("requires")]
     public string? Requires { get; set; }
 
+    [JsonPropertyName("strictness")]
+    public JsonElement Strictness { get; set; }
+
     [JsonPropertyName("rules")]
     public List<RuleDto>? Rules { get; set; }
 

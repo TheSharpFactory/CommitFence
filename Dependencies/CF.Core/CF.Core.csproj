@@ -6,4 +6,9 @@
     <InternalsVisibleTo Include="CF.App.Tests" />
   </ItemGroup>
 
+  <ItemGroup>
+    <!-- the notes of the running version are read from the changelog the build carries inside the program -->
+    <EmbeddedResource Include="..\..\CHANGELOG.md" LogicalName="CHANGELOG.md" />
+  </ItemGroup>
+
 </Project>

@@ -2,6 +2,7 @@ using Avalonia.Threading;
 using CF.Core.Code;
 using CF.Core.Findings;
 using CF.Core.Rules;
+using CF.Core.Rules.Settings;
 
 namespace CF.App.Rules;
 
@@ -43,6 +44,10 @@ internal sealed partial class RulesViewModel
         catch(RuleChangeException exception)
         {
             return new FileAnswer(null, exception.Message);
+        }
+        catch(SettingsException exception)
+        {
+            return new FileAnswer(null, SettingsFileName.FormatError(_folder.SettingsPath, exception));
         }
     }
 
@@ -134,7 +139,7 @@ internal sealed partial class RulesViewModel
 
     private static bool PassesFile(RuleFilter filter, FileRule rule)
     {
-        var place = rule.Main ?? (rule.Exceptions.Count > 0 ? rule.Exceptions[0] : null);
+        var place = rule.ListedPlace;
         return filter switch
         {
             RuleFilter.All => true,

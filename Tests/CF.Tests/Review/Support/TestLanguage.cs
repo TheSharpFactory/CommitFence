@@ -41,9 +41,16 @@ internal sealed class TestLanguage : ILanguage
         get { return null; }
     }
 
+    public IReadOnlyList<string> FileEndings { get; } = [".cs"];
+
     public bool OwnsFile(string path)
     {
         return path.EndsWith(".cs", StringComparison.OrdinalIgnoreCase);
+    }
+
+    public IReadOnlyList<SourceExemption> ReadExemptions(CodeFile file)
+    {
+        return CSharpExemptions.Read(file.Content);
     }
 }
 

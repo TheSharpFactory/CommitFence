@@ -121,7 +121,7 @@ public sealed class SettingsReader
 
         var structure = new StructureReader(positions).Read(file.Structure, "structure");
 
-        return new RuleSettings(file.Requires, rules, structure);
+        return new RuleSettings(file.Requires, rules, structure, new StrictnessReader(positions).Read(file.Strictness));
     }
 
     private static void RejectDuplicateId(List<RuleDefinition> earlier, RuleDefinition rule, string path, JsonPositions positions)

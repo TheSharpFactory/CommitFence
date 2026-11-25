@@ -10,7 +10,7 @@ namespace CF.Adapters.Git;
 /// It is moved so that files gone in the new tree disappear, unchanged files keep their time stamps and untracked files
 /// such as bin and obj stay. The developer's working folder, index, HEAD and stash are never touched.
 /// </remarks>
-public sealed class GitSnapshotStore : ISnapshotStore
+public sealed class GitSnapshotStore : ISnapshotStore, ISnapshotInspector
 {
     private readonly GitRunner _git;
     private readonly IDataFolder _dataFolder;
@@ -39,6 +39,57 @@ public sealed class GitSnapshotStore : ISnapshotStore
         {
             throw new GitException("the private copy cannot be written: " + exception.Message);
         }
+    }
+
+    /// <inheritdoc />
+    public PrivateCopyStatus Inspect(RepositoryLocation repository)
+    {
+        var folder = RepositoryDataFolder.For(_dataFolder.RootFolder, repository);
+        var lockPath = Path.Combine(folder, "lock");
+        if(!File.Exists(lockPath))
+            return InspectFiles(repository, folder);
+
+        FileStream held;
+        try
+        {
+            held = new FileStream(lockPath, FileMode.Open, FileAccess.Read, FileShare.None);
+        }
+        catch(FileNotFoundException)
+        {
+            return InspectFiles(repository, folder);
+        }
+        catch(IOException)
+        {
+            return new PrivateCopyStatus(PrivateCopyState.InUse, folder);
+        }
+
+        using(held)
+        {
+            return InspectFiles(repository, folder);
+        }
+    }
+
+    private PrivateCopyStatus InspectFiles(RepositoryLocation repository, string folder)
+    {
+        var tree = Path.Combine(folder, "tree");
+        var index = Path.Combine(folder, "index");
+        var hasTree = Directory.Exists(tree);
+        var hasIndex = File.Exists(index);
+        if(File.Exists(index + ".lock"))
+            return new PrivateCopyStatus(PrivateCopyState.IndexLocked, folder);
+
+        if(hasTree != hasIndex)
+            return new PrivateCopyStatus(PrivateCopyState.OutOfOrder, folder);
+
+        if(!hasIndex)
+            return new PrivateCopyStatus(PrivateCopyState.Absent, folder);
+
+        var environment = CreateEnvironment(tree, index);
+        var differences = _git.Run(repository, WithSettings(new List<string> { "diff-files", "--no-ext-diff", "--name-only", "-z" }), environment, null);
+        if(differences.ExitCode != 0 || differences.Output.Length != 0)
+            return new PrivateCopyStatus(PrivateCopyState.OutOfOrder, folder);
+
+        return new PrivateCopyStatus(PrivateCopyState.InOrder, folder, File.GetLastWriteTime(index));
     }
 
     private string Move(RepositoryLocation repository, string tree)

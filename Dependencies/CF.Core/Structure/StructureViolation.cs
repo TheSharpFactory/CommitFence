@@ -6,7 +6,7 @@ namespace CF.Core.Structure;
 /// One use that the layer directions do not allow.
 /// </summary>
 /// <remarks>
-/// Its identity is the file and the member that use, the type used and that type's assembly:
+/// Its identity is the direction, the file and the member that use, the type used and that type's assembly:
 /// it survives lines moving, and a second forbidden use in another member is another violation.
 /// </remarks>
 public sealed class StructureViolation
@@ -53,6 +53,11 @@ public sealed class StructureViolation
     /// </summary>
     public string Identity
     {
-        get { return string.Join("\u001f", Use.File, Use.Member, Use.UsedType, Use.UsedAssembly); }
+        get { return IdentityInFile(Use.File); }
+    }
+
+    internal string IdentityInFile(string path)
+    {
+        return string.Join("\u001f", FromModule, ToModule, path, Use.Member, Use.UsedType, Use.UsedAssembly);
     }
 }

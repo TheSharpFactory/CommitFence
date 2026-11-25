@@ -21,7 +21,12 @@ internal sealed class MeaningAnalyzerFile
         _fileSystem = fileSystem;
     }
 
-    public string Path { get; } = ToolchainPaths.Combine(AppContext.BaseDirectory, "analyzers/CF.Meaning.dll");
+    public string Path { get; } = PathBeside(AppContext.BaseDirectory);
+
+    public static string PathBeside(string programFolder)
+    {
+        return ToolchainPaths.Combine(programFolder, "analyzers/CF.Meaning.dll");
+    }
 
     public bool Exists()
     {

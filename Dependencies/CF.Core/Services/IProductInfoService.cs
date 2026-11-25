@@ -14,4 +14,12 @@ public interface IProductInfoService
     /// The version as written in the VERSION file.
     /// </summary>
     string Version { get; }
+
+    /// <summary>
+    /// The release notes of the version that runs, carried inside the program, or nothing when its changelog has no section for it.
+    /// </summary>
+    VersionNotes? Notes
+    {
+        get { return null; }
+    }
 }

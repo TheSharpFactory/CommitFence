@@ -195,7 +195,7 @@ internal sealed class ReviewHarness
         var fileSystem = new SystemFileSystem();
         var settingsFile = new SettingsFile(fileSystem, new SettingsReader(languages));
         var logs = new FolderLogs(dataFolder);
-        _review = new ChangeSetReview(languages, snapshots, new SettingsInTree(fileSystem, settingsFile, "1.0.0.0"), new FileReviewer(fileSystem, languages), new ToolchainStage(languages, logs), new StructureReview(git, snapshots, logs, settingsFile));
+        _review = new ChangeSetReview(languages, snapshots, new SettingsInTree(fileSystem, settingsFile, "1.0.0.0"), new FileReviewer(fileSystem, languages), new ToolchainStage(languages, logs), new StructureReview(git, snapshots, logs, settingsFile), git);
     }
 
     /// <summary>

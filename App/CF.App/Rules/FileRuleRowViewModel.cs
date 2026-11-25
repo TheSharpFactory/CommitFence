@@ -210,6 +210,9 @@ internal sealed partial class FileRuleRowViewModel : RuleListItemViewModel
     {
         get
         {
+            if(Rule.Main?.IsOffByStrictness == true)
+                return $"Off under the current strictness. {_fileName} sets it to {Rule.Setting} on line {Rule.Line}.";
+
             return $"Off for all {Rule.Language} files: {Rule.Setting}, on line {Rule.Line} of {_fileName}. Change it in the file.";
         }
     }
@@ -250,6 +253,9 @@ internal sealed partial class FileRuleRowViewModel : RuleListItemViewModel
             var title = Rule.Title == null ? string.Empty : $", {Rule.Title}";
             if(IsUnset)
                 return $"{Id}{title}. From {_fileName}, on and off set in the file. Not set for all {Rule.Language} files.";
+
+            if(Rule.Main?.IsOffByStrictness == true)
+                return $"{Id}{title}. From {_fileName}. Off under the current strictness.";
 
             if(IsOffInFile)
                 return $"{Id}{title}. From {_fileName}, on and off set in the file. Off in the file.";

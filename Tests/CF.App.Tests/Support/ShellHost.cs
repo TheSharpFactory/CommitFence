@@ -14,18 +14,20 @@ internal sealed class ShellHost : IDisposable
 {
     private readonly TestFolder _folder = new TestFolder();
 
-    public ShellHost(string settings = SettingsText.Four, IReadOnlyList<FileRule>? fileRules = null)
+    public ShellHost(string settings = SettingsText.Four, IReadOnlyList<FileRule>? fileRules = null, string repositoryName = "invoicing")
     {
-        RepositoryPath = Path.Combine(_folder.Path, "invoicing");
+        RepositoryPath = Path.Combine(_folder.Path, repositoryName);
         Directory.CreateDirectory(RepositoryPath);
         File.WriteAllText(Path.Combine(RepositoryPath, "commitfence.json"), settings);
         Rules = new RuleServiceDouble(Path.Combine(_folder.Path, "data"));
         if(fileRules != null)
             Rules.FileListings = new List<FileRuleListing> { new FileRuleListing("csharp", ".editorconfig", fileRules, new List<string>()) };
 
-        var services = new CommitFenceServices(new ProductInfoService(), Clock, new List<ILanguage>(), Rules, Review, null!, new FixedFolderService(Samples.Folder(RepositoryPath)), Updater, Record);
-        Model = new MainWindowViewModel(services, RepositoryPath);
+        Services = new CommitFenceServices(new ProductInfoService(), Clock, new List<ILanguage>(), Rules, Review, null!, new FixedFolderService(Samples.Folder(RepositoryPath, name: repositoryName)), Updater, Record, Doctor, SettingsService, Structure, Languages, Machine, Exemptions, Stats);
+        Model = new MainWindowViewModel(Services, RepositoryPath);
     }
+
+    public CommitFenceServices Services { get; }
 
     public string RepositoryPath { get; }
 
@@ -38,6 +40,20 @@ internal sealed class ShellHost : IDisposable
     public FakeUpdater Updater { get; } = new FakeUpdater();
 
     public MemoryCheckRecord Record { get; } = new MemoryCheckRecord();
+
+    public FakeDoctorService Doctor { get; } = new FakeDoctorService();
+
+    public FakeSettingsService SettingsService { get; } = new FakeSettingsService();
+
+    public FakeLanguageService Languages { get; } = new FakeLanguageService();
+
+    public MemoryMachineSettings Machine { get; } = new MemoryMachineSettings();
+
+    public FakeStructureService Structure { get; } = new FakeStructureService();
+
+    public FakeExemptionService Exemptions { get; } = new FakeExemptionService();
+
+    public FakeStatsService Stats { get; } = new FakeStatsService();
 
     public MainWindowViewModel Model { get; }
 

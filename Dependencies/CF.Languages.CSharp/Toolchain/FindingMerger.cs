@@ -20,7 +20,7 @@ internal static class FindingMerger
         var projects = JoinDistinct(group.Select(finding => finding.Project));
         var frameworks = JoinDistinct(group.Select(finding => finding.TargetFramework));
 
-        return new Finding(first.RuleId, first.Source, first.Severity, first.Language, projects, frameworks, first.File, first.Line, first.Column, first.Message, first.Why, first.Reach);
+        return first.HoldingFor(projects, frameworks);
     }
 
     private static string? JoinDistinct(IEnumerable<string?> values)

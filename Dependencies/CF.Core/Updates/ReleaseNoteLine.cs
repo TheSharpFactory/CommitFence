@@ -11,6 +11,11 @@ public sealed class ReleaseNoteLine
     public required string Text { get; init; }
 
     /// <summary>
+    /// The text of the line with its bold (**) and code (backtick) marks kept, for a view that draws them. A heading has none.
+    /// </summary>
+    public string Marked { get; init; } = string.Empty;
+
+    /// <summary>
     /// Whether the line is a heading.
     /// </summary>
     public bool IsHeading { get; init; }

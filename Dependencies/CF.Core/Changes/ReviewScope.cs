@@ -1,3 +1,5 @@
+using CF.Core.Ports;
+
 namespace CF.Core.Changes;
 
 /// <summary>
@@ -21,6 +23,15 @@ public sealed class ReviewScope
     /// Which kind of scope this is.
     /// </summary>
     public ScopeKind Kind { get; }
+
+    /// <summary>Which entry point asked for a push review.</summary>
+    public ReviewSource Source { get; private init; }
+
+    /// <summary>Supplies the entry point without changing what is under review.</summary>
+    public ReviewScope WithSource(ReviewSource source)
+    {
+        return new ReviewScope(Kind, RemoteName, RemoteUrl, PushedRefs, BaseRevision, HeadRevision, TargetPath) { Source = source };
+    }
 
     /// <summary>
     /// For a push: the name of the remote, as git gives it to the hook.

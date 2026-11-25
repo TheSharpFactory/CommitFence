@@ -15,6 +15,12 @@ internal sealed class StructureDto
     [JsonPropertyName("directions")]
     public DirectionsDto? Directions { get; set; }
 
+    [JsonPropertyName("references")]
+    public List<JsonElement>? References { get; set; }
+
+    [JsonPropertyName("layout")]
+    public List<JsonElement>? Layout { get; set; }
+
     [JsonExtensionData]
     public Dictionary<string, JsonElement>? UnknownKeys { get; set; }
 }

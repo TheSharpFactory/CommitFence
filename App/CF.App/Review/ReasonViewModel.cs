@@ -12,13 +12,17 @@ namespace CF.App.Review;
 internal sealed partial class ReasonViewModel : ObservableObject
 {
     private const int _longestPathParts = 3;
+    private const string _machineNotReady = "The machine is not ready";
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(SpokenName))]
     public partial bool IsOpen { get; set; }
 
-    public ReasonViewModel(string about, string failed, string? message, bool startsOpen)
+    private readonly Action? _openDoctor;
+
+    public ReasonViewModel(string about, string failed, string? message, bool startsOpen, Action? openDoctor = null)
     {
+        _openDoctor = openDoctor;
         About = about;
         Failed = failed;
         Message = message ?? string.Empty;
@@ -26,6 +30,14 @@ internal sealed partial class ReasonViewModel : ObservableObject
     }
 
     public string About { get; }
+
+    /// <summary>
+    /// The machine is not ready: the opened part offers "Open Doctor".
+    /// </summary>
+    public bool OpensDoctor
+    {
+        get { return _openDoctor != null && HasMessage; }
+    }
 
     public string Failed { get; }
 
@@ -60,12 +72,12 @@ internal sealed partial class ReasonViewModel : ObservableObject
     /// Cuts the body's string into its three parts. What it is about is the part before the first colon and space; of the rest,
     /// the part up to its first colon and space is what failed (its first letter raised) and the part after is the message.
     /// </summary>
-    public static ReasonViewModel Parse(string about, string reason, bool startsOpen)
+    public static ReasonViewModel Parse(string about, string reason, bool startsOpen, Action? openDoctor = null)
     {
         var split = reason.IndexOf(": ", StringComparison.Ordinal);
         var failed = split < 0 ? reason : reason.Substring(0, split);
         var message = split < 0 ? null : reason.Substring(split + 2).Trim();
-        return new ReasonViewModel(CutPaths(about), Raise(CutPaths(failed)), message == null || message.Length == 0 ? null : CutPaths(message), startsOpen);
+        return new ReasonViewModel(CutPaths(about), Raise(CutPaths(failed)), message == null || message.Length == 0 ? null : CutPaths(message), startsOpen, reason.StartsWith(_machineNotReady, StringComparison.Ordinal) ? openDoctor : null);
     }
 
     /// <summary>
@@ -93,6 +105,12 @@ internal sealed partial class ReasonViewModel : ObservableObject
 
     [GeneratedRegex(@"(?:(?<![A-Za-z0-9])[A-Za-z]:\\|(?<![A-Za-z0-9.\)])/)(?:[^\\/\s'""<>|:()]+[\\/])+[^\\/\s'""<>|:()]*")]
     private static partial Regex PathPattern();
+
+    [RelayCommand]
+    private void OpenDoctor()
+    {
+        _openDoctor?.Invoke();
+    }
 
     [RelayCommand]
     private void Toggle()

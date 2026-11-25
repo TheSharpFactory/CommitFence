@@ -200,6 +200,9 @@
     <Setter Property="Foreground" Value="{DynamicResource ink}"/>
     <Setter Property="FontWeight" Value="SemiBold"/>
   </Style>
+  <Style Selector="ListBox.segmented ListBoxItem:disabled TextBlock.segment">
+    <Setter Property="Foreground" Value="{DynamicResource ink-disabled}"/>
+  </Style>
   <Style Selector="ListBox.segmented TextBlock.segment-count">
     <Setter Property="Foreground" Value="{DynamicResource ink-2}"/>
   </Style>

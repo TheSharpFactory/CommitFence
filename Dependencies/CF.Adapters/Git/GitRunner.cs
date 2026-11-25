@@ -31,6 +31,20 @@ internal sealed class GitRunner
         _processRunner = processRunner;
     }
 
+    public string? ReadVersion()
+    {
+        var arguments = new List<string> { "--version" };
+        var result = _processRunner.Run(new ProcessRequest(_gitProgram, arguments, null, _baseEnvironment, null, GitTimeLimits.Query));
+        if(result.ExitCode == -1)
+            return null;
+
+        const string prefix = "git version ";
+        if(result.ExitCode == 0 && result.Output.StartsWith(prefix, StringComparison.Ordinal))
+            return result.Output.Substring(prefix.Length).Trim();
+
+        throw new GitException(Describe(arguments, result));
+    }
+
     public ProcessResult Run(RepositoryLocation repository, IReadOnlyList<string> arguments)
     {
         return Run(repository, arguments, new Dictionary<string, string?>(), null);

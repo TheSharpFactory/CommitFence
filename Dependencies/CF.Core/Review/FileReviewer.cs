@@ -49,7 +49,7 @@ public sealed class FileReviewer
             return null;
 
         var codeFile = new CodeFile(path, language.Id, content);
-        run.RememberSource(path, content);
+        run.RememberSource(language, codeFile, changedLines);
         var ways = readings.Count > 0 ? ReadingRules.Read(language, codeFile, readings, run) : ReadAsWritten(language, codeFile, run);
         if(ways == null)
             return null;

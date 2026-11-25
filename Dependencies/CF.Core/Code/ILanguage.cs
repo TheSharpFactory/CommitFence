@@ -1,3 +1,5 @@
+using CF.Core.Setup;
+
 namespace CF.Core.Code;
 
 /// <summary>
@@ -44,4 +46,32 @@ public interface ILanguage
     /// Whether the file at this path is a source file of the language, judged by its name alone.
     /// </summary>
     bool OwnsFile(string path);
+
+    /// <summary>
+    /// The endings of the file names the language owns, such as .cs, for the people who read what a build covers.
+    /// </summary>
+    IReadOnlyList<string> FileEndings
+    {
+        get { return []; }
+    }
+
+    /// <summary>
+    /// One sentence about what a full review does with the language's files, or nothing when there is nothing to add.
+    /// </summary>
+    string? FullReviewNote
+    {
+        get { return null; }
+    }
+
+    /// <summary>Reads the source exemptions for one file, including forms handled by the language's tools.</summary>
+    IReadOnlyList<SourceExemption> ReadExemptions(CodeFile file)
+    {
+        return [];
+    }
+
+    /// <summary>The language's readiness checks, in order.</summary>
+    IReadOnlyList<IDoctorCheck> DoctorChecks
+    {
+        get { return []; }
+    }
 }

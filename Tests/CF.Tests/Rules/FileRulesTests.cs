@@ -1,6 +1,7 @@
 using CF.Adapters.Machine;
 using CF.Core.Code;
 using CF.Core.Review;
+using CF.Core.Rules;
 using CF.Languages.CSharp.EditorConfig;
 using CF.Languages.CSharp.Toolchain;
 using CF.Tests.Rules.Support;
@@ -134,6 +135,20 @@ public sealed class FileRulesTests
         }, detail.Output.Split(Environment.NewLine, StringSplitOptions.RemoveEmptyEntries));
     }
 
+    [Fact]
+    public void ListMapsTheMainSettingAndEachException()
+    {
+        using var fixture = new RulesFixture("""{"strictness":"strict","rules":[]}""");
+        ScopedRule(fixture, "*.cs:error,tests/*.cs:warning,*.g.cs:none");
+
+        var result = fixture.Commands.Run("rules", "list");
+
+        Assert.Equal(ExitCode.Passed, result.ExitCode);
+        AssertLine(result.Output, "ZZ1000", "on", "blocks", "line 2");
+        Assert.Contains("blocks for tests/*.cs, line 4", result.Output, StringComparison.Ordinal);
+        Assert.Contains("off for *.g.cs, line 6", result.Output, StringComparison.Ordinal);
+    }
+
     private static FileRule ScopedRule(RulesFixture fixture, string settings)
     {
         fixture.Write(".editorconfig", string.Join("\n", settings.Split(',').Select(pair => pair.Split(':')).Select(parts => $"[{parts[0]}]\ndotnet_diagnostic.ZZ1000.severity = {parts[1]}")));
@@ -187,7 +202,11 @@ public sealed class FileRulesTests
     [Fact]
     public void SeverityVocabularyDescribesTheEffect()
     {
-        var described = new[] { "error", "Warning", "suggestion", "none", "silent", "default", "bogus", string.Empty }.Select(word => $"{word}:{SeverityWords.StateOf(word)}:{SeverityWords.SeverityOf(word)}").ToList();
+        var described = new[] { "error", "Warning", "suggestion", "none", "silent", "default", "bogus", string.Empty }.Select(word =>
+        {
+            var effect = Strictness.Standard.EffectOf(word);
+            return $"{word}:{FileRulePlace.StateOf(word)}:{effect}";
+        }).ToList();
 
         Assert.Equal(
             new[] { "error:On:Block", "Warning:On:Warn", "suggestion:On:Warn", "none:Off:", "silent:Off:", "default:OwnDefault:", "bogus:NotUnderstood:", ":NotUnderstood:" },

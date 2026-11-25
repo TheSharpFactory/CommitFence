@@ -1,4 +1,5 @@
 using System.Text;
+using System.Text.Json;
 using CF.Core.Findings;
 using CF.Core.Structure;
 
@@ -28,11 +29,27 @@ internal sealed class SettingsWriter
         if(settings.Requires != null)
             parts.Add(_indent + "\"requires\": " + JsonText.Quote(settings.Requires));
 
+        if(settings.ConfiguredStrictness != null)
+            parts.Add(_indent + "\"strictness\": " + WriteStrictness(settings.ConfiguredStrictness));
+
         parts.Add(WriteRules(settings.Rules));
-        if(settings.Structure.Modules.Count > 0)
-            parts.Add(WriteStructure(settings.Structure));
+        if(settings.Structure != StructureRules.None)
+            parts.Add(_indent + "\"structure\": " + WriteStructure(settings.Structure));
 
         return "{" + _newline + string.Join("," + _newline, parts) + _newline + "}" + _newline;
+    }
+
+    private static string WriteStrictness(Strictness strictness)
+    {
+        if(strictness.Preset != StrictnessPreset.Custom)
+            return JsonText.Quote(strictness.Preset.ToString().ToLowerInvariant());
+
+        return $"{{ \"error\": {WriteEffect(strictness.Error)}, \"warning\": {WriteEffect(strictness.Warning)}, \"suggestion\": {WriteEffect(strictness.Suggestion)} }}";
+    }
+
+    private static string WriteEffect(Severity? effect)
+    {
+        return JsonText.Quote(effect?.ToString().ToLowerInvariant() ?? "off");
     }
 
     private string WriteRules(IReadOnlyList<RuleDefinition> rules)
@@ -101,42 +118,84 @@ internal sealed class SettingsWriter
         return name + ": " + JsonText.Value(condition.ExpectedValues[0]);
     }
 
-    private string WriteStructure(StructureRules structure)
+    public string ReplaceStructure(string settingsText, StructureRules structure)
     {
-        var builder = new StringBuilder();
-        builder.Append(_indent + "\"structure\": {" + _newline);
-        builder.Append(_indent + _indent + "\"modules\": {" + _newline);
-        builder.Append(string.Join("," + _newline, structure.Modules.Select(WriteModule)) + _newline);
-        builder.Append(_indent + _indent + "}," + _newline);
-        builder.Append(_indent + _indent + "\"directions\": {" + _newline);
-        builder.Append(WriteDirections(structure.Directions) + _newline);
-        builder.Append(_indent + _indent + "}" + _newline);
-        builder.Append(_indent + "}");
+        var bytes = Encoding.UTF8.GetBytes(settingsText);
+        var reader = new Utf8JsonReader(bytes);
+        reader.Read();
+        var insertAt = (int)reader.BytesConsumed;
+        var hasProperties = false;
+        while(reader.Read() && reader.TokenType == JsonTokenType.PropertyName)
+        {
+            var isStructure = reader.ValueTextEquals("structure"u8);
+            reader.Read();
+            var start = (int)reader.TokenStartIndex;
+            reader.Skip();
+            insertAt = (int)reader.BytesConsumed;
+            if(isStructure)
+                return Encoding.UTF8.GetString(bytes.AsSpan(0, start)) + WriteStructure(structure) + Encoding.UTF8.GetString(bytes.AsSpan(insertAt));
 
-        return builder.ToString();
+            hasProperties = true;
+        }
+
+        var separator = hasProperties ? "," : string.Empty;
+        var suffix = Encoding.UTF8.GetString(bytes.AsSpan(insertAt));
+        if(!suffix.StartsWith(_newline, StringComparison.Ordinal))
+            suffix = _newline + suffix;
+
+        return Encoding.UTF8.GetString(bytes.AsSpan(0, insertAt)) + separator + _newline + _indent
+            + "\"structure\": " + WriteStructure(structure) + suffix;
+    }
+
+    public string WriteStructure(StructureRules structure)
+    {
+        var fields = new List<string>
+        {
+            "\"modules\": " + WriteObject(structure.Modules.Select(WriteModule), _indent + _indent),
+            "\"directions\": " + WriteDirections(structure.Directions)
+        };
+        if(structure.References != null)
+            fields.Add("\"references\": " + JsonText.InlineArray(structure.References.Select(rule => rule.GetRawText())));
+
+        if(structure.Layout != null)
+            fields.Add("\"layout\": " + JsonText.InlineArray(structure.Layout.Select(rule => rule.GetRawText())));
+
+        return WriteObject(fields, _indent);
+    }
+
+    private string WriteObject(IEnumerable<string> fields, string indent)
+    {
+        var lines = string.Join("," + _newline, fields.Select(field => indent + _indent + field));
+        return lines.Length == 0 ? "{}" : "{" + _newline + lines + _newline + indent + "}";
     }
 
     private string WriteModule(ModuleDefinition module)
     {
-        var selectors = JsonText.InlineArray(module.Selectors.Select(selector => JsonText.Quote(selector.ToString())));
-        return _indent + _indent + _indent + JsonText.Quote(module.Name) + ": " + selectors;
+        var selectors = module.Selectors.Count == 0 ? "[]" : JsonText.InlineArray(module.Selectors.Select(selector => JsonText.Quote(selector.ToString())));
+        return JsonText.Quote(module.Name) + ": " + selectors;
     }
 
     private string WriteDirections(LayerDirections directions)
     {
         var lists = new List<string>();
-        if(directions.Allow.Count > 0)
+        if(directions.HasAllowList)
             lists.Add(WritePairs("allow", directions.Allow));
 
-        if(directions.Forbid.Count > 0)
+        if(directions.HasForbidList)
             lists.Add(WritePairs("forbid", directions.Forbid));
 
-        return string.Join("," + _newline, lists);
+        if(directions.NoCycles is { } noCycles)
+            lists.Add("\"noCycles\": " + (noCycles ? "true" : "false"));
+
+        return WriteObject(lists, _indent + _indent);
     }
 
     private string WritePairs(string key, IReadOnlyList<ModulePair> pairs)
     {
+        if(pairs.Count == 0)
+            return $"\"{key}\": []";
+
         var lines = pairs.Select(pair => _indent + _indent + _indent + _indent + JsonText.Quote(pair.ToString()));
-        return _indent + _indent + _indent + $"\"{key}\": [" + _newline + string.Join("," + _newline, lines) + _newline + _indent + _indent + _indent + "]";
+        return $"\"{key}\": [" + _newline + string.Join("," + _newline, lines) + _newline + _indent + _indent + _indent + "]";
     }
 }

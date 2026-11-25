@@ -1,0 +1,184 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:parts="using:CF.App.Parts"
+             xmlns:review="using:CF.App.Review"
+             xmlns:screen="using:CF.App.Doctor"
+             x:Class="CF.App.Doctor.DoctorView"
+             x:ClassModifier="internal"
+             x:DataType="screen:DoctorViewModel">
+
+  <!-- The Doctor screen in the frame of the five screens: the verdict with "Check again" at the right end of its first line, the
+       checks in groups, each a row with its mark, and, beside them from 1304 wide (after them in one pane), the panel "This machine".
+       A check that fails is always open: its fix, the lines of the file it is about, and its buttons. -->
+  <UserControl.Styles>
+    <Style Selector="Border.verdictbadge">
+      <Setter Property="Width" Value="44"/>
+      <Setter Property="Height" Value="44"/>
+      <Setter Property="CornerRadius" Value="13"/>
+    </Style>
+    <Style Selector="Border.verdictbadge.ready">
+      <Setter Property="Background" Value="{DynamicResource req-ink}"/>
+    </Style>
+    <Style Selector="Border.verdictbadge.fails">
+      <Setter Property="Background" Value="{DynamicResource block}"/>
+    </Style>
+    <Style Selector="Border.verdictbadge.unfinished">
+      <Setter Property="Background" Value="{DynamicResource solid}"/>
+    </Style>
+    <Style Selector="Border.verdictbadge.running">
+      <Setter Property="Background" Value="{DynamicResource hover}"/>
+    </Style>
+  </UserControl.Styles>
+
+  <parts:ScreenFrame Name="Frame" Title="Doctor" Meta="{Binding Meta}">
+    <parts:ScreenFrame.Main>
+      <StackPanel>
+
+        <!-- The verdict: the badge, the heading, and "Check again" at the right end of the line, centred on the badge. -->
+        <Grid ColumnDefinitions="Auto,*,Auto" MinHeight="44">
+          <Border Classes="verdictbadge" Classes.ready="{Binding IsReady}" Classes.fails="{Binding HasFailures}"
+                  Classes.unfinished="{Binding IsUnfinished}" Classes.running="{Binding IsRunning}" Margin="0,0,14,0">
+            <Panel>
+              <parts:Icon Data="{StaticResource i-check}" Width="24" Height="24" StrokeThickness="2.4" Stroke="{DynamicResource page}"
+                          IsVisible="{Binding IsReady}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+              <parts:Icon Data="{StaticResource i-x}" Width="24" Height="24" StrokeThickness="2.6" Stroke="{DynamicResource on-block}"
+                          IsVisible="{Binding HasFailures}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+              <parts:Icon Data="{StaticResource i-off}" Width="24" Height="24" StrokeThickness="1.8" Stroke="{DynamicResource on-solid}"
+                          IsVisible="{Binding IsUnfinished}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+              <parts:TurningRing Width="24" Height="24" IsVisible="{Binding IsRunning}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+            </Panel>
+          </Border>
+          <TextBlock Grid.Column="1" Theme="{StaticResource type-verdict}" VerticalAlignment="Center" Text="{Binding Heading}"/>
+          <Button Grid.Column="2" Name="CheckAgainButton" Classes="cf outlined" Margin="14,0,0,0" VerticalAlignment="Center"
+                  Command="{Binding AgainCommand}" AutomationProperties.Name="Check again">
+            <TextBlock Theme="{StaticResource type-body-strong}" Text="Check again"/>
+          </Button>
+        </Grid>
+
+        <screen:DoctorTextBlock Theme="{StaticResource type-lead}" Foreground="{DynamicResource ink-2}" MaxWidth="760" HorizontalAlignment="Left"
+                                Margin="0,12,0,0" Parts="{Binding Sentence}"/>
+
+        <StackPanel Orientation="Horizontal" Spacing="20" Margin="0,14,0,0" IsVisible="{Binding HasFacts}">
+          <StackPanel Orientation="Horizontal" Spacing="6">
+            <parts:Icon Data="{StaticResource i-doc}" Width="15" Height="15" Stroke="{DynamicResource ink-3}" VerticalAlignment="Center"/>
+            <TextBlock Theme="{StaticResource type-body}" Foreground="{DynamicResource ink-2}" FontFeatures="+tnum" VerticalAlignment="Center" Text="{Binding ChecksText}"/>
+          </StackPanel>
+          <StackPanel Orientation="Horizontal" Spacing="6">
+            <parts:Icon Data="{StaticResource i-time}" Width="15" Height="15" Stroke="{DynamicResource ink-3}" VerticalAlignment="Center"/>
+            <TextBlock Theme="{StaticResource type-body}" Foreground="{DynamicResource ink-2}" FontFeatures="+tnum" VerticalAlignment="Center" Text="{Binding CheckedText}"/>
+          </StackPanel>
+        </StackPanel>
+
+        <!-- The groups, 28 apart, in the order the checks come. -->
+        <ItemsControl Name="GroupList" ItemsSource="{Binding Groups}" Focusable="False">
+          <ItemsControl.ItemTemplate>
+            <DataTemplate DataType="screen:DoctorGroupViewModel" x:DataType="screen:DoctorGroupViewModel">
+              <StackPanel Margin="0,28,0,0">
+                <Border MinHeight="36" Padding="8,0,0,4">
+                  <TextBlock Theme="{StaticResource type-h3}" VerticalAlignment="Center" Text="{Binding Name}"/>
+                </Border>
+                <Border BorderBrush="{DynamicResource line}" BorderThickness="0,1,0,0">
+                  <ItemsControl ItemsSource="{Binding Checks}" Focusable="False">
+                    <ItemsControl.ItemTemplate>
+                      <DataTemplate DataType="screen:DoctorCheckViewModel" x:DataType="screen:DoctorCheckViewModel">
+                        <Border BorderBrush="{DynamicResource line}" BorderThickness="0,0,0,1" AutomationProperties.Name="{Binding SpokenName}">
+                          <StackPanel>
+
+                            <!-- The check: its mark, its title, and what was found. A passing check is not a control. -->
+                            <Grid ColumnDefinitions="24,*" ColumnSpacing="12" Margin="8,12,12,12">
+                              <Panel Height="24" VerticalAlignment="Top">
+                                <Border IsVisible="{Binding ShowsPass}" Width="20" Height="20" CornerRadius="6" Background="{DynamicResource req-ink}"
+                                        HorizontalAlignment="Center" VerticalAlignment="Top">
+                                  <parts:Icon Data="{StaticResource i-check}" Width="12" Height="12" StrokeThickness="2.8" Stroke="{DynamicResource page}"
+                                              HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                </Border>
+                                <Border IsVisible="{Binding ShowsFailure}" Width="24" Height="24" CornerRadius="7" Background="{DynamicResource block}"
+                                        Margin="0,-2,0,0" VerticalAlignment="Top">
+                                  <parts:Icon Data="{StaticResource i-x}" Width="14" Height="14" StrokeThickness="2.4" Stroke="{DynamicResource on-block}"
+                                              HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                </Border>
+                                <parts:Icon IsVisible="{Binding ShowsNotChecked}" Data="{StaticResource i-off}" Width="16" Height="16" Stroke="{DynamicResource off}"
+                                            HorizontalAlignment="Center" VerticalAlignment="Top" Margin="0,2,0,0"/>
+                                <parts:TurningRing IsVisible="{Binding ShowsRing}" Width="14" Height="14" HorizontalAlignment="Center" VerticalAlignment="Top" Margin="0,3,0,0"/>
+                              </Panel>
+                              <StackPanel Grid.Column="1" Spacing="2">
+                                <TextBlock Theme="{StaticResource type-body-strong}" TextWrapping="Wrap" Text="{Binding Title}"/>
+                                <screen:DoctorTextBlock Theme="{StaticResource type-body}" Foreground="{DynamicResource ink-2}" Parts="{Binding Found}"/>
+                              </StackPanel>
+                            </Grid>
+
+                            <!-- The fix of a failing check, always open, in the line of the title. -->
+                            <StackPanel IsVisible="{Binding HasFix}" Margin="44,0,12,18">
+                              <screen:DoctorTextBlock Theme="{StaticResource type-body}" Foreground="{DynamicResource ink-2}" MaxWidth="640"
+                                                      HorizontalAlignment="Left" Parts="{Binding FixText}"/>
+                              <Border IsVisible="{Binding HasLines}" Margin="0,12,0,0" Background="{DynamicResource page}" BorderBrush="{DynamicResource line}"
+                                      BorderThickness="1" CornerRadius="12" Padding="0,8" ClipToBounds="True">
+                                <parts:FileLines ItemsSource="{Binding Lines}" NumberWidth="30" NumberGap="14"/>
+                              </Border>
+                              <ItemsControl IsVisible="{Binding HasActions}" ItemsSource="{Binding Actions}" Margin="0,16,0,0" Focusable="False">
+                                <ItemsControl.ItemsPanel>
+                                  <ItemsPanelTemplate>
+                                    <WrapPanel Orientation="Horizontal" ItemSpacing="8" LineSpacing="8"/>
+                                  </ItemsPanelTemplate>
+                                </ItemsControl.ItemsPanel>
+                                <ItemsControl.ItemTemplate>
+                                  <DataTemplate DataType="screen:DoctorActionViewModel" x:DataType="screen:DoctorActionViewModel">
+                                    <Panel>
+                                      <Panel IsVisible="{Binding IsCopy}">
+                                        <review:CopyButton DataContext="{Binding Copy}"/>
+                                      </Panel>
+                                      <Button IsVisible="{Binding IsOpen}" Classes="cf outlined" Command="{Binding OpenCommand}" AutomationProperties.Name="{Binding Label}">
+                                        <StackPanel Orientation="Horizontal" Spacing="8">
+                                          <parts:Icon Data="{StaticResource i-open}" Width="16" Height="16" Stroke="{Binding $parent[Button].Foreground}"/>
+                                          <TextBlock Theme="{StaticResource type-body-strong}" Text="{Binding Label}"/>
+                                        </StackPanel>
+                                      </Button>
+                                    </Panel>
+                                  </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                              </ItemsControl>
+                            </StackPanel>
+
+                          </StackPanel>
+                        </Border>
+                      </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                  </ItemsControl>
+                </Border>
+              </StackPanel>
+            </DataTemplate>
+          </ItemsControl.ItemTemplate>
+        </ItemsControl>
+
+        <!-- In one pane "This machine" stands here, 40 below the checks. -->
+        <parts:PanelPlace Name="MachinePlace"/>
+
+      </StackPanel>
+    </parts:ScreenFrame.Main>
+
+    <parts:ScreenFrame.Panel>
+      <StackPanel Name="MachinePanel">
+        <TextBlock Theme="{StaticResource type-h3}" Margin="10,0,10,4" Text="This machine"/>
+        <ItemsControl ItemsSource="{Binding Machine}" Focusable="False">
+          <ItemsControl.ItemTemplate>
+            <DataTemplate DataType="screen:MachineRowViewModel" x:DataType="screen:MachineRowViewModel">
+              <StackPanel AutomationProperties.Name="{Binding SpokenName}">
+                <Grid ColumnDefinitions="72,*" ColumnSpacing="12" Margin="10,8">
+                  <TextBlock Theme="{StaticResource type-meta}" Foreground="{DynamicResource ink-2}" Margin="0,1,0,0" Text="{Binding Name}"/>
+                  <screen:MachineValueText Grid.Column="1" Theme="{StaticResource code}" Foreground="{DynamicResource ink}" TextWrapping="Wrap"
+                                           IsVisible="{Binding IsKnown}" Value="{Binding Value}"/>
+                  <TextBlock Grid.Column="1" Theme="{StaticResource type-meta}" Foreground="{DynamicResource ink-2}" Margin="0,1,0,0"
+                             IsVisible="{Binding IsUnknown}" Text="Unknown"/>
+                </Grid>
+                <Border Height="1" Background="{DynamicResource line}" IsVisible="{Binding HasLine}"/>
+              </StackPanel>
+            </DataTemplate>
+          </ItemsControl.ItemTemplate>
+        </ItemsControl>
+        <TextBlock Theme="{StaticResource type-meta}" Foreground="{DynamicResource ink-2}" TextWrapping="Wrap" Margin="10,10,10,4"
+                   Text="What the checks found about this machine. Quote it when you ask why a review cannot finish."/>
+      </StackPanel>
+    </parts:ScreenFrame.Panel>
+  </parts:ScreenFrame>
+
+</UserControl>

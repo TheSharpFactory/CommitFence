@@ -9,8 +9,8 @@ namespace CF.Core.Code;
 public interface IRepositoryRules
 {
     /// <summary>
-    /// The rules the files of the repository folder set. Throws a <see cref="RepositoryRulesException" /> when a file
-    /// exists and cannot be read.
+    /// The settings the repository's files give its rules, before push effects are assigned. Throws a
+    /// <see cref="RepositoryRulesException" /> when a file exists and cannot be read.
     /// </summary>
     FileRuleListing Read(string repositoryFolder);
 }

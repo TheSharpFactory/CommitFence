@@ -20,9 +20,13 @@ internal static class CliApplication
         {
             var services = CompositionRoot.Create();
 
+            var runner = new CommandRunner(services.ProductInfo, services.Rules, services.Review, services.Setup, services.Updater, environment, services.Doctor, services.Settings, services.Structure, services.Clock, services.Exemptions, services.Stats);
+            if(args.Length > 0 && args[0] == CommandRunner.DoctorCommandName)
+                return runner.Run(args);
+
             // what an earlier update left beside the program; one try, a review must not wait for it
             services.Updater.CleanUpAsync(1).GetAwaiter().GetResult();
-            var exitCode = new CommandRunner(services.ProductInfo, services.Rules, services.Review, services.Setup, services.Updater, environment).Run(args);
+            var exitCode = runner.Run(args);
 
             // after the command's own work, so it never delays it
             new UpdateNotice(services.Updater, services.UpdateChecks, services.Clock, environment).ShowIfDue(args);

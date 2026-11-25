@@ -33,7 +33,7 @@ public sealed class InstallLocationTests
 
             // a build from the source (the program is a .dll beside it), a program that is neither, and no path: nothing is replaced
             File.WriteAllText(Path.Combine(folder.Path, "commitfence.dll"), "dll");
-            Assert.NotNull(InstallLocation.Find(commandLine, platform).Problem);
+            Assert.Equal("This copy is not a release download, so it cannot update itself.", InstallLocation.Find(commandLine, platform).Problem);
             Assert.NotNull(InstallLocation.Find(Path.Combine(folder.Path, "Other.exe"), platform).Problem);
             Assert.NotNull(InstallLocation.Find(null, platform).Problem);
         }

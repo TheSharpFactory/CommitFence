@@ -42,13 +42,15 @@ internal sealed class UnitBuilder
         _fileSystem = fileSystem;
         _dotnet = dotnet;
         _sarifReader = new SarifReader(fileSystem);
-        _findingBuilder = new SarifFindingBuilder(treeFolder);
+        _findingBuilder = new SarifFindingBuilder(treeFolder, fileSystem);
         _ruleErrorScanner = new RuleErrorScanner(_sarifReader);
         _treeFolder = treeFolder;
         _logFolder = logFolder;
         _targetsPath = targetsPath;
         _meaningPath = meaningPath;
     }
+
+    public bool RanBuild { get; private set; }
 
     /// <summary>
     /// Builds the unit.
@@ -160,6 +162,7 @@ internal sealed class UnitBuilder
             _fileSystem.DeleteFile(unit.IntermediateAssembly);
         }
 
+        RanBuild = true;
         var result = _dotnet.Run(_treeFolder, CreateArguments(unit, logPath, letThrough), DotnetTimeLimits.Build);
 
         return ForgetKeptWhenCompiled(unit, logPath) ?? BuildAttempt.Ran(result, logPath);
@@ -242,10 +245,13 @@ internal sealed class UnitBuilder
         try
         {
             var run = _sarifReader.Read(logPath);
-            var findings = _findingBuilder.Build(run, unit);
-            var unplaced = findings.FirstOrDefault(finding => finding.File != null && Path.IsPathRooted(finding.File));
+            var found = _findingBuilder.Build(run, unit);
+            var unplaced = found.FirstOrDefault(finding => IsOutsideTheTree(finding) && finding.Severity == Severity.Block);
             if(unplaced != null)
                 return UnitOutcome.NoEvidence($"the compiler reported {unplaced.RuleId} at {unplaced.File}, which is not inside the private copy ({_treeFolder}), so the finding cannot be placed in the repository and the log cannot be relied on");
+
+            // a warning about a file from outside the tree, such as a source file a package adds to the compile, is not the repository's
+            var findings = found.Where(finding => !IsOutsideTheTree(finding)).ToList();
 
             return Conclude(unit, result, findings, run);
         }
@@ -255,12 +261,17 @@ internal sealed class UnitBuilder
         }
     }
 
+    private static bool IsOutsideTheTree(Finding finding)
+    {
+        return finding.File != null && Path.IsPathRooted(finding.File);
+    }
+
     private UnitOutcome Conclude(ProjectUnit unit, ProcessResult result, IReadOnlyList<Finding> findings, SarifRunDto run)
     {
         if(result.ExitCode == 0)
             return ReadFacts(unit, findings, run);
 
-        var compileErrors = findings.Count(finding => finding.Source == FindingSource.Compiler && finding.Severity == Severity.Block && finding.Reach == null);
+        var compileErrors = findings.Count(finding => finding.IsCompileError);
         var ruleErrors = findings.Count(finding => finding.Severity == Severity.Block) - compileErrors;
         if(compileErrors == 0 && ruleErrors == 0)
             return UnitOutcome.NoEvidence("the build failed without an error in its log: " + DotnetTool.SummarizeErrors(result));

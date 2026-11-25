@@ -3,6 +3,68 @@
 What changed in each published release of CommitFence, newest first. Each section is also the text of that release on
 GitHub, with its downloads.
 
+## 1.0.0.2 — 2026-11-24
+
+### Fixed
+
+- **A review is complete again when a package adds a source file of its own to a project.** With 1.0.0.1 a push that
+  touched a test project on xUnit v3 ended as "review incomplete" and was refused, because xUnit v3 compiles one file
+  from the package folder. What the build says about a file outside the repository is now left out.
+
+### The five screens, and their commands
+
+- **Dashboard** and **`commitfence stats`:** the reviews of pushes on this machine in the last 30 days, one box per
+  review by day (refused, incomplete, allowed), the rules that found the most, the rules that never fired, and how long
+  a push waited. The history is kept on your machine, one line per review; a review never waits on it or fails for it.
+- **Exemptions** and **`commitfence exemptions list`:** every line of the last commit that sets a rule aside, by file
+  and by rule, with the reason it gives. "Narrow the rule" opens the rule on Rules with a new condition.
+- **Architecture** and **`commitfence structure show`**, **`structure set`:** the modules in layers, each above the ones
+  it may use, with the chosen module's lines drawn and every direction as a table; add, rename and remove modules and
+  their parts, allow a direction or stop allowing one, each saved at once and undoable. It says whether the last review
+  found a use that breaks a direction, and which.
+- **Settings** and **`commitfence settings show`**, **`settings set strictness`:** the strictness of the repository, the
+  languages this version reviews, the version with its update status, and the notes of the release.
+- **Doctor** and **`commitfence doctor`:** seven checks of whether a push from this machine will be reviewed (the hook
+  line first and able to stop a push, the program git finds, the PATH, the .NET SDK, the meaning component, the private
+  copy, `.editorconfig`), each with what was found and, when it fails, how to fix it. It changes nothing on your machine.
+- **Ctrl+1 to Ctrl+7** open the seven screens; F5 does each screen's "again".
+
+### Rules and reviews
+
+- **Exemptions in the code.** `// commitfence:allow TEAM010: the reason` on the line, or alone on the line above, sets a
+  finding of that rule aside; the review says how many were set aside. A comment without a reason sets nothing aside
+  and is a finding of its own (`ALLOW001`, it blocks). A compile error cannot be set aside.
+- **Strictness.** `"strictness"` in `commitfence.json` is `quiet`, `standard` or `strict`, or a mapping of your own; it
+  says what the words `error`, `warning` and `suggestion` of `.editorconfig` do to a push. Standard is what CommitFence
+  did before, and is what holds when the key is not there. Team rules keep the effect they were given.
+- **A use that breaks a direction** is followed through a renamed file, and is a new one when the file moved to
+  another module.
+
+### The app
+
+- **The update notice** is the last row of the page on every screen, with a progress bar and the state of an update
+  from "available" to "installed"; the release notes moved to Settings, where "What's new" leads.
+- A file rule's page and the new screens wrap long lines of a file in place of cutting them.
+
+### Not in this version
+
+- Architecture does not show or edit reference rules and layout rules: CommitFence reads them and does not judge them
+  yet.
+- Doctor does not move the hook line for you: it shows the line, says where it belongs and copies it.
+- With a strictness mapping of your own in `commitfence.json`, Settings shows it and cannot switch to a preset: remove
+  the mapping in the file first.
+
+### Downloads
+
+| Download | What |
+|---|---|
+| `CommitFence-win-x64.zip`, `CommitFence-win-arm64.zip` | The app for Windows, with the command line beside it |
+| `CommitFence-osx-arm64.zip`, `CommitFence-osx-x64.zip` | The app for macOS (Apple silicon, Intel) |
+| `CommitFence-linux-x64.tar.gz` | The app for Linux |
+| `commitfence-cli-*` | The command line, `commitfence`, for the same systems |
+
+---
+
 ## 1.0.0.1 — 2026-11-24
 
 ### Changes

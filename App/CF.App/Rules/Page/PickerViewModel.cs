@@ -48,6 +48,8 @@ internal sealed partial class PickerViewModel : ObservableObject
 
     public bool HasFindRow { get; private set; }
 
+    public bool AlwaysFind { get; init; }
+
     /// <summary>
     /// Opens the picker on these entries. The highlight starts on the current entry when the keyboard opened it.
     /// </summary>
@@ -55,7 +57,7 @@ internal sealed partial class PickerViewModel : ObservableObject
     {
         _entries.Clear();
         _entries.AddRange(entries);
-        HasFindRow = _entries.Count >= _findFrom;
+        HasFindRow = AlwaysFind || _entries.Count >= _findFrom;
         OnPropertyChanged(nameof(HasFindRow));
         foreach(var entry in _entries)
             entry.IsHighlighted = byKeyboard && entry.IsCurrent && !entry.IsDisabled;

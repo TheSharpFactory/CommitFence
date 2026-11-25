@@ -153,4 +153,12 @@
     <Setter Property="LetterSpacing" Value="0"/>
   </ControlTheme>
 
+  <ControlTheme x:Key="code-h3" TargetType="TextBlock">
+    <Setter Property="FontFamily" Value="Cascadia Mono, Consolas, Menlo, DejaVu Sans Mono, monospace"/>
+    <Setter Property="FontSize" Value="15"/>
+    <Setter Property="FontWeight" Value="SemiBold"/>
+    <Setter Property="LineHeight" Value="22"/>
+    <Setter Property="LetterSpacing" Value="0"/>
+  </ControlTheme>
+
 </ResourceDictionary>

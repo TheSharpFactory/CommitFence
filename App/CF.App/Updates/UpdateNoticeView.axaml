@@ -1,66 +1,90 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:updates="using:CF.App.Updates"
-             xmlns:core="using:CF.Core.Updates"
-             xmlns:review="using:CF.App.Review"
+             xmlns:parts="using:CF.App.Parts"
              x:Class="CF.App.Updates.UpdateNoticeView"
              x:ClassModifier="internal"
              x:DataType="updates:UpdatesViewModel"
-             IsVisible="{Binding IsNoticeVisible}">
+             IsVisible="False"
+             AutomationProperties.Name="Update">
 
-  <!-- The notice of an update: it lies over the bottom of the screen, as wide as a banner (684 at most), in the colours of a
-       banner. The headline says what is going on or which version is available; under it the release notes (scrolled when
-       long) or the bar of the download; at the right the buttons. A raised panel: the small neutral shadow. -->
-  <Border MaxWidth="684" Padding="16,12" CornerRadius="12" Background="{DynamicResource warn-tint}" BoxShadow="{DynamicResource shadow-popup}">
-    <StackPanel Spacing="10">
+  <!-- The notice of an update: the last row of the page, right of the rail, as wide as the page. The sheet above it ends at its top
+       edge, so nothing lies under it. Its own surface (hover) with a hairline of line-strong across the top, no shadow; padding 12 32
+       (12 24 in one pane); its inside as wide as the frame above (1292 at most, 760 in one pane). From 1304 wide it is one row: the
+       mark 28, the words, the bar 280 when there is one, the buttons. In one pane the mark and the words, then the bar across the
+       column, then the buttons at the right end. It takes no focus when it arrives and reads its title and line as a live region. -->
+  <Border Name="Slot" ClipToBounds="True">
+    <Border Name="Strip" Background="{DynamicResource hover}" BorderBrush="{DynamicResource line-strong}" BorderThickness="0,1,0,0" Padding="32,12">
+      <Border Name="Inner" MaxWidth="1292" MinHeight="40" HorizontalAlignment="Stretch">
+        <Grid Name="Layout" ColumnDefinitions="28,*,Auto,Auto" RowDefinitions="Auto,Auto,Auto" ColumnSpacing="14">
 
-      <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
-        <TextBlock Grid.Column="0" Theme="{StaticResource type-body-strong}" TextWrapping="Wrap" VerticalAlignment="Center"
-                   Text="{Binding Headline}" AutomationProperties.LiveSetting="Polite"/>
+          <!-- The mark: the logo, a tick, the refused badge, or the busy ring. -->
+          <Panel Name="MarkHost" Width="28" Height="28" VerticalAlignment="Center">
+            <Viewbox Width="28" Height="28" IsVisible="{Binding IsLogoMark}" Focusable="False">
+              <parts:LogoMark/>
+            </Viewbox>
+            <Border Width="28" Height="28" CornerRadius="8" Background="{DynamicResource req-ink}" IsVisible="{Binding IsTickMark}">
+              <parts:Icon Data="{StaticResource i-check}" Width="16" Height="16" StrokeThickness="2.4" Stroke="{DynamicResource page}"
+                          HorizontalAlignment="Center" VerticalAlignment="Center"/>
+            </Border>
+            <Border Width="28" Height="28" CornerRadius="8" Background="{DynamicResource block}" IsVisible="{Binding IsFailureMark}">
+              <parts:Icon Data="{StaticResource i-x}" Width="16" Height="16" StrokeThickness="2.4" Stroke="{DynamicResource on-block}"
+                          HorizontalAlignment="Center" VerticalAlignment="Center"/>
+            </Border>
+            <parts:TurningRing OnSurface="True" Width="20" Height="20" HorizontalAlignment="Center" VerticalAlignment="Center"
+                               IsVisible="{Binding IsBusyMark}"/>
+          </Panel>
 
-        <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8" VerticalAlignment="Top">
-          <Button Classes="cf small quiet" Command="{Binding CancelUpdateCommand}" IsVisible="{Binding CanCancel}"
-                  AutomationProperties.Name="Cancel the update">
-            <TextBlock Theme="{StaticResource type-meta-strong}" Text="Cancel"/>
-          </Button>
-          <Button Classes="cf small quiet" Command="{Binding DismissCommand}" IsVisible="{Binding CanDismiss}"
-                  AutomationProperties.Name="Later">
-            <TextBlock Theme="{StaticResource type-meta-strong}" Text="Later"/>
-          </Button>
-          <Button Classes="cf small main" Command="{Binding UpdateNowCommand}" IsVisible="{Binding CanUpdate}"
-                  AutomationProperties.Name="Update now">
-            <TextBlock Theme="{StaticResource type-meta-strong}" Text="Update now"/>
-          </Button>
-          <Button Classes="cf small main" Command="{Binding OpenReleasePageCommand}" IsVisible="{Binding CanOpenReleasePage}"
-                  AutomationProperties.Name="Open the release page">
-            <TextBlock Theme="{StaticResource type-meta-strong}" Text="Open the release page"/>
-          </Button>
-        </StackPanel>
-      </Grid>
+          <!-- The words: the title, 6, the line, on one line and wrapping when they must (from 1304 wide); in one pane the title
+               and, 2 under it, the line. -->
+          <WrapPanel Name="WordsWide" Grid.Column="1" Orientation="Horizontal" ItemSpacing="6" VerticalAlignment="Center">
+            <TextBlock Theme="{StaticResource type-body-strong}" TextWrapping="Wrap" Text="{Binding Title}" AutomationProperties.LiveSetting="Polite"/>
+            <TextBlock Theme="{StaticResource type-meta}" Foreground="{DynamicResource ink-2}" TextWrapping="Wrap" Text="{Binding Line}"
+                       AutomationProperties.LiveSetting="Polite"/>
+          </WrapPanel>
+          <StackPanel Name="WordsStacked" Grid.Column="1" Spacing="2" IsVisible="False" VerticalAlignment="Center">
+            <TextBlock Theme="{StaticResource type-body-strong}" TextWrapping="Wrap" Text="{Binding Title}" AutomationProperties.LiveSetting="Polite"/>
+            <TextBlock Theme="{StaticResource type-meta}" Foreground="{DynamicResource ink-2}" TextWrapping="Wrap" Text="{Binding Line}"
+                       AutomationProperties.LiveSetting="Polite"/>
+          </StackPanel>
 
-      <!-- Why the app cannot install the release itself. -->
-      <TextBlock Theme="{StaticResource type-body}" TextWrapping="Wrap" Text="{Binding ProblemText}"
-                 IsVisible="{Binding HasProblem}"/>
+          <!-- The bar: 10 high, radius 5, the percent 10 to its right. A piece that moves when the size is not known. -->
+          <Grid Name="BarHost" Grid.Column="2" Width="280" ColumnDefinitions="*,Auto" ColumnSpacing="10" VerticalAlignment="Center"
+                IsVisible="{Binding ShowsBar}">
+            <parts:ProgressTrack Fraction="{Binding BarFraction}" VerticalAlignment="Center"/>
+            <TextBlock Grid.Column="1" Theme="{StaticResource type-body}" Foreground="{DynamicResource ink-2}" FontFeatures="+tnum" MinWidth="34"
+                       TextAlignment="Right" VerticalAlignment="Center" IsVisible="{Binding ShowsPercent}" Text="{Binding PercentText}"/>
+          </Grid>
 
-      <!-- The release notes: headings, list items and paragraphs. -->
-      <ScrollViewer MaxHeight="280" IsVisible="{Binding HasNotes}" VerticalScrollBarVisibility="Auto">
-        <ItemsControl ItemsSource="{Binding NotesLines}" Margin="0,0,16,0">
-          <ItemsControl.ItemTemplate>
-            <DataTemplate x:DataType="core:ReleaseNoteLine">
-              <Panel Margin="0,0,0,4">
-                <TextBlock IsVisible="{Binding IsHeading}" Theme="{StaticResource type-body-strong}" TextWrapping="Wrap" Text="{Binding Text}"/>
-                <TextBlock IsVisible="{Binding IsListItem}" Theme="{StaticResource type-body}" TextWrapping="Wrap" Text="{Binding Text, StringFormat='• {0}'}"/>
-                <TextBlock IsVisible="{Binding IsParagraph}" Theme="{StaticResource type-body}" TextWrapping="Wrap" Text="{Binding Text}"/>
-              </Panel>
-            </DataTemplate>
-          </ItemsControl.ItemTemplate>
-        </ItemsControl>
-      </ScrollViewer>
+          <!-- The buttons, 36 high, 8 apart, in the order of the table. -->
+          <StackPanel Name="ButtonsHost" Grid.Column="3" Orientation="Horizontal" Spacing="8" HorizontalAlignment="Right" VerticalAlignment="Center">
+            <Button Name="LaterButton" Classes="cf outlined" Command="{Binding DismissCommand}" IsVisible="{Binding ShowsLater}" AutomationProperties.Name="Later">
+              <TextBlock Theme="{StaticResource type-body-strong}" Text="Later"/>
+            </Button>
+            <Button Name="WhatsNewButton" Classes="cf outlined" Command="{Binding WhatsNewCommand}" IsVisible="{Binding ShowsWhatsNew}" AutomationProperties.Name="What's new">
+              <TextBlock Theme="{StaticResource type-body-strong}" Text="What's new"/>
+            </Button>
+            <Button Name="CancelButton" Classes="cf outlined" Command="{Binding CancelUpdateCommand}" IsVisible="{Binding ShowsCancel}" AutomationProperties.Name="Cancel the update">
+              <TextBlock Theme="{StaticResource type-body-strong}" Text="Cancel"/>
+            </Button>
+            <Button Name="CloseButton" Classes="cf outlined" Command="{Binding DismissCommand}" IsVisible="{Binding ShowsClose}" AutomationProperties.Name="Close">
+              <TextBlock Theme="{StaticResource type-body-strong}" Text="Close"/>
+            </Button>
+            <Button Name="ReleasePageButton" Classes="cf outlined" Command="{Binding OpenReleasePageCommand}" IsVisible="{Binding ShowsReleasePage}"
+                    AutomationProperties.Name="Open the release page">
+              <TextBlock Theme="{StaticResource type-body-strong}" Text="Open the release page"/>
+            </Button>
+            <Button Name="TryAgainButton" Classes="cf outlined" Command="{Binding TryAgainCommand}" IsVisible="{Binding ShowsTryAgain}" AutomationProperties.Name="Try again">
+              <TextBlock Theme="{StaticResource type-body-strong}" Text="Try again"/>
+            </Button>
+            <Button Name="UpdateNowButton" Classes="cf main" Command="{Binding UpdateNowCommand}" IsVisible="{Binding ShowsUpdateNow}" AutomationProperties.Name="Update now">
+              <TextBlock Theme="{StaticResource type-body-strong}" Text="Update now"/>
+            </Button>
+          </StackPanel>
 
-      <!-- The download: a bar from the left, as wide as the part done. -->
-      <review:FractionBar Thickness="4" Height="4" Fraction="{Binding DownloadFraction}"
-                          Fill="{DynamicResource solid}" IsVisible="{Binding IsInstalling}"/>
-    </StackPanel>
+        </Grid>
+      </Border>
+    </Border>
   </Border>
 
 </UserControl>

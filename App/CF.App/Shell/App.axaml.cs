@@ -1,6 +1,7 @@
 using Avalonia;
 using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Markup.Xaml;
+using CF.App.Parts;
 using CF.Composition;
 
 namespace CF.App.Shell;
@@ -17,6 +18,7 @@ internal sealed partial class App : Application
         if(ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
         {
             var services = CompositionRoot.Create();
+            Motion.ReducedOnThisMachine = services.Machine.ReduceMotion;
             var model = new MainWindowViewModel(services, FolderToWorkOn(desktop.Args));
             var window = new MainWindow
             {

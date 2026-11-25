@@ -1,3 +1,6 @@
+using System.Globalization;
+using System.Security.Cryptography;
+using System.Text;
 using CF.Adapters.Machine;
 using CF.Core.Changes;
 using CF.Core.Code;
@@ -5,6 +8,7 @@ using CF.Core.Findings;
 using CF.Core.Ports;
 using CF.Core.Review;
 using CF.Languages.CSharp;
+using CF.Languages.CSharp.Meaning;
 using CF.Tests.Toolchain.Support;
 using Xunit;
 
@@ -202,6 +206,42 @@ public sealed class ToolchainBuildTests
             Assert.Contains(mustAlsoSay, entry.Reason, StringComparison.Ordinal);
             Assert.Empty(review.Findings);
         }
+    }
+
+    [Fact]
+    public void AFileFromOutsideTheRepositoryIsLeftOutAndALogAboutNoFileOfItIsRefused()
+    {
+        // a source file that a package adds to the compile lies in the user's package folder, not in the tree
+        var foreign = Path.Combine(TestPaths.Temp, "cf-packages", "runner", "Reporters.cs");
+        using(var fixture = new FakeBuildFixture(TreeFiles.NoRules, Project("Library", "net9.0", new[] { "Library/Greeter.cs" })))
+        {
+            var log = new SarifLogText().Rule("CA1822", "warning", false).Result("CA1822", "warning", "Member can be static.", foreign, 3, 5).Closing("any", 1);
+            fixture.Dotnet.BuildAnswerFor = _ => new BuildAnswer(0, log.ToString());
+
+            var review = fixture.Review(ReviewHarness.Changed("Library/Greeter.cs"));
+
+            Assert.Equal(ExitCode.Passed, review.ExitCode);
+            Assert.Empty(review.Findings);
+            Assert.DoesNotContain(review.Coverage, entry => entry.Status == CoverageStatus.Failed);
+
+            var reader = new MeaningFactReader(Path.GetDirectoryName(Path.GetDirectoryName(fixture.FullPath("Library/Greeter.cs")))!);
+            var own = "D|" + fixture.FullPath("Library/Greeter.cs") + "|3|5|type|Library.Greeter|public|class";
+            var packaged = "D|" + foreign + "|1|1|type|Runner.Reporters|internal|class";
+
+            var facts = reader.Read(new[] { own, packaged }, new[] { ClosingOf(own, packaged) }, "Library", 1);
+
+            Assert.Equal("Library/Greeter.cs", Assert.Single(facts.Declarations).File.Replace(Path.DirectorySeparatorChar, '/'));
+            var refusal = Assert.Throws<MeaningLogException>(() => reader.Read(new[] { packaged }, new[] { ClosingOf(packaged) }, "Library", 1));
+            Assert.Contains("no file inside the private copy", refusal.Message, StringComparison.Ordinal);
+        }
+    }
+
+    private static string ClosingOf(params string[] factLines)
+    {
+        var sorted = string.Join('\n', factLines.Order(StringComparer.Ordinal));
+        var checksum = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(sorted))).ToLowerInvariant();
+
+        return string.Join("|", "END", "1", "Library", "1", factLines.Length.ToString(CultureInfo.InvariantCulture), checksum);
     }
 
     [Fact]

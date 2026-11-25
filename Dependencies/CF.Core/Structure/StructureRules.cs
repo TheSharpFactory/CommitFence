@@ -1,18 +1,23 @@
+using System.Globalization;
+using System.Text;
+using System.Text.Json;
+
 namespace CF.Core.Structure;
 
 /// <summary>
-/// The structure rules of the settings file: the modules and the directions between them. Layout and reference rules
-/// are not read yet.
+/// The structure rules of the settings file, including the declarations this version does not judge.
 /// </summary>
 public sealed class StructureRules
 {
     /// <summary>
     /// Creates the rules.
     /// </summary>
-    public StructureRules(IReadOnlyList<ModuleDefinition> modules, LayerDirections directions)
+    public StructureRules(IReadOnlyList<ModuleDefinition> modules, LayerDirections directions, IReadOnlyList<JsonElement>? references = null, IReadOnlyList<JsonElement>? layout = null)
     {
         Modules = modules;
         Directions = directions;
+        References = references;
+        Layout = layout;
     }
 
     /// <summary>
@@ -24,6 +29,12 @@ public sealed class StructureRules
     /// Which module may use which.
     /// </summary>
     public LayerDirections Directions { get; }
+
+    /// <summary>The reference rules as written, if present.</summary>
+    public IReadOnlyList<JsonElement>? References { get; }
+
+    /// <summary>The layout rules as written, if present.</summary>
+    public IReadOnlyList<JsonElement>? Layout { get; }
 
     /// <summary>
     /// Rules that say nothing: a settings file without a structure part.
@@ -66,10 +77,41 @@ public sealed class StructureRules
     /// </summary>
     public string Describe()
     {
-        var modules = Modules.Select(module => module.Name + "=" + string.Join(",", module.Selectors));
-        var allow = Directions.Allow.Select(pair => "allow " + pair);
-        var forbid = Directions.Forbid.Select(pair => "forbid " + pair);
+        if(this == None)
+            return string.Empty;
 
-        return string.Join(";", modules.Concat(allow).Concat(forbid));
+        var description = new StringBuilder();
+        foreach(var module in Modules)
+        {
+            AddField(description, "module");
+            AddField(description, module.Name);
+            AddList(description, "parts", module.Selectors.Select(selector => selector.ToString()));
+        }
+
+        AddList(description, "allow", Directions.HasAllowList ? Directions.Allow.Select(pair => pair.ToString()) : null);
+        AddList(description, "forbid", Directions.HasForbidList ? Directions.Forbid.Select(pair => pair.ToString()) : null);
+        AddField(description, Directions.NoCycles?.ToString() ?? string.Empty);
+        AddList(description, "references", References?.Select(rule => rule.GetRawText()));
+        AddList(description, "layout", Layout?.Select(rule => rule.GetRawText()));
+        return description.ToString();
+    }
+
+    private static void AddList(StringBuilder description, string name, IEnumerable<string>? entries)
+    {
+        if(entries == null)
+            return;
+
+        AddField(description, name);
+        var list = entries.ToList();
+        AddField(description, list.Count.ToString(CultureInfo.InvariantCulture));
+        foreach(var entry in list)
+            AddField(description, entry);
+    }
+
+    private static void AddField(StringBuilder description, string value)
+    {
+        description.Append(value.Length.ToString(CultureInfo.InvariantCulture));
+        description.Append(':');
+        description.Append(value);
     }
 }

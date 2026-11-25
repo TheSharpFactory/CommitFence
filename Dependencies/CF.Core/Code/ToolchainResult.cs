@@ -24,6 +24,9 @@ public sealed class ToolchainResult
     /// </summary>
     public IReadOnlyList<Finding> Findings { get; }
 
+    /// <summary>Whether this run invoked a build.</summary>
+    public bool RanBuild { get; init; }
+
     /// <summary>
     /// What was checked and what could not be, one entry for each part of the build.
     /// </summary>

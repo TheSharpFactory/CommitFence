@@ -9,14 +9,17 @@ public sealed class LayerDirections
     /// <summary>
     /// Creates the directions.
     /// </summary>
-    public LayerDirections(IReadOnlyList<ModulePair> allow, IReadOnlyList<ModulePair> forbid)
+    public LayerDirections(IReadOnlyList<ModulePair> allow, IReadOnlyList<ModulePair> forbid, bool? hasAllowList = null, bool? hasForbidList = null, bool? noCycles = null)
     {
         Allow = allow;
         Forbid = forbid;
+        HasAllowList = hasAllowList ?? allow.Count > 0;
+        HasForbidList = hasForbidList ?? forbid.Count > 0;
+        NoCycles = noCycles;
     }
 
     /// <summary>
-    /// The directions that are allowed; when there are some, every other direction between two modules is a breach.
+    /// The directions that are allowed by the allow list.
     /// </summary>
     public IReadOnlyList<ModulePair> Allow { get; }
 
@@ -25,12 +28,21 @@ public sealed class LayerDirections
     /// </summary>
     public IReadOnlyList<ModulePair> Forbid { get; }
 
+    /// <summary>Whether the file has an allow list, even if it lists no pairs.</summary>
+    public bool HasAllowList { get; }
+
+    /// <summary>Whether the file has a forbid list, even if it lists no pairs.</summary>
+    public bool HasForbidList { get; }
+
+    /// <summary>The optional cycle rule, preserved in settings until it can be judged.</summary>
+    public bool? NoCycles { get; }
+
     /// <summary>
     /// Whether the directions say anything at all.
     /// </summary>
     public bool IsEmpty
     {
-        get { return Allow.Count == 0 && Forbid.Count == 0; }
+        get { return !HasAllowList && !HasForbidList; }
     }
 
     /// <summary>
@@ -44,6 +56,7 @@ public sealed class LayerDirections
         if(Forbid.Any(pair => pair.Is(from, to)))
             return false;
 
-        return Allow.Count == 0 || Allow.Any(pair => pair.Is(from, to));
+        var needsPermission = HasAllowList && (!HasForbidList || Allow.Count > 0);
+        return !needsPermission || Allow.Any(pair => pair.Is(from, to));
     }
 }

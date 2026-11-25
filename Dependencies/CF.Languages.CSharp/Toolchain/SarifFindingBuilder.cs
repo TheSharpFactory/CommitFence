@@ -1,5 +1,7 @@
 using CF.Core.Code;
 using CF.Core.Findings;
+using CF.Core.Ports;
+using CF.Languages.CSharp.EditorConfig;
 
 namespace CF.Languages.CSharp.Toolchain;
 
@@ -9,7 +11,7 @@ namespace CF.Languages.CSharp.Toolchain;
 /// <remarks>
 /// A compile error is a diagnostic of the compiler that is an error without any configuration: it blocks wherever it is
 /// and is never filtered by lines. Every other diagnostic is a rule of the compiler or of the .editorconfig and carries
-/// the lines it covers, so that only those the push changed are kept: error blocks, warning and suggestion warn. A
+/// the lines it covers, so that only those the push changed are kept. A
 /// suppressed diagnostic is not a finding.
 /// </remarks>
 internal sealed class SarifFindingBuilder
@@ -17,10 +19,12 @@ internal sealed class SarifFindingBuilder
     private const string _languageId = "csharp";
 
     private readonly string _treeFolder;
+    private readonly EditorConfigSeverity? _fileSettings;
 
-    public SarifFindingBuilder(string treeFolder)
+    public SarifFindingBuilder(string treeFolder, IFileSystem? files = null)
     {
         _treeFolder = treeFolder;
+        _fileSettings = files == null ? null : new EditorConfigSeverity(treeFolder, files);
     }
 
     public IReadOnlyList<Finding> Build(SarifRunDto run, ProjectUnit unit)
@@ -54,10 +58,19 @@ internal sealed class SarifFindingBuilder
         var file = FindFile(result);
         var place = file != null && region != null && region.StartLine > 0;
         var severity = result.Level == "error" ? Severity.Block : Severity.Warn;
-        var source = isCompilerRule ? FindingSource.Compiler : FindingSource.EditorConfig;
+        var configured = isCompileError ? null : _fileSettings?.Read(file, ruleId);
+        var source = isCompilerRule && configured == null ? FindingSource.Compiler : FindingSource.EditorConfig;
         var reach = place && !isCompileError ? ArtifactReach.OfSpan(new SourceSpan(region!.StartLine, region.StartColumn, Math.Max(region.EndLine, region.StartLine), region.EndColumn)) : null;
 
-        return new Finding(ruleId, source, severity, _languageId, unit.Project.DisplayName, unit.Framework, file, place ? region!.StartLine : null, place ? region!.StartColumn : null, result.Message?.Text ?? string.Empty, null, reach);
+        return new Finding(ruleId, source, severity, _languageId, unit.Project.DisplayName, unit.Framework, file, place ? region!.StartLine : null, place ? region!.StartColumn : null, result.Message?.Text ?? string.Empty, null, reach)
+        {
+            FileSeverity = configured == null ? null : FileWord(result.Level!)
+        };
+    }
+
+    private static string FileWord(string level)
+    {
+        return level == "note" ? "suggestion" : level;
     }
 
     private string? FindFile(SarifResultDto result)

@@ -53,6 +53,15 @@ public sealed class Finding
     /// </summary>
     public Severity Severity { get; }
 
+    /// <summary>The build's severity word when the file sets the rule, before strictness is applied.</summary>
+    public string? FileSeverity { get; init; }
+
+    /// <summary>Whether the finding reports a compiler error that prevents the code from compiling.</summary>
+    public bool IsCompileError
+    {
+        get { return Source == FindingSource.Compiler && Severity == Severity.Block && Reach == null; }
+    }
+
     /// <summary>
     /// The identifier of the language, such as csharp.
     /// </summary>
@@ -104,6 +113,11 @@ public sealed class Finding
     /// </summary>
     public Finding HoldingFor(string? project, string? targetFramework)
     {
-        return new Finding(RuleId, Source, Severity, Language, project, targetFramework, File, Line, Column, Message, Why, Reach);
+        return new Finding(RuleId, Source, Severity, Language, project, targetFramework, File, Line, Column, Message, Why, Reach) { FileSeverity = FileSeverity };
+    }
+
+    internal Finding WithSeverity(Severity severity)
+    {
+        return new Finding(RuleId, Source, severity, Language, Project, TargetFramework, File, Line, Column, Message, Why, Reach) { FileSeverity = FileSeverity };
     }
 }

@@ -63,6 +63,12 @@ internal sealed class ReviewHarness : IDisposable
 
     public IReadOnlyList<ILanguage> Languages { get; set; }
 
+    public IStructureJudgments? StructureJudgments { get; set; }
+
+    public IReviewHistory? History { get; set; }
+
+    public FixedClock Clock { get; } = new FixedClock(new DateTimeOffset(2026, 11, 24, 12, 0, 0, TimeSpan.Zero));
+
     /// <summary>
     /// The review service, put together from the parts as they are now; the same service from then on.
     /// </summary>
@@ -108,10 +114,9 @@ internal sealed class ReviewHarness : IDisposable
         var settings = new SettingsInTree(FileSystem, settingsFile, FixedProduct.ProgramVersion);
         var fileReviewer = new FileReviewer(FileSystem, Languages);
         var logs = new LogFoldersOfTest(Path.Combine(_folder.Path, "logs"));
-        var changeSetReview = new ChangeSetReview(Languages, Snapshots, settings, fileReviewer, new ToolchainStage(Languages, logs), new StructureReview(Git, Snapshots, logs, settingsFile));
-        var clock = new FixedClock(new DateTimeOffset(2026, 11, 24, 12, 0, 0, TimeSpan.Zero));
-        var tree = new TreeReview(clock, Git, ReviewLock, new NoProgramLock(), new ChangeResolver(Git, Languages), changeSetReview);
+        var changeSetReview = new ChangeSetReview(Languages, Snapshots, settings, fileReviewer, new ToolchainStage(Languages, logs), new StructureReview(Git, Snapshots, logs, settingsFile), Git);
+        var tree = new TreeReview(Clock, Git, ReviewLock, new NoProgramLock(), new ChangeResolver(Git, Languages), changeSetReview, StructureJudgments, History);
 
-        return new ReviewService(new NamedFilesReview(clock, Languages, settings, fileReviewer), tree, new PushScopeFinder(Git));
+        return new ReviewService(new NamedFilesReview(Clock, Languages, settings, fileReviewer), tree, new PushScopeFinder(Git));
     }
 }

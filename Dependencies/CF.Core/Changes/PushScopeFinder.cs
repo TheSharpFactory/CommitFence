@@ -61,7 +61,7 @@ public sealed class PushScopeFinder
         var url = _git.RemoteUrl(repository, target.RemoteName) ?? target.RemoteName;
         var pushed = PushedRefs.FromRefs(new List<PushedRef> { new PushedRef(_headsPrefix + branch, commit, target.RemoteRef, remoteObject) });
 
-        return PushScopeAnswer.Found(ReviewScope.ForPush(target.RemoteName, url, pushed), branch, target.RemoteName);
+        return PushScopeAnswer.Found(ReviewScope.ForPush(target.RemoteName, url, pushed).WithSource(ReviewSource.CommandLine), branch, target.RemoteName);
     }
 
     private BranchUpstream ChooseTarget(RepositoryLocation repository, string branch, IReadOnlyList<string> remotes)

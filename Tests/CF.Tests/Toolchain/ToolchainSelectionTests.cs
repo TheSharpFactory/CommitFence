@@ -1,4 +1,5 @@
 using System.Text.Json;
+using CF.Adapters.Machine;
 using CF.Core.Findings;
 using CF.Languages.CSharp.Toolchain;
 using CF.Tests.Toolchain.Support;
@@ -61,7 +62,9 @@ public sealed class ToolchainSelectionTests
     [Fact]
     public void SarifPreservesSeverityLocationAndSuppression()
     {
-        var graph = new SelectorGraph(Path.Combine(TestPaths.Temp, "cf-selector"));
+        using var folder = new TestFolder();
+        var graph = new SelectorGraph(folder.Path);
+        TreeFiles.Write(graph.Tree, ".editorconfig", "[*.cs]\ndotnet_diagnostic.IDE0044.severity = warning\ndotnet_diagnostic.IDE0051.severity = suggestion\n");
         var unit = graph.Graph.Units.First(candidate => candidate.Label == "Consumer (net11.0)");
         var use = ToolchainPaths.Combine(graph.Tree, "Consumer/Use.cs");
         var text = new SarifLogText()
@@ -77,10 +80,11 @@ public sealed class ToolchainSelectionTests
             .ToString();
         var run = JsonSerializer.Deserialize(text, SarifJsonContext.Default.SarifLogDto)!.Runs![0];
 
-        var findings = new SarifFindingBuilder(graph.Tree).Build(run, unit);
+        var findings = new SarifFindingBuilder(graph.Tree, new SystemFileSystem()).Build(run, unit);
 
         Assert.Equal(new[] { "CS0103", "IDE0044", "CA1050", "IDE0051", "IDE0060" }, findings.Select(finding => finding.RuleId));
         Assert.Equal(new[] { Severity.Block, Severity.Block, Severity.Warn, Severity.Warn, Severity.Warn }, findings.Select(finding => finding.Severity));
+        Assert.Equal(new List<string?> { null, "error", null, "suggestion", null }, findings.Select(finding => finding.FileSeverity));
         Assert.All(findings, finding => Assert.Equal("Consumer", finding.Project));
         Assert.All(findings, finding => Assert.Equal("net11.0", finding.TargetFramework));
         Assert.Equal(new[] { 7, 3, 1, 5 }, findings.Where(finding => finding.File != null).Select(finding => finding.Line!.Value));

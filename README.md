@@ -61,12 +61,31 @@ of the push.
 
 ![The Review screen after a refused push: two findings block it and one only warns, with the code of the first finding](docs/images/review-screen.png)
 
+**Dashboard.** The reviews of pushes on this machine in the last 30 days: how many were refused, which rules found the
+most, which never fired, and how long a push waited.
+
+![The Dashboard: a chart with one box per review by day, the rules that never fired, and the rules most broken](docs/images/dashboard-screen.png)
+
+**Architecture.** The modules of the repository in layers, each above the ones it may use, and the use that breaks a
+direction in red. Every direction is also a table, and each change is saved at once.
+
+![The Architecture screen: eleven modules in layers, the chosen module's lines, and one use that breaks a direction](docs/images/architecture-screen.png)
+
+**Exemptions, Settings and Doctor.** Every line that sets a rule aside, with its reason; the strictness of the
+repository, the version and its updates; and seven checks of whether a push from this machine will be reviewed, each
+with how to fix it.
+
 ## The command line
 
 | Command | What it does |
 |---|---|
 | `commitfence install [--print] [--no-path]` | Sets the program up for your user |
 | `commitfence init` | Starts `commitfence.json` in a repository and prints the hook line |
+| `commitfence doctor` | Checks whether pushes from this repository will be reviewed and explains how to fix failed checks |
+| `commitfence settings show`, `set strictness <quiet\|standard\|strict>` | Shows or changes what the severity words in `.editorconfig` do to a push |
+| `commitfence stats [--all]` | Shows local push reviews from the last 30 days, the rules they found and how long they took. Use `--all` to list every rule that never fired |
+| `commitfence structure show`, `structure set` | Shows modules, allowed directions and the last structure judgment, or edits a module, part or direction |
+| `commitfence exemptions list [--rule <id>]` | Lists the lines of the last commit that set a rule aside, by file, with the reason each one gives |
 | `commitfence catalog [<language> [<artifact type>]]` | Lists what a rule can be about and the properties it can look at |
 | `commitfence rules list`, `show <id>` | Lists the rules, or shows one, including the rules `.editorconfig` sets |
 | `commitfence rules add`, `set`, `copy`, `remove` | Writes, changes, copies and removes a team rule |
@@ -125,7 +144,10 @@ and a reason. This repository's own `commitfence.json` holds the rules it is rev
 - **C# only.** Other languages are not reviewed.
 - A review needs the .NET SDK on the machine that pushes, because it builds the changed projects. When the build cannot
   run, the review says so and the push is not allowed; it never passes a review it could not finish.
-- The app screens Dashboard, Exemptions, Architecture, Settings and Doctor are shown but not built yet.
+- **Setting a rule aside.** `// commitfence:allow TEAM010: the reason`, on the line or alone on the line above,
+  sets a finding of that rule aside. The reason is required: a comment without one is a finding of its own.
+- **Strictness.** `"strictness"` in `commitfence.json` (`quiet`, `standard`, `strict`) says what the words of
+  `.editorconfig` do to a push. Without it, `error` blocks and `warning` and `suggestion` warn.
 - The product never writes `.editorconfig`.
 
 ## Building

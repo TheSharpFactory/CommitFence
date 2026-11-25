@@ -63,7 +63,7 @@ internal sealed class PromptReporter
             foreach(var finding in findings.Where(finding => !IsTeamRule(finding) && file.ContainsKey(finding.RuleId)))
                 rules[finding.RuleId] = PromptRule.Of(file[finding.RuleId]);
         }
-        catch(RuleChangeException)
+        catch(Exception exception) when(exception is SettingsException || exception is RuleChangeException)
         {
             // without the file's rules they are named by their ids
         }

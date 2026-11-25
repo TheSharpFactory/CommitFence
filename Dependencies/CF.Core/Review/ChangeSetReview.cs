@@ -24,11 +24,12 @@ public sealed class ChangeSetReview
     private readonly FileReviewer _fileReviewer;
     private readonly ToolchainStage _toolchains;
     private readonly StructureReview _structureReview;
+    private readonly IGit _git;
 
     /// <summary>
     /// Creates the review.
     /// </summary>
-    public ChangeSetReview(IReadOnlyList<ILanguage> languages, ISnapshotStore snapshots, SettingsInTree settings, FileReviewer fileReviewer, ToolchainStage toolchains, StructureReview structureReview)
+    public ChangeSetReview(IReadOnlyList<ILanguage> languages, ISnapshotStore snapshots, SettingsInTree settings, FileReviewer fileReviewer, ToolchainStage toolchains, StructureReview structureReview, IGit git)
     {
         _languages = languages;
         _snapshots = snapshots;
@@ -36,6 +37,7 @@ public sealed class ChangeSetReview
         _fileReviewer = fileReviewer;
         _toolchains = toolchains;
         _structureReview = structureReview;
+        _git = git;
     }
 
     internal void Review(RepositoryLocation repository, ChangeSet changeSet, string? settingsPath, ReviewRun run)
@@ -57,6 +59,7 @@ public sealed class ChangeSetReview
         }
         catch(Exception exception) when(!ReviewBoundary.PassesThrough(exception))
         {
+            run.MarkStructureIncomplete();
             run.AddCoverage(changeSet.Label, CoverageStatus.Failed, DescribeFailure(exception));
         }
     }
@@ -78,7 +81,10 @@ public sealed class ChangeSetReview
         var toolchainWork = _toolchains.FindWork(tree);
         NoteFilesNotLookedAt(tree, toolchainWork, run);
         if(_settings.RefusesOlderProgram(tree.SettingsPath(), run))
+        {
+            run.MarkStructureIncomplete();
             return;
+        }
 
         var toReview = tree.ChangeSet.Files.Where(file => file.Language != null && file.Status != ChangeStatus.Deleted).ToList();
         if(toReview.Count == 0 && toolchainWork.Count == 0 && !tree.ChangesTheSettingsOfTheTree())
@@ -86,7 +92,20 @@ public sealed class ChangeSetReview
 
         // a settings file that is there is always read strictly, also when it is the only thing the push changes
         var settings = _settings.Load(tree.SettingsPath(), toReview.Count > 0);
+        try
+        {
+            CollectFindings(tree, toReview, settings, toolchainWork, run);
+        }
+        finally
+        {
+            run.ApplyPolicies(settings?.Strictness ?? Strictness.Standard, finding => ReadExemptions(tree, finding, run));
+        }
+    }
+
+    private void CollectFindings(TreeUnderReview tree, IReadOnlyList<ChangedFile> toReview, RuleSettings? settings, IReadOnlyList<ToolchainWork> toolchainWork, ReviewRun run)
+    {
         var outcomes = _toolchains.Run(tree, toolchainWork);
+        run.RanBuild |= outcomes.Exists(outcome => outcome.Result.RanBuild);
         var sources = ReviewFiles(tree, toReview, settings, ToolchainStage.ReadingsOf(outcomes), run);
         var answers = ToolchainStage.Record(outcomes, tree.ChangeSet, run);
         if(settings == null)
@@ -97,6 +116,25 @@ public sealed class ChangeSetReview
             MeaningRulePass.Run(settings.ActiveRules, sources, answers, _languages, run);
 
         _structureReview.Run(tree, settings, answers, run);
+    }
+
+    private IReadOnlyList<SourceExemption> ReadExemptions(TreeUnderReview tree, Finding finding, ReviewRun run)
+    {
+        var path = ReachFilter.FindFile(finding.File, tree.ChangeSet.Files)?.Path ?? finding.File!;
+        var language = _languages.FirstOrDefault(candidate => candidate.OwnsFile(path));
+        if(language == null)
+            return [];
+
+        try
+        {
+            var text = _git.ReadFile(tree.Repository, tree.ChangeSet.Tree, path);
+            return text == null ? [] : ExemptionFilter.Read(language, new CodeFile(path, language.Id, text));
+        }
+        catch(GitException exception)
+        {
+            run.AddCoverage(path, CoverageStatus.Failed, "allow comments could not be checked: " + exception.Message);
+            return [];
+        }
     }
 
     private static void NoteFilesNotLookedAt(TreeUnderReview tree, IReadOnlyList<ToolchainWork> toolchainWork, ReviewRun run)

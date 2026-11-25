@@ -42,7 +42,7 @@ public sealed class UpdateCommandTests
         if(row == "update, fails")
             _updater.InstallFailure = new UpdateException("The download of version 9.0.0.0 is damaged. Nothing was changed.");
         else if(row == "update, copy cannot update itself")
-            _updater.Problem = "This copy of the program is not a release download, so it cannot update itself.";
+            _updater.Problem = "This copy is not a release download, so it cannot update itself.";
 
         var exitCode = CreateRunner().Run(args);
 

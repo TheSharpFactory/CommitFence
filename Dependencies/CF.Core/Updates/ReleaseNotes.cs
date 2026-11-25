@@ -64,7 +64,7 @@ public static class ReleaseNotes
 
             length += block.Text.Length;
             var text = block.IsListItem ? block.Text.Substring(2) : block.Text;
-            result.Add(new ReleaseNoteLine { Text = text, IsHeading = block.IsHeading, IsListItem = block.IsListItem });
+            result.Add(new ReleaseNoteLine { Text = text, Marked = block.Marked, IsHeading = block.IsHeading, IsListItem = block.IsListItem });
         }
 
         return result;
@@ -93,7 +93,7 @@ public static class ReleaseNotes
 
                 current = null;
                 if(heading.Length > 0)
-                    blocks.Add(new NotesBlock { Text = heading, IsHeading = true });
+                    blocks.Add(new NotesBlock { Text = heading, Marked = heading, IsHeading = true });
 
                 continue;
             }
@@ -106,7 +106,7 @@ public static class ReleaseNotes
 
             if(line.StartsWith("- ", StringComparison.Ordinal) || line.StartsWith("* ", StringComparison.Ordinal))
             {
-                current = new NotesBlock { Text = "• " + CleanInline(line.Substring(2)), IsListItem = true };
+                current = new NotesBlock { Text = "• " + CleanInline(line.Substring(2)), Marked = KeepMarks(line.Substring(2)), IsListItem = true };
                 blocks.Add(current);
                 continue;
             }
@@ -115,10 +115,11 @@ public static class ReleaseNotes
             if(current != null)
             {
                 current.Text += " " + CleanInline(line);
+                current.Marked += " " + KeepMarks(line);
                 continue;
             }
 
-            current = new NotesBlock { Text = CleanInline(line) };
+            current = new NotesBlock { Text = CleanInline(line), Marked = KeepMarks(line) };
             blocks.Add(current);
         }
 
@@ -135,11 +136,21 @@ public static class ReleaseNotes
     }
 
     /// <summary>
+    /// A link as its text; the bold and code marks stay, for a view that draws them.
+    /// </summary>
+    private static string KeepMarks(string text)
+    {
+        return _link.Replace(text, "$1").Trim();
+    }
+
+    /// <summary>
     /// A paragraph, a list item or a heading of the release text.
     /// </summary>
     private sealed class NotesBlock
     {
         public string Text { get; set; } = string.Empty;
+
+        public string Marked { get; set; } = string.Empty;
 
         public bool IsHeading { get; init; }
 

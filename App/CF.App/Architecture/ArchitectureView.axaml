@@ -1,0 +1,280 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:parts="using:CF.App.Parts"
+             xmlns:screen="using:CF.App.Architecture"
+             xmlns:core="using:CF.Core.Services"
+             xmlns:ports="using:CF.Core.Ports"
+             xmlns:pick="using:CF.App.Rules.Page"
+             x:Class="CF.App.Architecture.ArchitectureView"
+             x:ClassModifier="internal"
+             x:DataType="screen:ArchitectureViewModel">
+
+  <UserControl.Styles>
+    <Style Selector="Button.arch-remove">
+      <Setter Property="Width" Value="28"/>
+      <Setter Property="Padding" Value="0"/>
+    </Style>
+    <Style Selector="Button.arch-module">
+      <Setter Property="Background" Value="{DynamicResource page}"/>
+      <Setter Property="BorderBrush" Value="{DynamicResource ink-3}"/>
+      <Setter Property="Padding" Value="0"/>
+    </Style>
+    <Style Selector="Button.arch-module.unlinked">
+      <Setter Property="Background" Value="{DynamicResource line}"/>
+      <Setter Property="BorderBrush" Value="{DynamicResource line}"/>
+    </Style>
+    <Style Selector="Button.arch-module:pointerover">
+      <Setter Property="Background" Value="{DynamicResource hover}"/>
+    </Style>
+    <Style Selector="Button.arch-module.unlinked:pointerover">
+      <Setter Property="Background" Value="{DynamicResource line-strong}"/>
+    </Style>
+    <Style Selector="Button.arch-module.current">
+      <Setter Property="BorderBrush" Value="{DynamicResource ink}"/>
+      <Setter Property="BorderThickness" Value="2"/>
+    </Style>
+    <Style Selector="Button.arch-cell">
+      <Setter Property="Padding" Value="0"/>
+      <Setter Property="CornerRadius" Value="0"/>
+    </Style>
+    <Style Selector="Button.arch-cell:pointerover">
+      <Setter Property="Background" Value="{DynamicResource hover}"/>
+    </Style>
+    <Style Selector="StackPanel.arch-key > TextBlock">
+      <Setter Property="Theme" Value="{StaticResource type-meta}"/>
+      <Setter Property="Foreground" Value="{DynamicResource ink-2}"/>
+      <Setter Property="VerticalAlignment" Value="Center"/>
+    </Style>
+    <Style Selector="Button#SwitchModule.open /template/ parts|FocusRing#Ring">
+      <Setter Property="IsVisible" Value="True"/>
+    </Style>
+    <Style Selector="pick|PickerPanel.arch-picker TextBlock.entry-name">
+      <Setter Property="Theme" Value="{StaticResource code}"/>
+    </Style>
+  </UserControl.Styles>
+
+  <parts:ScreenFrame Name="Frame" Title="Architecture" Meta="Structure rules, kept in commitfence.json">
+    <parts:ScreenFrame.Actions>
+      <Button Name="NewButton" Classes="cf main" Command="{Binding NewModuleCommand}" AutomationProperties.Name="New module">
+        <StackPanel Orientation="Horizontal" Spacing="8">
+          <parts:Icon Data="{StaticResource i-plus}" Width="16" Height="16" Stroke="{DynamicResource on-solid}"/>
+          <TextBlock Theme="{StaticResource type-body-strong}" Text="New module"/>
+        </StackPanel>
+      </Button>
+    </parts:ScreenFrame.Actions>
+
+    <parts:ScreenFrame.Main>
+      <StackPanel Name="MainColumn">
+        <Border IsVisible="{Binding HasBanner}" Background="{DynamicResource warn-tint}" CornerRadius="12"
+                Padding="14,10" Margin="0,0,0,12">
+          <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
+            <TextBlock Theme="{StaticResource type-body}" Text="{Binding Banner}" TextWrapping="Wrap" VerticalAlignment="Center"
+                       AutomationProperties.LiveSetting="Polite"/>
+            <Button Grid.Column="1" IsVisible="{Binding CanOpenFile}" Classes="cf quiet small" Command="{Binding OpenFileCommand}">
+              <TextBlock Theme="{StaticResource type-meta-strong}" Text="Open the file"/>
+            </Button>
+          </Grid>
+        </Border>
+        <Border IsVisible="{Binding HasUndo}" Background="{DynamicResource warn-tint}" CornerRadius="12"
+                Padding="14,6,8,6" Margin="0,0,0,12">
+          <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
+            <TextBlock Theme="{StaticResource type-body}" Text="{Binding UndoText}" VerticalAlignment="Center"
+                       AutomationProperties.LiveSetting="Polite"/>
+            <Button Grid.Column="1" Classes="cf quiet small" Command="{Binding UndoCommand}" IsEnabled="{Binding CanEdit}">
+              <TextBlock Theme="{StaticResource type-meta-strong}" Text="Undo"/>
+            </Button>
+          </Grid>
+        </Border>
+        <Border IsVisible="{Binding HasNotice}" Background="{DynamicResource warn-tint}" CornerRadius="12"
+                Padding="14,10" Margin="0,0,0,12">
+          <TextBlock Theme="{StaticResource type-body}" Text="{Binding Notice}" TextWrapping="Wrap"
+                     AutomationProperties.LiveSetting="Polite"/>
+        </Border>
+
+        <StackPanel IsVisible="{Binding HasModules}">
+          <parts:SummaryRow Margin="0,0,0,20">
+            <TextBlock Name="CountText"/>
+            <StackPanel Classes="fact" IsVisible="{Binding IsClean}" Orientation="Horizontal" Spacing="6">
+              <parts:Icon Data="{StaticResource i-check}" Width="15" Height="15" Stroke="{DynamicResource req-ink}"/>
+              <TextBlock Text="{Binding Judgment}"/>
+            </StackPanel>
+            <StackPanel Classes="fact" IsVisible="{Binding IsUnjudged}" Orientation="Horizontal" Spacing="6">
+              <parts:Icon Data="{StaticResource i-off}" Width="15" Height="15" Stroke="{DynamicResource off}"/>
+              <TextBlock Text="{Binding Judgment}"/>
+            </StackPanel>
+            <Border IsVisible="{Binding HasJudgedBreaches}" Background="{DynamicResource block}" Height="34"
+                    CornerRadius="10" Padding="10,0,13,0">
+              <StackPanel Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
+                <parts:EffectMark Kind="Block" Width="17" Height="17" Shape="{DynamicResource on-block}" Sign="{DynamicResource block}"/>
+                <TextBlock Theme="{StaticResource type-count}" Foreground="{DynamicResource on-block}" Text="{Binding Judgment}"/>
+              </StackPanel>
+            </Border>
+          </parts:SummaryRow>
+          <Border Background="{DynamicResource side}" CornerRadius="16" Padding="20,16,20,20">
+            <StackPanel Spacing="16">
+              <parts:WrapRow ItemSpacing="12" LineSpacing="8" MinHeight="36">
+                <parts:SegmentedList Name="Mode" Classes="segmented" SelectedIndex="0"
+                                     AutomationProperties.Name="Show the modules as" SelectionChanged="OnModeChanged">
+                  <ListBoxItem Height="28"><TextBlock Name="DiagramLabel" Classes="segment" Theme="{StaticResource type-meta}" Text="Diagram"/></ListBoxItem>
+                  <ListBoxItem Height="28"><TextBlock Classes="segment" Theme="{StaticResource type-meta}" Text="Table"/></ListBoxItem>
+                </parts:SegmentedList>
+                <Button Name="SwitchModule" Classes="cf outlined" Click="OnSwitchModule" KeyDown="OnSwitchKey"
+                        AutomationProperties.Name="Choose a module" Padding="12,0,10,0">
+                  <StackPanel Orientation="Horizontal" Spacing="8">
+                    <TextBlock Theme="{StaticResource type-meta}" Foreground="{DynamicResource ink-2}" Text="Module"/>
+                    <TextBlock Theme="{StaticResource code-strong}" Text="{Binding SelectedName}"/>
+                    <parts:Icon Data="{StaticResource i-down}" Width="13" Height="13" Stroke="{DynamicResource ink-2}"/>
+                  </StackPanel>
+                </Button>
+                <WrapPanel Name="Legend" parts:WrapRow.AtEnd="True" ItemSpacing="18" LineSpacing="6" VerticalAlignment="Center"/>
+              </parts:WrapRow>
+              <screen:ModuleDiagram Name="Diagram"/>
+              <screen:DirectionTable Name="Table" IsVisible="False"/>
+              <TextBlock Name="Foot" Theme="{StaticResource type-meta}" Foreground="{DynamicResource ink-2}" TextWrapping="Wrap"/>
+              <StackPanel Name="ScrollCue" Orientation="Horizontal" Spacing="6" IsVisible="False">
+                <parts:Icon Data="{StaticResource i-right}" Width="14" Height="14" Stroke="{DynamicResource ink}"/>
+                <TextBlock Theme="{StaticResource type-meta-strong}" Text="Wider than the panel: scroll sideways"/>
+              </StackPanel>
+            </StackPanel>
+          </Border>
+        </StackPanel>
+        <parts:PanelPlace Margin="0,20,0,0"/>
+        <Popup Name="PickerPopup" Placement="BottomEdgeAlignedLeft" VerticalOffset="8" IsLightDismissEnabled="True"/>
+      </StackPanel>
+    </parts:ScreenFrame.Main>
+
+    <parts:ScreenFrame.Panel>
+      <StackPanel Name="ModulePanel">
+        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8" Margin="10,0,4,4" MinHeight="28">
+          <TextBlock IsVisible="{Binding !EditingName}" Theme="{StaticResource code-h3}" Text="{Binding SelectedName}"
+                     VerticalAlignment="Center" TextWrapping="Wrap"/>
+          <TextBox Name="NameField" IsVisible="{Binding EditingName}" IsEnabled="{Binding IsWritable}" AutomationProperties.Name="Module name" KeyDown="OnNameKey"/>
+          <Button Grid.Column="1" Name="More" IsEnabled="{Binding CanEdit}" Classes="cf quiet small arch-remove"
+                  AutomationProperties.Name="{Binding MoreName}">
+            <parts:Icon Data="{StaticResource i-more}" Width="16" Height="16" Stroke="{DynamicResource ink}"/>
+            <Button.Flyout>
+              <MenuFlyout>
+                <MenuItem Header="Rename module" Click="OnRename"/>
+                <Separator/>
+                <MenuItem Header="Remove module" Command="{Binding RemoveModuleCommand}">
+                  <MenuItem.Icon><parts:Icon Data="{StaticResource i-bin}" Width="16" Height="16" Stroke="{DynamicResource block-ink}"/></MenuItem.Icon>
+                </MenuItem>
+              </MenuFlyout>
+            </Button.Flyout>
+          </Button>
+        </Grid>
+
+        <Border IsVisible="{Binding HasSelectedBreach}" Background="{DynamicResource page}" BorderBrush="{DynamicResource line}"
+                BorderThickness="1" CornerRadius="12" Padding="14,12,14,14" Margin="0,4">
+          <StackPanel Spacing="6">
+            <StackPanel Orientation="Horizontal" Spacing="6">
+              <parts:EffectMark Kind="Block" Width="15" Height="15" Classes="block"/>
+              <TextBlock Theme="{StaticResource type-body-strong}" Text="{Binding Judgment}"/>
+            </StackPanel>
+            <ItemsControl ItemsSource="{Binding ShownBreaches}">
+              <ItemsControl.ItemTemplate>
+                <DataTemplate x:DataType="ports:StructureBreach">
+                  <screen:BreachText Theme="{StaticResource type-body}" Foreground="{DynamicResource ink-2}" Breach="{Binding}"/>
+                </DataTemplate>
+              </ItemsControl.ItemTemplate>
+            </ItemsControl>
+            <TextBlock Theme="{StaticResource type-meta}" Text="{Binding MoreBreaches}" IsVisible="{Binding HasMoreBreaches}"/>
+            <TextBlock Theme="{StaticResource type-body}" Foreground="{DynamicResource ink-2}" TextWrapping="Wrap" Text="{Binding BreachContext}"/>
+            <WrapPanel ItemSpacing="8" LineSpacing="8" Margin="0,6,0,0">
+              <Button Classes="cf outlined small" Padding="8,0" IsVisible="{Binding CanOpenReview}" Command="{Binding OpenReviewCommand}">
+                <StackPanel Orientation="Horizontal" Spacing="6">
+                  <parts:Icon Data="{StaticResource i-review}" Width="14" Height="14" Stroke="{DynamicResource ink}"/>
+                  <TextBlock Theme="{StaticResource type-meta-strong}" Text="Open the review"/>
+                </StackPanel>
+              </Button>
+              <Button Classes="cf outlined small" Padding="8,0" Command="{Binding AllowBreachCommand}" IsEnabled="{Binding CanEdit}">
+                <TextBlock Theme="{StaticResource type-meta-strong}" Text="Allow this direction"/>
+              </Button>
+            </WrapPanel>
+          </StackPanel>
+        </Border>
+
+        <StackPanel Margin="4,12,4,4">
+          <TextBlock Theme="{StaticResource type-meta-strong}" Text="Made of" Margin="6,0,6,4"/>
+          <ItemsControl ItemsSource="{Binding Selected.Parts}">
+            <ItemsControl.ItemTemplate>
+              <DataTemplate x:DataType="core:StructurePart">
+                <Grid ColumnDefinitions="76,*,28" ColumnSpacing="8" MinHeight="36" Margin="6,0,4,0">
+                  <TextBlock Theme="{StaticResource type-meta}" Foreground="{DynamicResource ink-2}" Text="{Binding Kind}" VerticalAlignment="Center"/>
+                  <TextBlock Grid.Column="1" Theme="{StaticResource code}" Text="{Binding Pattern}" TextWrapping="Wrap" VerticalAlignment="Center"/>
+                  <Button Grid.Column="2" Classes="cf quiet small arch-remove" IsEnabled="{Binding $parent[ItemsControl].((screen:ArchitectureViewModel)DataContext).CanEdit}"
+                          Click="OnRemovePart" KeyDown="OnDelete" AutomationProperties.Name="{Binding StringFormat='Remove {0}'}" ToolTip.Tip="Remove this part">
+                    <parts:Icon Data="{StaticResource i-x}" Width="14" Height="14" Stroke="{DynamicResource ink-3}"/>
+                  </Button>
+                </Grid>
+              </DataTemplate>
+            </ItemsControl.ItemTemplate>
+          </ItemsControl>
+          <Button Name="AddPart" Classes="cf quiet small" HorizontalAlignment="Left" Margin="0,2,0,0"
+                  IsEnabled="{Binding CanEdit}" Click="OnAddPart">
+            <StackPanel Orientation="Horizontal" Spacing="8">
+              <parts:Icon Data="{StaticResource i-plus}" Width="14" Height="14" Stroke="{DynamicResource ink-2}"/>
+              <TextBlock Theme="{StaticResource type-meta-strong}" Text="Add a part"/>
+            </StackPanel>
+          </Button>
+          <TextBox Name="PartField" IsVisible="False" Margin="6,4,4,0" KeyDown="OnPartKey" AutomationProperties.Name="Part pattern"/>
+        </StackPanel>
+
+        <StackPanel Margin="4,12,4,4">
+          <StackPanel Orientation="Horizontal" Spacing="8" Margin="6,0,6,4">
+            <Path Data="M0 4h22" Width="22" Height="8" VerticalAlignment="Center" Stroke="{DynamicResource ink}" StrokeThickness="2"/>
+            <TextBlock Theme="{StaticResource type-meta-strong}" Text="May use"/>
+            <TextBlock Theme="{StaticResource type-meta}" Foreground="{DynamicResource ink-3}" Text="{Binding MayUse.Count}"/>
+          </StackPanel>
+          <ItemsControl ItemsSource="{Binding MayUse}">
+            <ItemsControl.ItemTemplate>
+              <DataTemplate x:DataType="x:String">
+                <Grid ColumnDefinitions="*,28" MinHeight="36" Margin="6,0,4,0">
+                  <TextBlock Theme="{StaticResource code}" Text="{Binding}" TextWrapping="Wrap" VerticalAlignment="Center"/>
+                  <Button Grid.Column="1" Classes="cf quiet small arch-remove" IsEnabled="{Binding $parent[ItemsControl].((screen:ArchitectureViewModel)DataContext).CanEdit}"
+                          Click="OnStopAllowing" KeyDown="OnDelete" AutomationProperties.Name="{Binding StringFormat='Stop allowing {0}'}" ToolTip.Tip="Stop allowing">
+                    <parts:Icon Data="{StaticResource i-x}" Width="14" Height="14" Stroke="{DynamicResource ink-3}"/>
+                  </Button>
+                </Grid>
+              </DataTemplate>
+            </ItemsControl.ItemTemplate>
+          </ItemsControl>
+          <Button Name="AllowAnother" Classes="cf quiet small" HorizontalAlignment="Left" Margin="0,2,0,0"
+                  IsEnabled="{Binding CanEdit}" Click="OnAllowAnother">
+            <StackPanel Orientation="Horizontal" Spacing="8">
+              <parts:Icon Data="{StaticResource i-plus}" Width="14" Height="14" Stroke="{DynamicResource ink-2}"/>
+              <TextBlock Theme="{StaticResource type-meta-strong}" Text="Allow another module"/>
+            </StackPanel>
+          </Button>
+        </StackPanel>
+
+        <StackPanel Margin="4,12,4,4">
+          <StackPanel Orientation="Horizontal" Spacing="8" Margin="6,0,6,4">
+            <Path Data="M0 4h22" Width="22" Height="8" VerticalAlignment="Center" Stroke="{DynamicResource ink-2}" StrokeThickness="1.75" StrokeDashArray="3.43,1.71"/>
+            <TextBlock Theme="{StaticResource type-meta-strong}" Text="Used by"/>
+            <TextBlock Theme="{StaticResource type-meta}" Foreground="{DynamicResource ink-3}" Text="{Binding UsedBy.Count}"/>
+          </StackPanel>
+          <ItemsControl ItemsSource="{Binding UsedBy}">
+            <ItemsControl.ItemTemplate>
+              <DataTemplate x:DataType="x:String">
+                <Button Classes="cf quiet" HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch" Padding="6,0,4,0"
+                        Click="OnChooseUser" AutomationProperties.Name="{Binding StringFormat='Choose {0}'}">
+                  <Grid ColumnDefinitions="*,28">
+                    <TextBlock Theme="{StaticResource code}" Text="{Binding}" VerticalAlignment="Center" TextWrapping="Wrap"/>
+                    <parts:Icon Grid.Column="1" Width="14" Height="14" Data="{StaticResource i-right}"
+                                Stroke="{DynamicResource ink-3}" HorizontalAlignment="Center"/>
+                  </Grid>
+                </Button>
+              </DataTemplate>
+            </ItemsControl.ItemTemplate>
+          </ItemsControl>
+        </StackPanel>
+        <Border Margin="6,8,6,0" BorderBrush="{DynamicResource line}" BorderThickness="0,1,0,0" Padding="10,12,10,4">
+          <TextBlock Theme="{StaticResource type-meta}" Foreground="{DynamicResource ink-2}" TextWrapping="Wrap"
+                     Text="Changes are saved at once, in commitfence.json."/>
+        </Border>
+      </StackPanel>
+    </parts:ScreenFrame.Panel>
+  </parts:ScreenFrame>
+
+</UserControl>

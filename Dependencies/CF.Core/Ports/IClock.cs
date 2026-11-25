@@ -9,4 +9,10 @@ public interface IClock
     /// The current moment.
     /// </summary>
     DateTimeOffset Now { get; }
+
+    /// <summary>Converts an instant to the clock's local calendar.</summary>
+    DateTimeOffset ToLocalTime(DateTimeOffset instant)
+    {
+        return instant.ToOffset(Now.Offset);
+    }
 }

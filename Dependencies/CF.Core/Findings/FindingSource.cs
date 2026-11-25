@@ -28,5 +28,8 @@ public enum FindingSource
     /// <summary>
     /// A rule that comes from a pack.
     /// </summary>
-    Pack
+    Pack,
+
+    /// <summary>An invalid exemption in the source.</summary>
+    Exemption
 }

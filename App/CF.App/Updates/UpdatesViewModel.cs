@@ -8,13 +8,23 @@ using CommunityToolkit.Mvvm.Input;
 namespace CF.App.Updates;
 
 /// <summary>
-/// Automatic updates: a check when the app starts and once a day after (and when asked), the notice with the release notes,
-/// and the install and restart once the user says so. Nothing is downloaded before the user says yes.
+/// Automatic updates: a check when the app starts and once a day after (and when asked), the notice with its title, its line,
+/// its bar and its buttons for each state of an update, and the install and restart once the user says so. Nothing is downloaded
+/// before the user says yes. The notice and Settings read their words from here.
 /// </summary>
 internal sealed partial class UpdatesViewModel : ObservableObject
 {
     private const int _notesLength = 1500;
     private static readonly TimeSpan _timerInterval = TimeSpan.FromHours(1);
+
+    private static readonly string[] _noticeProperties =
+    [
+        nameof(NoticeState), nameof(IsNoticeVisible), nameof(Title), nameof(Line), nameof(Mark), nameof(ShowsBar), nameof(ShowsPercent), nameof(PercentText),
+        nameof(BarFraction), nameof(Buttons), nameof(ShowsLater), nameof(ShowsWhatsNew), nameof(ShowsCancel), nameof(ShowsClose),
+        nameof(ShowsReleasePage), nameof(ShowsTryAgain), nameof(ShowsUpdateNow), nameof(IsFinished), nameof(IsRunning), nameof(CanDismiss),
+        nameof(CanUpdate), nameof(CanOpenReleasePage), nameof(HasUpdate), nameof(ProblemText), nameof(HasProblem), nameof(NotesLines), nameof(HasNotes),
+        nameof(IsBusyMark), nameof(IsLogoMark), nameof(IsTickMark), nameof(IsFailureMark)
+    ];
 
     private readonly IUpdater _updater;
     private readonly IUpdateCheckRecord _record;
@@ -36,12 +46,48 @@ internal sealed partial class UpdatesViewModel : ObservableObject
         _folderPath = folderPath;
     }
 
+    /// <summary>
+    /// Why the last update failed, in the sentence the body gave.
+    /// </summary>
+    public string Failure { get; private set; } = string.Empty;
+
+    /// <summary>
+    /// Whether a check of this run has answered, with a newer version or without one. The record keeps only when a check worked, so
+    /// until this is true the screens claim nothing about the version being the latest.
+    /// </summary>
+    public bool HasAnswered { get; private set; }
+
+    /// <summary>
+    /// Why a check the user asked for could not finish, in the sentence the body gave; null while that check has not failed.
+    /// </summary>
+    public string? CheckProblem { get; private set; }
+
+    /// <summary>
+    /// Where an update that was started has got to.
+    /// </summary>
+    private enum InstallPhase
+    {
+        None,
+        Downloading,
+        Cancelling,
+        Replacing,
+        Installed,
+        CouldNotRestart,
+        Cancelled,
+        Failed
+    }
+
+    /// <summary>
+    /// Asked for by "What's new": the window opens Settings, where the notes of the version are shown.
+    /// </summary>
+    public event Action? WhatsNewRequested;
+
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(IsIdle))]
     public partial bool IsChecking { get; set; }
 
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(IsIdle), nameof(CanCancel), nameof(CanDismiss), nameof(CanUpdate), nameof(HasNotes), nameof(IsNoticeVisible))]
+    [NotifyPropertyChangedFor(nameof(IsIdle), nameof(CanCancel), nameof(CanDismiss), nameof(CanUpdate), nameof(HasNotes))]
     public partial bool IsInstalling { get; set; }
 
     /// <summary>
@@ -52,14 +98,14 @@ internal sealed partial class UpdatesViewModel : ObservableObject
     public partial bool IsReplacing { get; set; }
 
     /// <summary>
-    /// What the notice says about a check the user asked for, or about an update that is running.
+    /// What a check the user asked for found: "Checking for updates…", "You have the latest version", or why it failed. It is
+    /// Settings' to show; the notice answers a check only by showing a newer version.
     /// </summary>
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(Headline), nameof(HasStatus), nameof(IsNoticeVisible))]
+    [NotifyPropertyChangedFor(nameof(HasStatus))]
     public partial string? StatusText { get; set; }
 
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(HasUpdate), nameof(IsNoticeVisible), nameof(Headline), nameof(NotesLines), nameof(HasNotes), nameof(ProblemText), nameof(HasProblem), nameof(CanUpdate), nameof(CanOpenReleasePage))]
     public partial ReleaseInfo? AvailableRelease { get; set; }
 
     /// <summary>
@@ -70,8 +116,10 @@ internal sealed partial class UpdatesViewModel : ObservableObject
     public partial int DownloadPercent { get; set; }
 
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(IsNoticeVisible))]
     public partial bool IsDismissed { get; set; }
+
+    [ObservableProperty]
+    private partial InstallPhase Phase { get; set; }
 
     /// <summary>
     /// Starts the app again from where it is and ends this run: false when it could not start. The window gives it.
@@ -99,30 +147,215 @@ internal sealed partial class UpdatesViewModel : ObservableObject
     }
 
     /// <summary>
-    /// The notice shows while a newer release waits and was not sent away, and while it has something to say about a check
-    /// the user asked for or an update that runs.
+    /// What the notice is saying: a newer version waits and was not sent away, an update runs, or one has just ended.
     /// </summary>
-    public bool IsNoticeVisible
-    {
-        get { return HasStatus || (HasUpdate && !IsDismissed); }
-    }
-
-    /// <summary>
-    /// The first line of the notice: what is going on, or the version that is available.
-    /// </summary>
-    public string Headline
+    public UpdateNoticeState NoticeState
     {
         get
         {
-            if(StatusText != null)
-                return StatusText;
+            return Phase switch
+            {
+                InstallPhase.Downloading => IsDownloadPercentKnown ? UpdateNoticeState.Downloading : UpdateNoticeState.SizeNotKnown,
+                InstallPhase.Cancelling => UpdateNoticeState.Cancelling,
+                InstallPhase.Replacing => UpdateNoticeState.Replacing,
+                InstallPhase.Installed => UpdateNoticeState.Installed,
+                InstallPhase.CouldNotRestart => UpdateNoticeState.InstalledCouldNotRestart,
+                InstallPhase.Cancelled => UpdateNoticeState.Cancelled,
+                InstallPhase.Failed => UpdateNoticeState.Failed,
+                InstallPhase.None => WaitingState(),
+                _ => throw new ArgumentOutOfRangeException(nameof(Phase))
+            };
+        }
+    }
 
-            return AvailableRelease == null ? string.Empty : $"CommitFence {AvailableRelease.Version} is available. You have {CurrentVersion}.";
+    public bool IsNoticeVisible
+    {
+        get { return NoticeState != UpdateNoticeState.None; }
+    }
+
+    /// <summary>
+    /// The title of the notice, in the words of its table.
+    /// </summary>
+    public string Title
+    {
+        get
+        {
+            var version = AvailableRelease?.Version;
+            return NoticeState switch
+            {
+                UpdateNoticeState.Available or UpdateNoticeState.CannotUpdate => $"CommitFence {version} is available.",
+                UpdateNoticeState.Downloading or UpdateNoticeState.SizeNotKnown => $"Downloading {version}",
+                UpdateNoticeState.Cancelling => "Cancelling the update",
+                UpdateNoticeState.Replacing => $"Replacing the files with {version}",
+                UpdateNoticeState.Installed or UpdateNoticeState.InstalledCouldNotRestart => $"{version} is installed.",
+                UpdateNoticeState.Cancelled => "The update was cancelled.",
+                UpdateNoticeState.Failed => "The update failed.",
+                UpdateNoticeState.None => string.Empty,
+                _ => throw new ArgumentOutOfRangeException(nameof(NoticeState))
+            };
         }
     }
 
     /// <summary>
-    /// What the release notes say, laid out line by line.
+    /// The line under the title.
+    /// </summary>
+    public string Line
+    {
+        get
+        {
+            return NoticeState switch
+            {
+                UpdateNoticeState.Available => $"You have {CurrentVersion}. Nothing is downloaded until you say so.",
+                UpdateNoticeState.CannotUpdate => $"You have {CurrentVersion}. {ProblemText}",
+                UpdateNoticeState.Downloading or UpdateNoticeState.SizeNotKnown => "The app restarts when it is in place.",
+                UpdateNoticeState.Cancelling => $"You will keep {CurrentVersion}.",
+                UpdateNoticeState.Replacing => "Too late to cancel. It takes a moment.",
+                UpdateNoticeState.Installed => "Restarting.",
+                UpdateNoticeState.InstalledCouldNotRestart => "Close the app and start it again to use it.",
+                UpdateNoticeState.Cancelled => $"You still have {CurrentVersion}.",
+                UpdateNoticeState.Failed => $"{Failure} You still have {CurrentVersion}.",
+                UpdateNoticeState.None => string.Empty,
+                _ => throw new ArgumentOutOfRangeException(nameof(NoticeState))
+            };
+        }
+    }
+
+    public UpdateMark Mark
+    {
+        get
+        {
+            return NoticeState switch
+            {
+                UpdateNoticeState.Cancelling or UpdateNoticeState.Replacing => UpdateMark.Ring,
+                UpdateNoticeState.Installed or UpdateNoticeState.InstalledCouldNotRestart => UpdateMark.Tick,
+                UpdateNoticeState.Failed => UpdateMark.Failure,
+                UpdateNoticeState.None or UpdateNoticeState.Available or UpdateNoticeState.CannotUpdate or UpdateNoticeState.Downloading or UpdateNoticeState.SizeNotKnown or UpdateNoticeState.Cancelled => UpdateMark.Logo,
+                _ => throw new ArgumentOutOfRangeException(nameof(NoticeState))
+            };
+        }
+    }
+
+    public bool IsLogoMark
+    {
+        get { return Mark == UpdateMark.Logo; }
+    }
+
+    public bool IsBusyMark
+    {
+        get { return Mark == UpdateMark.Ring; }
+    }
+
+    public bool IsTickMark
+    {
+        get { return Mark == UpdateMark.Tick; }
+    }
+
+    public bool IsFailureMark
+    {
+        get { return Mark == UpdateMark.Failure; }
+    }
+
+    /// <summary>
+    /// The bar shows while a download runs. There is none while the files are replaced: the ring says it runs.
+    /// </summary>
+    public bool ShowsBar
+    {
+        get { return NoticeState is UpdateNoticeState.Downloading or UpdateNoticeState.SizeNotKnown; }
+    }
+
+    /// <summary>
+    /// The percent beside the bar, when the size is known.
+    /// </summary>
+    public bool ShowsPercent
+    {
+        get { return NoticeState == UpdateNoticeState.Downloading; }
+    }
+
+    public string PercentText
+    {
+        get { return $"{DownloadPercent}%"; }
+    }
+
+    /// <summary>
+    /// How much of the bar is filled, 0 to 1, or -1 for a piece that moves when the size is not known.
+    /// </summary>
+    public double BarFraction
+    {
+        get { return IsDownloadPercentKnown ? DownloadFraction : -1; }
+    }
+
+    /// <summary>
+    /// The buttons of the state, in the order the notice draws them.
+    /// </summary>
+    public IReadOnlyList<UpdateButton> Buttons
+    {
+        get
+        {
+            var buttons = new List<UpdateButton>();
+            AddIf(buttons, ShowsLater, UpdateButton.Later);
+            AddIf(buttons, ShowsWhatsNew, UpdateButton.WhatsNew);
+            AddIf(buttons, ShowsCancel, UpdateButton.Cancel);
+            AddIf(buttons, ShowsClose, UpdateButton.Close);
+            AddIf(buttons, ShowsReleasePage, UpdateButton.OpenReleasePage);
+            AddIf(buttons, ShowsTryAgain, UpdateButton.TryAgain);
+            AddIf(buttons, ShowsUpdateNow, UpdateButton.UpdateNow);
+            return buttons;
+        }
+    }
+
+    public bool ShowsLater
+    {
+        get { return NoticeState is UpdateNoticeState.Available or UpdateNoticeState.CannotUpdate; }
+    }
+
+    public bool ShowsWhatsNew
+    {
+        get { return NoticeState == UpdateNoticeState.Available; }
+    }
+
+    public bool ShowsCancel
+    {
+        get { return NoticeState is UpdateNoticeState.Downloading or UpdateNoticeState.SizeNotKnown; }
+    }
+
+    public bool ShowsClose
+    {
+        get { return NoticeState is UpdateNoticeState.InstalledCouldNotRestart or UpdateNoticeState.Cancelled or UpdateNoticeState.Failed; }
+    }
+
+    public bool ShowsReleasePage
+    {
+        get { return NoticeState is UpdateNoticeState.CannotUpdate or UpdateNoticeState.Failed && AvailableRelease?.PageUri != null; }
+    }
+
+    public bool ShowsTryAgain
+    {
+        get { return NoticeState == UpdateNoticeState.Failed; }
+    }
+
+    public bool ShowsUpdateNow
+    {
+        get { return NoticeState == UpdateNoticeState.Available; }
+    }
+
+    /// <summary>
+    /// The state is the end of an update that was started: "Close" ends it.
+    /// </summary>
+    public bool IsFinished
+    {
+        get { return NoticeState is UpdateNoticeState.InstalledCouldNotRestart or UpdateNoticeState.Cancelled or UpdateNoticeState.Failed; }
+    }
+
+    /// <summary>
+    /// An update is running: nothing sends the notice away.
+    /// </summary>
+    public bool IsRunning
+    {
+        get { return IsInstalling; }
+    }
+
+    /// <summary>
+    /// What the release notes say, laid out line by line. They are shown on Settings, not in the notice.
     /// </summary>
     public IReadOnlyList<ReleaseNoteLine> NotesLines
     {
@@ -148,7 +381,7 @@ internal sealed partial class UpdatesViewModel : ObservableObject
     }
 
     /// <summary>
-    /// "Update now" shows when the release waits and the app can install it.
+    /// "Update now" is possible when the release waits and the app can install it.
     /// </summary>
     public bool CanUpdate
     {
@@ -164,7 +397,7 @@ internal sealed partial class UpdatesViewModel : ObservableObject
     }
 
     /// <summary>
-    /// Later: not while an update runs.
+    /// Later and Close: not while an update runs.
     /// </summary>
     public bool CanDismiss
     {
@@ -244,8 +477,26 @@ internal sealed partial class UpdatesViewModel : ObservableObject
     }
 
     /// <summary>
-    /// Asks for the latest release. A newer one shows in the notice; a check the user asked for also says when there is none
-    /// or when it failed.
+    /// "Try again" after a failure starts the update again.
+    /// </summary>
+    [RelayCommand]
+    private async Task TryAgainAsync()
+    {
+        await InstallAsync();
+    }
+
+    /// <summary>
+    /// "What's new": Settings opens at the version, with the notes shown. The notice stays.
+    /// </summary>
+    [RelayCommand]
+    private void WhatsNew()
+    {
+        WhatsNewRequested?.Invoke();
+    }
+
+    /// <summary>
+    /// Asks for the latest release. A newer one shows in the notice; a check the user asked for also says, in its status text,
+    /// when there is none or when it failed.
     /// </summary>
     public async Task CheckAsync(bool userAsked)
     {
@@ -253,6 +504,7 @@ internal sealed partial class UpdatesViewModel : ObservableObject
             return;
 
         IsChecking = true;
+        CheckProblem = null;
         if(userAsked)
             StatusText = "Checking for updates…";
 
@@ -268,11 +520,14 @@ internal sealed partial class UpdatesViewModel : ObservableObject
 
         if(result.Status == UpdateCheckStatus.Failed || result.Release == null)
         {
+            CheckProblem = userAsked ? result.Problem ?? string.Empty : null;
             StatusText = userAsked ? $"Could not check for updates. {result.Problem}" : null;
             return;
         }
 
         _record.Save(_clock.Now.UtcDateTime);
+        HasAnswered = true;
+        OnPropertyChanged(nameof(HasAnswered));
         if(result.Status == UpdateCheckStatus.UpToDate)
         {
             AvailableRelease = null;
@@ -298,7 +553,7 @@ internal sealed partial class UpdatesViewModel : ObservableObject
         IsReplacing = false;
         IsInstalling = true;
         DownloadPercent = 0;
-        StatusText = $"Downloading version {release.Version}…";
+        Phase = InstallPhase.Downloading;
         using(var cancellation = new UpdateCancellation())
         {
             _installCancellation = cancellation;
@@ -316,12 +571,13 @@ internal sealed partial class UpdatesViewModel : ObservableObject
             }
             catch(OperationCanceledException) when(cancellation.IsCancelled)
             {
-                StopInstalling($"The update was cancelled. You still have version {CurrentVersion}.");
+                StopInstalling(InstallPhase.Cancelled);
                 return;
             }
             catch(Exception exception)
             {
-                StopInstalling($"The update failed. {exception.Message} You still have version {CurrentVersion}.");
+                Failure = exception.Message;
+                StopInstalling(InstallPhase.Failed);
                 return;
             }
             finally
@@ -334,15 +590,15 @@ internal sealed partial class UpdatesViewModel : ObservableObject
         // what a finished install means is set here, whether or not the "replacing" report ever arrived: the files are replaced and
         // Cancel is gone
         IsReplacing = true;
-        StatusText = $"Version {release.Version} is installed. Restarting…";
+        Phase = InstallPhase.Installed;
         if(StartAndExit != null && StartAndExit(_updater.CreateStartInfo(_folderPath)))
             return;
 
-        StopInstalling($"Version {release.Version} is installed. Close the app and start it again to use it.");
+        StopInstalling(InstallPhase.CouldNotRestart);
     }
 
     /// <summary>
-    /// Stops the download. Once the files are being replaced it is too late, and Cancel says so: the swap takes a moment and
+    /// Stops the download. Once the files are being replaced it is too late, and the notice says so: the swap takes a moment and
     /// finishes.
     /// </summary>
     [RelayCommand]
@@ -355,11 +611,12 @@ internal sealed partial class UpdatesViewModel : ObservableObject
 
         // cancelling can end the update on this very call, which has said what happened already
         if(IsInstalling)
-            StatusText = cancelled ? "Cancelling the update…" : "Too late to cancel: the files are being replaced.";
+            Phase = cancelled ? InstallPhase.Cancelling : InstallPhase.Replacing;
     }
 
     /// <summary>
-    /// Sends the notice away: a newer version stays away until a later one comes, or the user asks to check.
+    /// Later sends the notice away, and Close ends a finished state the same way: a newer version stays away until a later one
+    /// comes, or the user asks to check. Not while an update runs.
     /// </summary>
     [RelayCommand]
     private void Dismiss()
@@ -369,7 +626,20 @@ internal sealed partial class UpdatesViewModel : ObservableObject
 
         _dismissedVersion = AvailableRelease?.Version;
         StatusText = null;
+        Phase = InstallPhase.None;
         IsDismissed = true;
+    }
+
+    /// <summary>
+    /// Esc with the keyboard in the notice: Later or Close, and nothing while an update runs. True when it did something.
+    /// </summary>
+    public bool EscapePressed()
+    {
+        if(IsInstalling || !IsNoticeVisible)
+            return false;
+
+        Dismiss();
+        return true;
     }
 
     [RelayCommand]
@@ -380,11 +650,57 @@ internal sealed partial class UpdatesViewModel : ObservableObject
             await OpenUri(page);
     }
 
-    private void StopInstalling(string statusText)
+    partial void OnPhaseChanged(InstallPhase value)
+    {
+        RaiseNotice();
+    }
+
+    partial void OnAvailableReleaseChanged(ReleaseInfo? oldValue, ReleaseInfo? newValue)
+    {
+        // the end of an update describes that release only: when another is found, the notice offers it instead
+        if(!IsInstalling && !Equals(oldValue?.Version, newValue?.Version))
+            Phase = InstallPhase.None;
+
+        RaiseNotice();
+    }
+
+    partial void OnIsDismissedChanged(bool value)
+    {
+        RaiseNotice();
+    }
+
+    partial void OnDownloadPercentChanged(int value)
+    {
+        RaiseNotice();
+    }
+
+    private UpdateNoticeState WaitingState()
+    {
+        if(!HasUpdate || IsDismissed)
+            return UpdateNoticeState.None;
+
+        return ProblemText != null ? UpdateNoticeState.CannotUpdate : UpdateNoticeState.Available;
+    }
+
+    private void RaiseNotice()
+    {
+        foreach(var name in _noticeProperties)
+        {
+            OnPropertyChanged(name);
+        }
+    }
+
+    private static void AddIf(List<UpdateButton> buttons, bool condition, UpdateButton button)
+    {
+        if(condition)
+            buttons.Add(button);
+    }
+
+    private void StopInstalling(InstallPhase phase)
     {
         IsInstalling = false;
         IsReplacing = false;
-        StatusText = statusText;
+        Phase = phase;
     }
 
     private void OnInstallProgress(UpdateProgress progress)
@@ -392,14 +708,12 @@ internal sealed partial class UpdatesViewModel : ObservableObject
         if(progress.Stage == UpdateStage.Replacing)
         {
             IsReplacing = true;
-            if(AvailableRelease != null && _installCancellation != null)
-                StatusText = $"Replacing the files with version {AvailableRelease.Version}…";
+            if(_installCancellation != null && Phase == InstallPhase.Downloading)
+                Phase = InstallPhase.Replacing;
 
             return;
         }
 
         DownloadPercent = progress.Percent;
-        if(progress.Percent >= 0 && AvailableRelease != null && _installCancellation != null && !_installCancellation.IsCancelled)
-            StatusText = $"Downloading version {AvailableRelease.Version}… {progress.Percent}%";
     }
 }

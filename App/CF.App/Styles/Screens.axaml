@@ -1,0 +1,31 @@
+<Styles xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:parts="using:CF.App.Parts">
+
+  <!-- The parts of the frame the five screens share. Colours come from the token dictionaries only. -->
+
+  <!-- A text piece of a screen's summary: type-lead in ink-2, figures lined up. Its numbers are runs of weight 600 in ink. -->
+  <Style Selector="parts|SummaryRow > TextBlock">
+    <Setter Property="Theme" Value="{StaticResource type-lead}"/>
+    <Setter Property="Foreground" Value="{DynamicResource ink-2}"/>
+    <Setter Property="FontFeatures" Value="+tnum"/>
+    <Setter Property="TextWrapping" Value="NoWrap"/>
+    <Setter Property="VerticalAlignment" Value="Center"/>
+  </Style>
+
+  <!-- A fact in a summary or a head: a small icon, then a line of type-body in ink-2. -->
+  <Style Selector="StackPanel.fact > TextBlock">
+    <Setter Property="Theme" Value="{StaticResource type-body}"/>
+    <Setter Property="Foreground" Value="{DynamicResource ink-2}"/>
+    <Setter Property="FontFeatures" Value="+tnum"/>
+    <Setter Property="VerticalAlignment" Value="Center"/>
+  </Style>
+
+  <!-- The track of a progress bar (the update notice, Settings): 10 high; its empty part is data, its done part solid. -->
+  <Style Selector="parts|ProgressTrack">
+    <Setter Property="Height" Value="10"/>
+    <Setter Property="Fill" Value="{DynamicResource solid}"/>
+    <Setter Property="Track" Value="{DynamicResource data}"/>
+  </Style>
+
+</Styles>

@@ -41,12 +41,31 @@ public sealed class StructureReview
 
     internal void Run(TreeUnderReview tree, RuleSettings settings, IReadOnlyList<LanguageAnswers> afterAnswers, ReviewRun run)
     {
+        ReportUnsupported(settings.Structure, run);
         if(settings.Structure.IsEmpty)
             return;
 
         NoteChangedRules(tree, settings, run);
         foreach(var after in afterAnswers.Where(candidate => candidate.Language.Meaning != null))
-            RunLanguage(tree.Repository, tree.ChangeSet, settings.Structure, after, run);
+        {
+            if(RunLanguage(tree.Repository, tree.ChangeSet, settings.Structure, after, run))
+                run.MarkStructureJudged();
+            else
+                run.MarkStructureIncomplete();
+        }
+    }
+
+    internal static void ReportUnsupported(StructureRules rules, ReviewRun run)
+    {
+        const string reason = "this version does not judge it yet";
+        if(rules.References is { Count: > 0 })
+            run.AddNotRun("structure references", reason);
+
+        if(rules.Layout is { Count: > 0 })
+            run.AddNotRun("structure layout", reason);
+
+        if(rules.Directions.NoCycles == true)
+            run.AddNotRun("structure noCycles", reason);
     }
 
     /// <summary>
@@ -54,23 +73,38 @@ public sealed class StructureReview
     /// when the change starts from nothing) and which violations are in scope (all of a change; in a whole review those
     /// of the files of the change set).
     /// </summary>
-    private void RunLanguage(RepositoryLocation repository, ChangeSet changeSet, StructureRules rules, LanguageAnswers after, ReviewRun run)
+    private bool RunLanguage(RepositoryLocation repository, ChangeSet changeSet, StructureRules rules, LanguageAnswers after, ReviewRun run)
     {
         if(!after.Answers.IsComplete)
         {
             run.AddNotRun(StructureRuleInfo.LayerDirectionId, $"the build did not answer completely for {changeSet.NameOfTreeAfter()}: " + after.Answers.Gaps[0]);
-            return;
+            return false;
         }
 
         var judge = new StructureJudge(rules);
         var known = FindKnownViolations(repository, changeSet, judge, after, run);
         if(known == null)
-            return;
+            return false;
 
-        var made = judge.Judge(after.Answers).Where(violation => !known.Contains(violation.Identity) && IsInScope(changeSet, violation.Use.File));
-        run.AddFindings(made.Select(StructureFindings.Create).ToList());
-        foreach(var use in judge.FindUnplaced(after.Answers).Where(candidate => IsInScope(changeSet, candidate.File)))
+        var previousPaths = changeSet.Files.Where(file => file.PreviousPath != null)
+            .ToDictionary(file => file.Path, file => file.PreviousPath!, StringComparer.Ordinal);
+        var made = judge.Judge(after.Answers).Where(violation => !IsKnown(violation, known, previousPaths) && IsInScope(changeSet, violation.Use.File))
+            .OrderBy(violation => violation.Place.Line).ThenBy(violation => violation.Place.Column);
+        foreach(var violation in made)
+            run.AddStructureFinding(violation);
+
+        var unplaced = judge.FindUnplaced(after.Answers).Where(candidate => IsInScope(changeSet, candidate.File)).ToList();
+        foreach(var use in unplaced)
             run.AddNotRun(StructureRuleInfo.LayerDirectionId, DescribeUnplaced(use));
+
+        return unplaced.Count == 0;
+    }
+
+    private static bool IsKnown(StructureViolation violation, HashSet<string> known, Dictionary<string, string> previousPaths)
+    {
+        return previousPaths.TryGetValue(violation.Use.File, out var previous)
+            ? known.Contains(violation.IdentityInFile(previous))
+            : known.Contains(violation.Identity);
     }
 
     /// <summary>

@@ -1,0 +1,15 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:parts="using:CF.App.Parts"
+             x:Class="CF.App.Parts.SectionHead"
+             x:ClassModifier="internal">
+
+  <!-- The head of a section of a screen: a wrapping row at least 28 high, items centred, 12 apart: the name in type-h2, a note
+       in type-meta ink-2, and at the right end a small button. 12 below it comes the section itself. -->
+  <parts:WrapRow Name="Row" MinHeight="28" ItemSpacing="12" LineSpacing="4" Margin="0,0,0,12">
+    <TextBlock Name="NameText" Theme="{StaticResource type-h2}" TextWrapping="NoWrap" VerticalAlignment="Center"/>
+    <TextBlock Name="NoteText" Theme="{StaticResource type-meta}" Foreground="{DynamicResource ink-2}" VerticalAlignment="Center"/>
+    <ContentPresenter Name="ActionPlace" parts:WrapRow.AtEnd="True" VerticalAlignment="Center"/>
+  </parts:WrapRow>
+
+</UserControl>

@@ -22,11 +22,20 @@ internal sealed class CommandRunner
     /// </summary>
     internal const string UpdateCommandName = "update";
 
+    /// <summary>The name of the command that checks readiness for pushes.</summary>
+    internal const string DoctorCommandName = "doctor";
+
     private readonly IProductInfoService _productInfo;
     private readonly IRuleService _ruleService;
     private readonly IReviewService _reviewService;
     private readonly ISetupService _setupService;
     private readonly IUpdater _updater;
+    private readonly IDoctorService? _doctor;
+    private readonly ISettingsService? _settings;
+    private readonly IStructureService? _structure;
+    private readonly IClock? _clock;
+    private readonly IExemptionService? _exemptions;
+    private readonly IStatsService? _stats;
     private readonly CommandEnvironment _environment;
     private readonly string _programPath;
     private readonly string _currentFolder;
@@ -34,13 +43,19 @@ internal sealed class CommandRunner
     private readonly TextWriter _error;
     private readonly Dictionary<string, Func<string[], ExitCode>> _commands;
 
-    public CommandRunner(IProductInfoService productInfo, IRuleService ruleService, IReviewService reviewService, ISetupService setupService, IUpdater updater, CommandEnvironment environment)
+    public CommandRunner(IProductInfoService productInfo, IRuleService ruleService, IReviewService reviewService, ISetupService setupService, IUpdater updater, CommandEnvironment environment, IDoctorService? doctor = null, ISettingsService? settings = null, IStructureService? structure = null, IClock? clock = null, IExemptionService? exemptions = null, IStatsService? stats = null)
     {
         _productInfo = productInfo;
         _ruleService = ruleService;
         _reviewService = reviewService;
         _setupService = setupService;
         _updater = updater;
+        _doctor = doctor;
+        _settings = settings;
+        _structure = structure;
+        _clock = clock;
+        _exemptions = exemptions;
+        _stats = stats;
         _environment = environment;
         _currentFolder = environment.CurrentFolder;
         _programPath = environment.ProgramPath;
@@ -69,10 +84,15 @@ internal sealed class CommandRunner
             ["-h"] = Alone(ShowUsage),
             ["--version"] = Alone(() => new VersionCommand(_productInfo, _output).Run()),
             ["init"] = Alone(RunInit),
+            [DoctorCommandName] = Alone(RunDoctor),
+            ["stats"] = args => new StatsCommand(_stats ?? throw new InvalidOperationException("Stats is not configured."), _environment).Run(args),
             ["install"] = RunInstall,
             [UpdateCommandName] = RunUpdate,
             ["catalog"] = RunCatalog,
             ["rules"] = args => new RulesRunner(_ruleService, _environment).Run(args),
+            ["settings"] = args => new SettingsCommand(_settings ?? throw new InvalidOperationException("Settings is not configured."), _environment).Run(args),
+            ["structure"] = args => new StructureCommand(_structure ?? throw new InvalidOperationException("Structure is not configured."), _clock!, _environment).Run(args),
+            ["exemptions"] = args => new ExemptionsCommand(_exemptions ?? throw new InvalidOperationException("Exemptions is not configured."), _environment).Run(args),
             [ReviewCommandName] = RunReview
         };
     }
@@ -148,6 +168,11 @@ internal sealed class CommandRunner
             return Fail("update takes only --check." + Environment.NewLine + UsageText.Text);
 
         return new UpdateCommand(_updater, _output, _error, checkOnly).Run();
+    }
+
+    private ExitCode RunDoctor()
+    {
+        return new DoctorCommand(_doctor ?? throw new InvalidOperationException("Doctor is not configured."), _output).Run(_currentFolder);
     }
 
     private ExitCode RunInit()

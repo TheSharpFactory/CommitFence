@@ -7,6 +7,7 @@ using CF.Core.Review;
 using CF.Core.Rules.Settings;
 using CF.Core.Services;
 using CF.Languages.CSharp;
+using CF.Tests.Review.Support;
 
 namespace CF.Tests.Toolchain.Support;
 
@@ -50,7 +51,10 @@ internal sealed class CommandHarness
         var output = new StringWriter();
         var error = new StringWriter();
         var environment = new CommandEnvironment(_folder, _folder, Path.Combine(_folder, "commitfence"), new StringReader(input), output, error, false);
-        var runner = new CommandRunner(null!, new RuleService(_fileSystem, _settingsLock, languages), new ReviewService(namedFiles, null!, null!), null!, null!, environment);
+        var runner = new CommandRunner(null!, new RuleService(_fileSystem, _settingsLock, languages), new ReviewService(namedFiles, null!, null!), null!, null!, environment,
+            settings: new SettingsService(_fileSystem, _settingsLock, languages),
+            structure: new StructureService(_fileSystem, _settingsLock, languages, new FakeGit(_folder), new FileStructureJudgments(DataFolder, _fileSystem)),
+            clock: new FixedClock(DateTimeOffset.UnixEpoch));
 
         var exitCode = runner.Run(arguments);
 

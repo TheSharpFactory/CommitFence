@@ -10,7 +10,14 @@ public static class Excerpt
     /// </summary>
     public static IReadOnlyList<ExcerptLine> Around(string content, int line, int linesAround)
     {
-        var starts = LineStarts(content);
+        return Around(content, LineStarts(content), line, linesAround);
+    }
+
+    /// <summary>
+    /// The same cut, from the starts of the lines the text was split into once: many cuts of one text share one split.
+    /// </summary>
+    public static IReadOnlyList<ExcerptLine> Around(string content, IReadOnlyList<int> starts, int line, int linesAround)
+    {
         if(line < 1 || line > starts.Count)
             return new List<ExcerptLine>();
 
@@ -27,7 +34,10 @@ public static class Excerpt
         return lines;
     }
 
-    private static List<int> LineStarts(string content)
+    /// <summary>
+    /// Where each line of the text starts, in order; a text without a line break has one line.
+    /// </summary>
+    public static IReadOnlyList<int> LineStarts(string content)
     {
         var starts = new List<int> { 0 };
         for(var index = 0; index < content.Length; index++)

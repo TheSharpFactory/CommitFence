@@ -103,7 +103,7 @@ internal static class FileRuleTextFormatter
         if(rule.Exceptions.Count > 0)
         {
             var effect = rule.Main?.Effect.ToLowerInvariant() ?? "not set";
-            var applied = rule.Main == null ? "applied by the build where set" : rule.State == FileRuleState.Off ? "not applied by the build" : "applied by the build";
+            var applied = BuildStatus(rule);
             return $"{effect} for all {rule.Language} files, {rule.ExceptionCount}, {applied}";
         }
 
@@ -112,12 +112,23 @@ internal static class FileRuleTextFormatter
             case FileRuleState.On:
                 return "on, applied by the build";
             case FileRuleState.Off:
-                return "off, not applied by the build";
+                return rule.Main?.IsOffByStrictness == true ? "off under the current strictness" : "off, not applied by the build";
             case FileRuleState.OwnDefault:
                 return "the rule's own default applies; what it does to a push is not known here";
             default:
                 return "not understood by the build, so it has no effect the product can state";
         }
+    }
+
+    private static string BuildStatus(FileRule rule)
+    {
+        if(rule.Main == null)
+            return "applied by the build where set";
+
+        if(rule.Main.IsOffByStrictness)
+            return "set by the current strictness";
+
+        return rule.State == FileRuleState.Off ? "not applied by the build" : "applied by the build";
     }
 
     private static void AppendLine(StringBuilder builder, string label, string text)

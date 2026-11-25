@@ -1,5 +1,7 @@
+using Avalonia.Controls;
 using Avalonia.Headless.XUnit;
 using Avalonia.Styling;
+using CF.App.Parts;
 using CF.App.Review;
 using CF.App.Rules;
 using CF.App.Shell;
@@ -7,6 +9,8 @@ using CF.App.Tests.Support;
 using CF.Core.Code;
 using CF.Core.Findings;
 using CF.Core.Review;
+using CF.Core.Rules;
+using CF.Core.Updates;
 using Xunit;
 
 namespace CF.App.Tests;
@@ -98,13 +102,224 @@ public sealed class ScreenshotTests
             host.Save(folder, $"review-places-{theme}-760.png");
             window.Width = 1440;
             window.Height = 900;
+            // an empty screen in the frame of the five screens: the head with the screen's name and an empty sheet, then with a panel
+            // that the test gives it, at 1440 and at 760
+            shell.Model.CurrentScreen = Screen.Dashboard;
+            host.Pump();
+            host.Save(folder, $"frame-empty-{theme}-1440.png");
+            var frame = host.Find<ScreenFrame>(candidate => candidate.IsEffectivelyVisible)!;
+            frame.Main = new TextBlock { Text = "The main column", Height = 400 };
+            frame.Panel = new TextBlock { Text = "The panel", Height = 240 };
+            host.Pump();
+            host.Save(folder, $"frame-panel-{theme}-1440.png");
+            window.Width = 760;
+            window.Height = 1000;
+            host.Pump();
+            host.Save(folder, $"frame-panel-{theme}-760.png");
+            frame.Panel = null;
+            frame.Main = null;
+            host.Pump();
+            host.Save(folder, $"frame-empty-{theme}-760.png");
+            window.Width = 1440;
+            window.Height = 900;
+
             // the notice of a newer version, over the screen
             shell.Model.ShowRules();
             shell.Updater.Result = FakeUpdater.Available("1.1.0.0", "The first update.\n\n### What's new\n\n- Automatic updates. The program looks for a newer release.\n- The command line comes with the app.\n\n### Downloads\n\n| a | b |");
             await shell.Model.Updates.CheckAsync(true);
             Assert.True(shell.Model.Updates.CanUpdate);
             host.Save(folder, $"update-{theme}-1440x900.png");
+
+            // the notice as the last row of the page under a screen: a version is available, an update downloads at 64 percent, it
+            // failed; at 1440, at 760 by 1000, and at the window's smallest, 760 by 560, where every button must be in view
+            shell.Model.CurrentScreen = Screen.Dashboard;
+            host.Pump();
+            host.Save(folder, $"notice-available-{theme}-1440.png");
+            window.Width = 760;
+            window.Height = 1000;
+            host.Pump();
+            host.Save(folder, $"notice-available-{theme}-760x1000.png");
+            window.Width = 1440;
+            window.Height = 900;
+            shell.Updater.Delivery = ProgressDelivery.Before;
+            shell.Updater.HoldInstall = new TaskCompletionSource();
+            var install = shell.Model.Updates.InstallAsync();
+            await shell.Updater.InstallStarted.Task;
+            shell.Updater.LastProgress!.Report(new UpdateProgress { Stage = UpdateStage.Downloading, Percent = 64 });
+            host.Pump();
+            Assert.Equal("64%", shell.Model.Updates.PercentText);
+            host.Save(folder, $"notice-downloading-{theme}-1440.png");
+            shell.Updater.InstallFailure = new UpdateException("The download does not match the signed list of checksums, so nothing was changed.");
+            shell.Updater.HoldInstall.SetResult();
+            await install;
+            host.Pump();
+            host.Save(folder, $"notice-failed-{theme}-1440.png");
+            window.Width = 760;
+            window.Height = 560;
+            host.Pump();
+            host.Save(folder, $"notice-failed-{theme}-760x560.png");
+            window.Width = 1440;
+            window.Height = 900;
+
+            // Doctor: one check fails (1440, and the whole page at 760), the .NET SDK that global.json asks for is missing, every check
+            // passes, and the checks run (the notice is sent away first, so that it is not in these pictures)
+            shell.Model.Updates.DismissCommand.Execute(null);
+            shell.Doctor.Answer = _ => FakeDoctorService.Report(hookFails: true);
+            shell.Model.CurrentScreen = Screen.Doctor;
+            await shell.Model.Doctor.CheckAsync();
+            host.Pump();
+            host.Save(folder, $"doctor-fail-{theme}-1440.png");
+            window.Width = 760;
+            window.Height = 1700;
+            host.Pump();
+            host.Save(folder, $"doctor-fail-{theme}-760.png");
+            window.Width = 1440;
+            window.Height = 900;
+            shell.Doctor.Answer = _ => FakeDoctorService.SdkReport();
+            await shell.Model.Doctor.CheckAsync();
+            host.Window.FocusManager?.Focus(null);
+            host.Pump();
+            host.Save(folder, $"doctor-sdk-{theme}-1440.png");
+            shell.Doctor.Answer = _ => FakeDoctorService.Report();
+            await shell.Model.Doctor.CheckAsync();
+            host.Window.FocusManager?.Focus(null);
+            host.Pump();
+            host.Save(folder, $"doctor-ready-{theme}-1440.png");
+            using var held = new ManualResetEventSlim();
+            shell.Doctor.Answer = _ =>
+            {
+                held.Wait();
+                return FakeDoctorService.Report();
+            };
+            var checking = shell.Model.Doctor.CheckAsync();
+            host.Pump();
+            host.Save(folder, $"doctor-checking-{theme}-1440.png");
+            held.Set();
+            await checking;
+
+            // Settings: up to date (1440 and 760), the notes of the version installed shown, a custom mapping in the file, then an update
+            // that is available, downloading and failed (1440, and the whole page at 760)
+            shell.Updater.Delivery = ProgressDelivery.Before;
+            shell.Updater.InstallFailure = null;
+            shell.Updater.HoldInstall = null;
+            shell.Updater.Result = new UpdateCheckResult { Status = UpdateCheckStatus.UpToDate, Release = new ReleaseInfo { Version = new Version(1, 0, 0, 0) } };
+            shell.Model.CurrentScreen = Screen.Settings;
+            await shell.Model.Updates.CheckAsync(true);
+            await shell.Model.Settings.RefreshAsync();
+            host.Window.FocusManager?.Focus(null);
+            host.Pump();
+            host.Save(folder, $"settings-{theme}-1440.png");
+            window.Width = 760;
+            window.Height = 1300;
+            host.Pump();
+            host.Save(folder, $"settings-{theme}-760.png");
+            window.Width = 1440;
+            window.Height = 900;
+            shell.Model.Settings.ShowsNotes = true;
+            window.Height = 1300;
+            host.Pump();
+            host.Save(folder, $"settings-notes-{theme}-1440.png");
+            shell.Model.Settings.ShowsNotes = false;
+            window.Height = 900;
+            shell.SettingsService.Custom = new Strictness(StrictnessPreset.Custom, null, Severity.Block, Severity.Warn);
+            await shell.Model.Settings.RefreshAsync();
+            host.Pump();
+            host.Save(folder, $"settings-custom-{theme}-1440.png");
+            shell.SettingsService.Custom = null;
+            await shell.Model.Settings.RefreshAsync();
+            shell.Updater.Result = FakeUpdater.Available("1.0.1.0", "The app\n\n### The app\n\n- **Rules** keep their order.\n- Settings shows what the strictness does.\n\n### Fixes\n\n- A review of a folder with no commit says so.\n\n### Downloads\n\n| a | b |");
+            await shell.Model.Updates.CheckAsync(true);
+            host.Pump();
+            host.Save(folder, $"settings-available-{theme}-1440.png");
+            window.Width = 760;
+            window.Height = 1500;
+            host.Pump();
+            host.Save(folder, $"settings-available-{theme}-760.png");
+            window.Width = 1440;
+            window.Height = 900;
+            shell.Updater.HoldInstall = new TaskCompletionSource();
+            var installs = shell.Updater.Installs;
+            var settingsInstall = shell.Model.Updates.InstallAsync();
+            while(shell.Updater.Installs == installs)
+            {
+                await Task.Delay(5);
+            }
+
+            await Task.Delay(20);
+            shell.Updater.LastProgress!.Report(new UpdateProgress { Stage = UpdateStage.Downloading, Percent = 64 });
+            host.Pump();
+            host.Save(folder, $"settings-downloading-{theme}-1440.png");
+            window.Width = 760;
+            window.Height = 1500;
+            host.Pump();
+            host.Save(folder, $"settings-downloading-{theme}-760.png");
+            window.Width = 1440;
+            window.Height = 900;
+            shell.Updater.InstallFailure = new UpdateException("The download does not match the signed list of checksums, so nothing was changed.");
+            shell.Updater.HoldInstall.SetResult();
+            await settingsInstall;
+            host.Pump();
+            host.Save(folder, $"settings-failed-{theme}-1440.png");
+            window.Width = 760;
+            window.Height = 1500;
+            host.Pump();
+            host.Save(folder, $"settings-failed-{theme}-760.png");
+            window.Width = 1440;
+            window.Height = 900;
+            await ArchitecturePictures.SaveAsync(folder, theme);
+
+            await SaveExemptions(folder, theme);
+            await DashboardPictures.SaveAsync(folder, theme);
         }
+    }
+
+    private static async Task SaveExemptions(string folder, string theme)
+    {
+        using var shell = new ShellHost(SettingsText.Exempted, [
+            RulesHost.FileRule("CA1822", "Mark members as static", FileRuleState.On, Severity.Warn, 8, "warning"),
+            RulesHost.FileRule("IDE0055", "Fix formatting", FileRuleState.On, Severity.Block, 14),
+            RulesHost.FileRule("CA1051", "Do not declare visible instance fields", FileRuleState.On, Severity.Warn, 20),
+            RulesHost.FileRule("IDE0051", "Remove unused private members", FileRuleState.On, Severity.Warn, 26)
+        ]);
+        var window = new MainWindow
+        {
+            DataContext = shell.Model,
+            Width = 1440,
+            Height = 900,
+            RequestedThemeVariant = theme == "light" ? ThemeVariant.Light : ThemeVariant.Dark
+        };
+        using var host = new ViewHost(window);
+        var model = shell.Model.Exemptions;
+        shell.Model.CurrentScreen = Screen.Exemptions;
+        await model.ScanAsync();
+        host.Window.FocusManager?.Focus(null);
+        host.Pump();
+        host.Save(folder, $"exemptions-{theme}-1440.png");
+        window.Width = 760;
+        window.Height = 1300;
+        host.Pump();
+        host.Save(folder, $"exemptions-{theme}-760.png");
+        window.Width = 1440;
+        window.Height = 900;
+
+        // a rule chosen, then "Narrow the rule" on Rules
+        model.RuleRows.Single(row => row.RuleId == "TEAM010").ChooseCommand.Execute(null);
+        host.Pump();
+        host.Save(folder, $"exemptions-rule-{theme}-1440.png");
+        model.Chosen!.ActCommand.Execute(null);
+        host.Pump();
+        host.Save(folder, $"exemptions-narrow-landing-{theme}-1440.png");
+        shell.Model.Rules.CurrentPage!.BackToOriginCommand.Execute(null);
+        await model.ScanAsync();
+
+        // only the exemptions with no reason, then a commit with none and a scan that failed
+        model.ShowWithoutReasonCommand.Execute(null);
+        host.Pump();
+        host.Save(folder, $"exemptions-trouble-{theme}-1440.png");
+        shell.Exemptions.Answer = ExemptionSamples.None;
+        await model.ScanAsync();
+        host.Pump();
+        host.Save(folder, $"exemptions-empty-{theme}-1440.png");
     }
 
     private static ReviewResult ScopedPush()

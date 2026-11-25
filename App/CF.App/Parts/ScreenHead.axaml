@@ -1,0 +1,19 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:parts="using:CF.App.Parts"
+             x:Class="CF.App.Parts.ScreenHead"
+             x:ClassModifier="internal">
+
+  <!-- The head of a screen, under the title strip: padding 4 above and 12 below, the sheet's sides at its sides, a hairline of
+       line under it across the page. Its inside is as wide as the frame below it. The name in type-h1, then one line of what the
+       screen shows in type-meta ink-2 (6 below the name's top), and at the right end the screen's actions. It does not scroll. -->
+  <Border Name="Hairline" BorderBrush="{DynamicResource line}" BorderThickness="0,0,0,1" Padding="32,4,32,12">
+    <parts:WrapRow Name="Row" MinHeight="36" MaxWidth="1292" HorizontalAlignment="Stretch">
+      <TextBlock Name="NameText" Theme="{StaticResource type-h1}" TextWrapping="NoWrap" VerticalAlignment="Center"/>
+      <TextBlock Name="MetaText" Theme="{StaticResource type-meta}" Foreground="{DynamicResource ink-2}" TextWrapping="Wrap"
+                 VerticalAlignment="Center" Margin="0,6,0,0"/>
+      <ContentPresenter Name="ActionsPlace" parts:WrapRow.AtEnd="True" VerticalAlignment="Center"/>
+    </parts:WrapRow>
+  </Border>
+
+</UserControl>

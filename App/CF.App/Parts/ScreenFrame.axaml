@@ -1,0 +1,49 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:parts="using:CF.App.Parts"
+             x:Class="CF.App.Parts.ScreenFrame"
+             x:ClassModifier="internal">
+
+  <!-- The frame of the five screens, which is the frame of Review: the title strip's room, the screen head that does not scroll,
+       and the sheet. From 1304 wide the sheet is two columns 32 apart, the main column and the panel, 340 wide, which stays in view
+       while the sheet scrolls; under 1304 it is one column of at most 760 and the panel stands where the screen marks its place.
+       The sides are 32 (24 in one pane); the scroll bar takes 12 of the right side. -->
+  <UserControl.Styles>
+    <Style Selector="Border.panelsurface">
+      <Setter Property="Background" Value="{DynamicResource side}"/>
+      <Setter Property="CornerRadius" Value="16"/>
+      <Setter Property="Padding" Value="8,12,8,8"/>
+    </Style>
+  </UserControl.Styles>
+
+  <Grid RowDefinitions="36,Auto,*" Background="{DynamicResource page}">
+
+    <parts:ScreenHead Name="Head" Grid.Row="1"/>
+
+    <Panel Grid.Row="2">
+      <ScrollViewer Name="Sheet" HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Visible" AllowAutoHide="False">
+        <Border Name="SheetRow" Padding="32,24,20,32">
+          <Border Name="Column" MaxWidth="1292">
+            <StackPanel>
+              <ContentPresenter Name="MainHost"/>
+              <parts:PanelPlace Name="EndPlace"/>
+            </StackPanel>
+          </Border>
+        </Border>
+      </ScrollViewer>
+
+      <!-- A screen with nothing to show puts its empty block here, over the room of the sheet; the sheet and the panel step aside. -->
+      <ContentPresenter Name="EmptyHost" IsVisible="False"/>
+
+      <!-- The panel stands over the sheet, in the frame's second column, 24 under the head, and keeps its place while the sheet
+           scrolls; the frame moves it up when the sheet ends. -->
+      <Border Name="PanelLayer" VerticalAlignment="Top" Margin="0,24,12,0" Padding="32,0,20,0">
+        <Border Name="PanelFrame" MaxWidth="1292">
+          <Border Name="PanelHost" HorizontalAlignment="Right" Width="340"/>
+        </Border>
+      </Border>
+    </Panel>
+
+  </Grid>
+
+</UserControl>

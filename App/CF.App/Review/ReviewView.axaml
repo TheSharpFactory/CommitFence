@@ -489,6 +489,13 @@
                                     <SelectableTextBlock Theme="{StaticResource code}" TextWrapping="Wrap" Text="{Binding Message}"/>
                                   </ScrollViewer>
                                 </Border>
+                                <Button Classes="cf outlined small" HorizontalAlignment="Left" Margin="0,10,0,0" IsVisible="{Binding OpensDoctor}"
+                                        Command="{Binding OpenDoctorCommand}" AutomationProperties.Name="Open Doctor">
+                                  <StackPanel Orientation="Horizontal" Spacing="6">
+                                    <parts:Icon Data="{StaticResource i-doc}" Width="14" Height="14" Stroke="{Binding $parent[Button].Foreground}"/>
+                                    <TextBlock Theme="{StaticResource type-meta-strong}" Text="Open Doctor"/>
+                                  </StackPanel>
+                                </Button>
                               </StackPanel>
                             </StackPanel>
                           </Border>

@@ -38,17 +38,12 @@ internal static class ReachFilter
     {
         var file = FindFile(finding.File, changedFiles);
         if(finding.Reach == null)
-            return finding.File == null || file != null || IsCompileError(finding);
+            return finding.File == null || file != null || finding.IsCompileError;
 
         return file != null && IsTouched(finding, file.ChangedLines);
     }
 
-    private static bool IsCompileError(Finding finding)
-    {
-        return finding.Source == FindingSource.Compiler && finding.Severity == Severity.Block;
-    }
-
-    private static ChangedFile? FindFile(string? path, IReadOnlyList<ChangedFile> changedFiles)
+    public static ChangedFile? FindFile(string? path, IReadOnlyList<ChangedFile> changedFiles)
     {
         return FindExactly(path, changedFiles) ?? FindByTheOnlySpellingThatDiffersInCase(path, changedFiles);
     }

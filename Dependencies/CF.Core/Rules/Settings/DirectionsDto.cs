@@ -14,6 +14,9 @@ internal sealed class DirectionsDto
     [JsonPropertyName("forbid")]
     public List<string>? Forbid { get; set; }
 
+    [JsonPropertyName("noCycles")]
+    public bool? NoCycles { get; set; }
+
     [JsonExtensionData]
     public Dictionary<string, JsonElement>? UnknownKeys { get; set; }
 }

@@ -12,4 +12,10 @@ public sealed class SystemClock : IClock
     {
         get { return DateTimeOffset.Now; }
     }
+
+    /// <inheritdoc />
+    public DateTimeOffset ToLocalTime(DateTimeOffset instant)
+    {
+        return instant.ToLocalTime();
+    }
 }

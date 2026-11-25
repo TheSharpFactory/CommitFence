@@ -12,7 +12,7 @@ public sealed class CommitFenceServices
     /// <summary>
     /// Creates the set of services.
     /// </summary>
-    public CommitFenceServices(IProductInfoService productInfo, IClock clock, IReadOnlyList<ILanguage> languages, IRuleService rules, IReviewService review, ISetupService setup, IFolderService folders, IUpdater updater, IUpdateCheckRecord updateChecks)
+    public CommitFenceServices(IProductInfoService productInfo, IClock clock, IReadOnlyList<ILanguage> languages, IRuleService rules, IReviewService review, ISetupService setup, IFolderService folders, IUpdater updater, IUpdateCheckRecord updateChecks, IDoctorService? doctor = null, ISettingsService? settings = null, IStructureService? structure = null, ILanguageService? languageReports = null, IMachineSettings? machine = null, IExemptionService? exemptions = null, IStatsService? stats = null)
     {
         ProductInfo = productInfo;
         Clock = clock;
@@ -23,6 +23,13 @@ public sealed class CommitFenceServices
         Folders = folders;
         Updater = updater;
         UpdateChecks = updateChecks;
+        Doctor = doctor!;
+        Settings = settings!;
+        Structure = structure!;
+        LanguageReports = languageReports!;
+        Machine = machine!;
+        Exemptions = exemptions!;
+        Stats = stats!;
     }
 
     /// <summary>
@@ -69,4 +76,25 @@ public sealed class CommitFenceServices
     /// When the program last asked for a newer release.
     /// </summary>
     public IUpdateCheckRecord UpdateChecks { get; }
+
+    /// <summary>Checks whether this machine can review pushes from a repository.</summary>
+    public IDoctorService Doctor { get; }
+
+    /// <summary>Reads and changes the strictness of a repository's settings.</summary>
+    public ISettingsService Settings { get; }
+
+    /// <summary>Reads and changes the structure rules of a repository.</summary>
+    public IStructureService Structure { get; }
+
+    /// <summary>Tells the languages of this build and what a repository holds of each.</summary>
+    public ILanguageService LanguageReports { get; }
+
+    /// <summary>What the app keeps about itself on this machine.</summary>
+    public IMachineSettings Machine { get; }
+
+    /// <summary>Finds the lines of the last commit that set a rule aside.</summary>
+    public IExemptionService Exemptions { get; }
+
+    /// <summary>Statistics about the reviews of pushes from a repository.</summary>
+    public IStatsService Stats { get; }
 }

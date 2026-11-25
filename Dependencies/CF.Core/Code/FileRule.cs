@@ -35,6 +35,12 @@ public sealed class FileRule
     /// <summary>The narrower settings in file order.</summary>
     public IReadOnlyList<FileRulePlace> Exceptions { get; }
 
+    /// <summary>The place used for the rule's list filters and counts.</summary>
+    public FileRulePlace? ListedPlace
+    {
+        get { return Main ?? (Exceptions.Count > 0 ? Exceptions[0] : null); }
+    }
+
     /// <summary>All places in source order.</summary>
     public IEnumerable<FileRulePlace> Places
     {

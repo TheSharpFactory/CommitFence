@@ -1,0 +1,388 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:parts="using:CF.App.Parts"
+             xmlns:doctor="using:CF.App.Doctor"
+             xmlns:screen="using:CF.App.Settings"
+             x:Class="CF.App.Settings.SettingsView"
+             x:ClassModifier="internal"
+             x:DataType="screen:SettingsViewModel">
+
+  <!-- The Settings screen in the frame of the five screens, with no panel. From 1304 wide two equal columns 48 apart, by where a setting is
+       kept: this repository on the left (the strictness with its table and its sentence, the languages), this app on the right (the version
+       and its status, the app's facts, the release notes). In one pane they are one column, this repository first; while an update waits, runs
+       or failed, this app comes first and its status leads the page. -->
+  <UserControl.Styles>
+    <Style Selector="ListBox.segmented.large.strictness ListBoxItem">
+      <Setter Property="MinWidth" Value="132"/>
+    </Style>
+    <Style Selector="Border.fact">
+      <Setter Property="BorderBrush" Value="{DynamicResource line}"/>
+      <Setter Property="BorderThickness" Value="0,0,0,1"/>
+      <Setter Property="Padding" Value="4,10"/>
+    </Style>
+    <Style Selector="Border.status">
+      <Setter Property="Padding" Value="14,4,4,4"/>
+    </Style>
+    <Style Selector="Border.status.tall">
+      <Setter Property="Padding" Value="14,12,4,12"/>
+    </Style>
+    <Style Selector="Border.status Panel#StatusMark">
+      <Setter Property="VerticalAlignment" Value="Center"/>
+    </Style>
+    <Style Selector="Border.status.tall Panel#StatusMark">
+      <Setter Property="VerticalAlignment" Value="Top"/>
+    </Style>
+    <Style Selector="StackPanel#StatusButtons.ownline">
+      <Setter Property="Margin" Value="0,4,0,0"/>
+    </Style>
+    <Style Selector="Border.mxcell">
+      <Setter Property="MinHeight" Value="40"/>
+      <Setter Property="Padding" Value="12,0"/>
+    </Style>
+  </UserControl.Styles>
+
+  <parts:ScreenFrame Name="Frame" Title="Settings">
+    <parts:ScreenFrame.Main>
+      <Grid Name="Columns">
+
+        <!-- ======== This repository ======== -->
+        <StackPanel Name="RepositoryColumn">
+          <Border BorderBrush="{DynamicResource line}" BorderThickness="0,0,0,1" Padding="0,0,0,12">
+            <StackPanel Orientation="Horizontal" Spacing="8">
+              <parts:Icon Data="{StaticResource i-branch}" Width="16" Height="16" Stroke="{DynamicResource ink-2}" VerticalAlignment="Center"/>
+              <TextBlock Theme="{StaticResource type-h3}" VerticalAlignment="Center" Text="{Binding RepositoryName}"/>
+              <TextBlock Theme="{StaticResource type-meta}" Foreground="{DynamicResource ink-2}" VerticalAlignment="Center"
+                         Text="Kept in commitfence.json, for everyone who pulls it"/>
+            </StackPanel>
+          </Border>
+
+          <!-- Strictness: the choice, the table with the column in force marked, the sentence with its three counts. -->
+          <StackPanel Margin="0,24,0,0" IsVisible="{Binding HasStrictness}">
+            <parts:SectionHead Title="Strictness"/>
+            <TextBlock Theme="{StaticResource type-body}" Foreground="{DynamicResource ink-2}" Margin="0,-5,0,12"
+                       Text="What the words of .editorconfig do to a push."/>
+
+            <!-- The settings file cannot be read or written: the reason, as the banner of Rules says it. -->
+            <Border IsVisible="{Binding HasBanner}" MaxWidth="684" HorizontalAlignment="Left" Margin="0,0,0,12" Padding="14,10"
+                    CornerRadius="12" Background="{DynamicResource warn-tint}">
+              <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12" AutomationProperties.LiveSetting="Polite">
+                <TextBlock Theme="{StaticResource type-body}" Text="{Binding BannerText}" TextWrapping="Wrap" VerticalAlignment="Center"/>
+                <Button Grid.Column="1" Classes="cf quiet small" Command="{Binding OpenSettingsFileCommand}" AutomationProperties.Name="Open the file">
+                  <TextBlock Theme="{StaticResource type-meta-strong}" Text="Open the file"/>
+                </Button>
+              </Grid>
+            </Border>
+
+            <parts:SegmentedList Name="StrictnessChoice" Classes="segmented large strictness" ItemsSource="{Binding Choices}"
+                                 SelectedItem="{Binding SelectedChoice, Mode=TwoWay}" AutomationProperties.Name="Strictness">
+              <parts:SegmentedList.Styles>
+                <Style Selector="ListBoxItem" x:DataType="screen:StrictnessChoiceViewModel">
+                  <Setter Property="IsEnabled" Value="{Binding IsEnabled}"/>
+                </Style>
+              </parts:SegmentedList.Styles>
+              <parts:SegmentedList.ItemTemplate>
+                <DataTemplate DataType="screen:StrictnessChoiceViewModel" x:DataType="screen:StrictnessChoiceViewModel">
+                  <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" AutomationProperties.Name="{Binding Label}"
+                              ToolTip.Tip="{Binding Tip}">
+                    <TextBlock Classes="segment" Theme="{StaticResource type-note}" Text="{Binding Label}"/>
+                    <parts:Icon IsVisible="{Binding IsCurrent}" Data="{StaticResource i-check}" Width="15" Height="15" StrokeThickness="2"
+                                Stroke="{DynamicResource ink}" Margin="6,0,0,0"/>
+                  </StackPanel>
+                </DataTemplate>
+              </parts:SegmentedList.ItemTemplate>
+            </parts:SegmentedList>
+            <TextBlock Name="CustomNote" IsVisible="{Binding IsCustom}" Theme="{StaticResource type-meta}" Foreground="{DynamicResource ink-2}"
+                       TextWrapping="Wrap" MaxWidth="640" HorizontalAlignment="Left" Margin="0,8,0,0" Text="{Binding CustomNote}"/>
+
+            <!-- What each word of the file does under each choice. It is not a control: the choice above is. -->
+            <StackPanel Margin="0,16,0,0" AutomationProperties.Name="What each word of the file does, by strictness">
+              <Border BorderBrush="{DynamicResource line}" BorderThickness="0,1,0,1">
+                <Grid ColumnDefinitions="132,*">
+                  <Border Classes="mxcell" VerticalAlignment="Stretch">
+                    <TextBlock Theme="{StaticResource type-meta}" Foreground="{DynamicResource ink-2}" VerticalAlignment="Center" Text="The file says"/>
+                  </Border>
+                  <ItemsControl Grid.Column="1" ItemsSource="{Binding Columns}" Focusable="False">
+                    <ItemsControl.ItemsPanel>
+                      <ItemsPanelTemplate>
+                        <UniformGrid Rows="1"/>
+                      </ItemsPanelTemplate>
+                    </ItemsControl.ItemsPanel>
+                    <ItemsControl.ItemTemplate>
+                      <DataTemplate DataType="screen:StrictnessColumnViewModel" x:DataType="screen:StrictnessColumnViewModel">
+                        <Panel>
+                          <Border IsVisible="{Binding IsInForce}" Background="{DynamicResource hover}"/>
+                          <Border IsVisible="{Binding IsInForce}" Height="4" VerticalAlignment="Top" Background="{DynamicResource here}"/>
+                          <Border Classes="mxcell">
+                            <TextBlock Classes.inforce="{Binding IsInForce}" Theme="{StaticResource type-meta}" Foreground="{DynamicResource ink-2}"
+                                       VerticalAlignment="Center" Text="{Binding Name}">
+                              <TextBlock.Styles>
+                                <Style Selector="TextBlock.inforce">
+                                  <Setter Property="Foreground" Value="{DynamicResource ink}"/>
+                                  <Setter Property="FontWeight" Value="SemiBold"/>
+                                </Style>
+                              </TextBlock.Styles>
+                            </TextBlock>
+                          </Border>
+                        </Panel>
+                      </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                  </ItemsControl>
+                </Grid>
+              </Border>
+              <ItemsControl ItemsSource="{Binding Rows}" Focusable="False">
+                <ItemsControl.ItemTemplate>
+                  <DataTemplate DataType="screen:StrictnessRowViewModel" x:DataType="screen:StrictnessRowViewModel">
+                    <Border BorderBrush="{DynamicResource line}" BorderThickness="0,0,0,1" AutomationProperties.Name="{Binding SpokenName}">
+                      <Grid ColumnDefinitions="132,*">
+                        <Border Classes="mxcell">
+                          <TextBlock Theme="{StaticResource code}" Foreground="{DynamicResource ink}" VerticalAlignment="Center" Text="{Binding Word}"/>
+                        </Border>
+                        <ItemsControl Grid.Column="1" ItemsSource="{Binding Cells}" Focusable="False">
+                          <ItemsControl.ItemsPanel>
+                            <ItemsPanelTemplate>
+                              <UniformGrid Rows="1"/>
+                            </ItemsPanelTemplate>
+                          </ItemsControl.ItemsPanel>
+                          <ItemsControl.ItemTemplate>
+                            <DataTemplate DataType="screen:StrictnessCellViewModel" x:DataType="screen:StrictnessCellViewModel">
+                              <Panel>
+                                <Border IsVisible="{Binding IsInForce}" Background="{DynamicResource hover}"/>
+                                <Border Classes="mxcell">
+                                  <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                                    <parts:EffectMark Classes.block="{Binding IsBlock}" Classes.warn="{Binding IsWarn}" Classes.off="{Binding IsOff}"
+                                                      Kind="{Binding Kind}" Width="16" Height="16" VerticalAlignment="Center"/>
+                                    <TextBlock Classes.off="{Binding IsOff}" Theme="{StaticResource type-body}" Foreground="{DynamicResource ink}"
+                                               VerticalAlignment="Center" Text="{Binding Word}">
+                                      <TextBlock.Styles>
+                                        <Style Selector="TextBlock.off">
+                                          <Setter Property="Foreground" Value="{DynamicResource ink-2}"/>
+                                        </Style>
+                                      </TextBlock.Styles>
+                                    </TextBlock>
+                                  </StackPanel>
+                                </Border>
+                              </Panel>
+                            </DataTemplate>
+                          </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                      </Grid>
+                    </Border>
+                  </DataTemplate>
+                </ItemsControl.ItemTemplate>
+              </ItemsControl>
+            </StackPanel>
+
+            <screen:MarkedText Theme="{StaticResource type-meta}" Foreground="{DynamicResource ink-2}" FontFeatures="+tnum" MaxWidth="640"
+                               HorizontalAlignment="Left" Margin="0,12,0,0" Marked="{Binding Sentence}"/>
+          </StackPanel>
+
+          <!-- Languages: a card per language, no switch. -->
+          <StackPanel Margin="0,40,0,0">
+            <parts:SectionHead Title="Languages"/>
+            <ItemsControl ItemsSource="{Binding LanguageCards}" Focusable="False">
+              <ItemsControl.ItemTemplate>
+                <DataTemplate DataType="screen:LanguageCardViewModel" x:DataType="screen:LanguageCardViewModel">
+                  <Border Background="{DynamicResource side}" CornerRadius="12" Padding="16,12" Margin="0,0,0,8" AutomationProperties.Name="{Binding Name}">
+                    <Grid ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto" RowSpacing="4" ColumnSpacing="16">
+                      <TextBlock Theme="{StaticResource type-body-strong}" VerticalAlignment="Center" Text="{Binding Name}"/>
+                      <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
+                        <parts:Icon Data="{StaticResource i-check}" Width="14" Height="14" StrokeThickness="2.4" Stroke="{DynamicResource req-ink}" VerticalAlignment="Center"/>
+                        <TextBlock Theme="{StaticResource type-body}" VerticalAlignment="Center" Text="Reviewed"/>
+                      </StackPanel>
+                      <TextBlock Grid.Row="1" Theme="{StaticResource type-meta}" Foreground="{DynamicResource ink-2}" TextWrapping="Wrap"
+                                 FontFeatures="+tnum" Text="{Binding Detail}"/>
+                    </Grid>
+                  </Border>
+                </DataTemplate>
+              </ItemsControl.ItemTemplate>
+            </ItemsControl>
+            <TextBlock Theme="{StaticResource type-meta}" Foreground="{DynamicResource ink-2}" Margin="0,4,0,0" Text="{Binding LanguagesNote}"/>
+          </StackPanel>
+        </StackPanel>
+
+        <!-- ======== This app ======== -->
+        <Grid Name="AppColumn" RowDefinitions="Auto,Auto,Auto,Auto,Auto">
+
+          <Border Name="AppHead" BorderBrush="{DynamicResource line}" BorderThickness="0,0,0,1" Padding="0,0,0,12">
+            <StackPanel Orientation="Horizontal" Spacing="8">
+              <parts:Icon Data="{StaticResource i-set}" Width="16" Height="16" Stroke="{DynamicResource ink-2}" VerticalAlignment="Center"/>
+              <TextBlock Theme="{StaticResource type-h3}" VerticalAlignment="Center" Text="This app"/>
+              <TextBlock Theme="{StaticResource type-meta}" Foreground="{DynamicResource ink-2}" VerticalAlignment="Center" Text="On this machine only"/>
+            </StackPanel>
+          </Border>
+
+          <!-- The version row: the logo, the name with its version, and what it covers. -->
+          <Grid Name="VersionRow" ColumnDefinitions="Auto,*" ColumnSpacing="14">
+            <Viewbox Width="44" Height="44" Focusable="False" VerticalAlignment="Center">
+              <parts:LogoMark/>
+            </Viewbox>
+            <StackPanel Grid.Column="1" VerticalAlignment="Center">
+              <TextBlock Theme="{StaticResource type-h2}" Text="{Binding VersionTitle}"/>
+              <TextBlock Theme="{StaticResource type-meta}" Foreground="{DynamicResource ink-2}" Text="The app and the command line beside it"/>
+            </StackPanel>
+          </Grid>
+
+          <!-- The update status: a live region. The mark, the words (the first in weight 600), the bar of a download, and the buttons. -->
+          <Border Name="StatusRow" Classes="status" Classes.tall="{Binding IsTall}" DataContext="{Binding Status}" x:DataType="screen:UpdateStatusViewModel"
+                  Background="{DynamicResource side}" CornerRadius="12" MinHeight="44" AutomationProperties.LiveSetting="Polite"
+                  AutomationProperties.Name="{Binding SpokenText}">
+            <Grid ColumnDefinitions="Auto,*,Auto" RowDefinitions="Auto,Auto,Auto">
+              <Panel Name="StatusMark" IsVisible="{Binding ShowsMark}" Margin="0,0,10,0" MinWidth="16" MinHeight="16">
+                <parts:Icon IsVisible="{Binding ShowsTick}" Data="{StaticResource i-check}" Width="16" Height="16" StrokeThickness="2.2" Stroke="{DynamicResource req-ink}"/>
+                <parts:TurningRing IsVisible="{Binding ShowsRing}" Width="14" Height="14" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                <Border IsVisible="{Binding ShowsFailureBadge}" Width="24" Height="24" CornerRadius="7" Background="{DynamicResource block}"
+                        HorizontalAlignment="Center" VerticalAlignment="Center">
+                  <parts:Icon Data="{StaticResource i-x}" Width="14" Height="14" StrokeThickness="2.4" Stroke="{DynamicResource on-block}"
+                              HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                </Border>
+              </Panel>
+              <StackPanel Grid.Column="1" VerticalAlignment="Center" Spacing="2">
+                <WrapPanel Orientation="Horizontal" ItemSpacing="6">
+                  <TextBlock Theme="{StaticResource type-body}" TextWrapping="Wrap" VerticalAlignment="Center">
+                    <Run FontWeight="SemiBold" Text="{Binding Lead}"/>
+                    <Run Text="{Binding RestText}"/>
+                  </TextBlock>
+                  <TextBlock Theme="{StaticResource type-body}" Foreground="{DynamicResource ink-2}" FontFeatures="+tnum" VerticalAlignment="Center"
+                             IsVisible="{Binding ShowsPercent}" Text="{Binding PercentText}"/>
+                </WrapPanel>
+                <TextBlock Theme="{StaticResource type-meta}" Foreground="{DynamicResource ink-2}" TextWrapping="Wrap" IsVisible="{Binding HasMeta}" Text="{Binding Meta}"/>
+              </StackPanel>
+              <StackPanel Name="StatusButtons" Classes.ownline="{Binding ButtonsOnOwnLine}" Grid.Row="{Binding ButtonsRow}" Grid.Column="{Binding ButtonsColumn}" Grid.ColumnSpan="{Binding ButtonsColumnSpan}" Orientation="Horizontal" Spacing="8" HorizontalAlignment="Right" VerticalAlignment="Center">
+                <Button Name="OpenReleasePageButton" Classes="cf outlined small" Command="{Binding Updates.OpenReleasePageCommand}" IsVisible="{Binding ShowsReleasePage}"
+                        AutomationProperties.Name="Open the release page">
+                  <StackPanel Orientation="Horizontal" Spacing="6">
+                    <parts:Icon Data="{StaticResource i-open}" Width="14" Height="14" Stroke="{Binding $parent[Button].Foreground}"/>
+                    <TextBlock Theme="{StaticResource type-meta-strong}" Text="Open the release page"/>
+                  </StackPanel>
+                </Button>
+                <Button Name="CheckNowButton" Classes="cf outlined small" Command="{Binding CheckNowCommand}" IsVisible="{Binding ShowsCheckNow}"
+                        AutomationProperties.Name="Check now">
+                  <TextBlock Theme="{StaticResource type-meta-strong}" Text="Check now"/>
+                </Button>
+                <Button Name="TryCheckAgainButton" Classes="cf outlined small" Command="{Binding CheckNowCommand}" IsVisible="{Binding ShowsTryCheckAgain}"
+                        AutomationProperties.Name="Try again">
+                  <TextBlock Theme="{StaticResource type-meta-strong}" Text="Try again"/>
+                </Button>
+                <Button Name="CancelButton" Classes="cf outlined small" Command="{Binding Updates.CancelUpdateCommand}" IsVisible="{Binding ShowsCancel}"
+                        AutomationProperties.Name="Cancel the update">
+                  <TextBlock Theme="{StaticResource type-meta-strong}" Text="Cancel"/>
+                </Button>
+                <Button Name="TryUpdateAgainButton" Classes="cf outlined small" Command="{Binding Updates.TryAgainCommand}" IsVisible="{Binding ShowsTryUpdateAgain}"
+                        AutomationProperties.Name="Try again">
+                  <TextBlock Theme="{StaticResource type-meta-strong}" Text="Try again"/>
+                </Button>
+                <Button Name="UpdateNowButton" Classes="cf main" Command="{Binding Updates.UpdateNowCommand}" IsVisible="{Binding ShowsUpdateNow}"
+                        AutomationProperties.Name="Update now">
+                  <TextBlock Theme="{StaticResource type-body-strong}" Text="Update now"/>
+                </Button>
+              </StackPanel>
+              <parts:ProgressTrack Name="StatusBar" Grid.Row="1" Grid.ColumnSpan="3" Margin="0,8,10,8" Fraction="{Binding BarFraction}" IsVisible="{Binding ShowsBar}"
+                                   VerticalAlignment="Center"/>
+            </Grid>
+          </Border>
+
+          <!-- The app's facts: a hairline above and under each row; selectable text, and the one switch on Linux and macOS. -->
+          <Border Name="FactsBox" BorderBrush="{DynamicResource line}" BorderThickness="0,1,0,0">
+            <ItemsControl ItemsSource="{Binding Facts}" Focusable="False" AutomationProperties.Name="This app">
+              <ItemsControl.ItemTemplate>
+                <DataTemplate DataType="screen:FactRowViewModel" x:DataType="screen:FactRowViewModel">
+                  <Border Classes="fact" AutomationProperties.Name="{Binding SpokenName}">
+                    <Grid ColumnDefinitions="72,*" ColumnSpacing="12">
+                      <TextBlock Theme="{StaticResource type-meta}" Foreground="{DynamicResource ink-2}" VerticalAlignment="Top" Text="{Binding Name}"/>
+                      <StackPanel Grid.Column="1" Spacing="2">
+                        <doctor:MachineValueText Theme="{StaticResource code}" Foreground="{DynamicResource ink}" TextWrapping="Wrap" IsVisible="{Binding IsCode}"
+                                                 Value="{Binding Value}"/>
+                        <TextBlock Theme="{StaticResource type-body}" Foreground="{DynamicResource ink}" TextWrapping="Wrap" IsVisible="{Binding IsText}" Text="{Binding Value}"/>
+                        <StackPanel Orientation="Horizontal" Spacing="12" IsVisible="{Binding HasSwitch}">
+                          <ToggleButton Classes="cfswitch" Focusable="True" IsChecked="{Binding IsOn, Mode=TwoWay}" AutomationProperties.Name="{Binding Value}"/>
+                          <TextBlock Theme="{StaticResource type-body}" Foreground="{DynamicResource ink}" VerticalAlignment="Center" Text="{Binding Value}"/>
+                        </StackPanel>
+                        <TextBlock Theme="{StaticResource type-meta}" Foreground="{DynamicResource ink-2}" TextWrapping="Wrap" IsVisible="{Binding HasSecond}"
+                                   Text="{Binding Second}"/>
+                      </StackPanel>
+                    </Grid>
+                  </Border>
+                </DataTemplate>
+              </ItemsControl.ItemTemplate>
+            </ItemsControl>
+          </Border>
+
+          <!-- The release notes, folded to their headings with counts, or shown whole. -->
+          <Border Name="NotesBox" DataContext="{Binding Notes}" x:DataType="screen:ReleaseNotesViewModel" IsVisible="{Binding HasNotes}" BorderBrush="{DynamicResource line}"
+                  BorderThickness="1" CornerRadius="16" Padding="20,16">
+            <StackPanel>
+              <TextBlock Theme="{StaticResource type-h3}" Text="{Binding Heading}"/>
+              <TextBlock Theme="{StaticResource type-meta}" Foreground="{DynamicResource ink-2}" Margin="0,4,0,0" IsVisible="{Binding HasReleased}" Text="{Binding Released}"/>
+
+              <!-- Folded: the headings as plain words, then the one button. -->
+              <StackPanel IsVisible="{Binding ShowsFolded}">
+                <ItemsControl ItemsSource="{Binding Headings}" Margin="0,12,0,0" IsVisible="{Binding HasHeadings}" Focusable="False">
+                  <ItemsControl.ItemsPanel>
+                    <ItemsPanelTemplate>
+                      <WrapPanel Orientation="Horizontal" ItemSpacing="20" LineSpacing="4"/>
+                    </ItemsPanelTemplate>
+                  </ItemsControl.ItemsPanel>
+                  <ItemsControl.ItemTemplate>
+                    <DataTemplate DataType="screen:NoteHeadingViewModel" x:DataType="screen:NoteHeadingViewModel">
+                      <StackPanel Orientation="Horizontal" AutomationProperties.Name="{Binding SpokenName}">
+                        <TextBlock Theme="{StaticResource type-body-strong}" Text="{Binding Name}"/>
+                        <TextBlock Theme="{StaticResource type-body}" Foreground="{DynamicResource ink-2}" FontFeatures="+tnum" Text="{Binding CountText}"/>
+                      </StackPanel>
+                    </DataTemplate>
+                  </ItemsControl.ItemTemplate>
+                </ItemsControl>
+                <Button Name="ShowNotesButton" Classes="cf outlined small" HorizontalAlignment="Left" Margin="0,14,0,0" Command="{Binding ShowTheNotesCommand}"
+                        AutomationProperties.Name="Show the notes">
+                  <StackPanel Orientation="Horizontal" Spacing="6">
+                    <parts:Icon Data="{StaticResource i-down}" Width="14" Height="14" Stroke="{Binding $parent[Button].Foreground}"/>
+                    <TextBlock Theme="{StaticResource type-meta-strong}" Text="Show the notes"/>
+                  </StackPanel>
+                </Button>
+              </StackPanel>
+
+              <!-- Shown: a hairline, the notes as the release writes them, and the buttons. -->
+              <StackPanel IsVisible="{Binding ShowsWhole}">
+                <Border Height="1" Background="{DynamicResource line}" Margin="0,14,0,14"/>
+                <ItemsControl ItemsSource="{Binding Lines}" Focusable="False">
+                  <ItemsControl.ItemTemplate>
+                    <DataTemplate DataType="screen:NoteLineViewModel" x:DataType="screen:NoteLineViewModel">
+                      <Panel>
+                        <screen:MarkedText IsVisible="{Binding IsHeading}" Theme="{StaticResource type-body-strong}" Margin="0,16,0,6" Marked="{Binding Marked}"/>
+                        <screen:MarkedText IsVisible="{Binding IsParagraph}" Theme="{StaticResource type-body}" Foreground="{DynamicResource ink-2}" Margin="0,0,0,8"
+                                           Marked="{Binding Marked}"/>
+                        <Grid IsVisible="{Binding IsItem}" ColumnDefinitions="16,*" Margin="0,0,0,6">
+                          <Border Width="5" Height="5" CornerRadius="1" Background="{DynamicResource ink-3}" HorizontalAlignment="Left" VerticalAlignment="Top"
+                                  Margin="2,8,0,0"/>
+                          <screen:MarkedText Grid.Column="1" Theme="{StaticResource type-body}" Foreground="{DynamicResource ink-2}" Marked="{Binding Marked}"/>
+                        </Grid>
+                      </Panel>
+                    </DataTemplate>
+                  </ItemsControl.ItemTemplate>
+                </ItemsControl>
+                <StackPanel Orientation="Horizontal" Spacing="8" Margin="0,14,0,0">
+                  <Button Name="HideNotesButton" Classes="cf outlined small" Command="{Binding HideTheNotesCommand}"
+                          AutomationProperties.Name="Hide the notes">
+                    <StackPanel Orientation="Horizontal" Spacing="6">
+                      <parts:Icon Data="{StaticResource i-down}" Width="14" Height="14" Stroke="{Binding $parent[Button].Foreground}" RenderTransform="rotate(180deg)"/>
+                      <TextBlock Theme="{StaticResource type-meta-strong}" Text="Hide the notes"/>
+                    </StackPanel>
+                  </Button>
+                  <Button Name="ReleasePageButton" Classes="cf outlined small" IsVisible="{Binding CanOpenReleasePage}"
+                          Command="{Binding OpenReleasePageCommand}"
+                          AutomationProperties.Name="On the release page">
+                    <StackPanel Orientation="Horizontal" Spacing="6">
+                      <parts:Icon Data="{StaticResource i-open}" Width="14" Height="14" Stroke="{Binding $parent[Button].Foreground}"/>
+                      <TextBlock Theme="{StaticResource type-meta-strong}" Text="On the release page"/>
+                    </StackPanel>
+                  </Button>
+                </StackPanel>
+              </StackPanel>
+            </StackPanel>
+          </Border>
+        </Grid>
+
+      </Grid>
+    </parts:ScreenFrame.Main>
+  </parts:ScreenFrame>
+
+</UserControl>

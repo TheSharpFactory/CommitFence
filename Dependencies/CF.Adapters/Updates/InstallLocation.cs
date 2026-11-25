@@ -13,7 +13,7 @@ internal sealed class InstallLocation
     public const string AppName = "commitfenceapp";
     public const string BundleName = "CommitFence.app";
 
-    private const string _notReleaseProblem = "This copy of the program is not a release download, so it cannot update itself.";
+    private const string _notReleaseProblem = "This copy is not a release download, so it cannot update itself.";
 
     /// <summary>
     /// The folder the download's files and folders go to (on macOS the folder that holds the .app).

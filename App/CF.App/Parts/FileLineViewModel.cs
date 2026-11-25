@@ -1,12 +1,12 @@
+using CF.App.Review;
 using CF.Core.Code;
 using CommunityToolkit.Mvvm.ComponentModel;
 
-namespace CF.App.Rules.Page;
+namespace CF.App.Parts;
 
 /// <summary>
-/// One line of the file shown on the page of a file rule: its number, its text, and whether it is the line that sets the rule.
-/// The page holds a fixed number of these and gives each the next rule's lines, so that choosing another rule changes what the
-/// lines say and builds no controls.
+/// One line of a file as the lines of a file show it: its number, its text (or its coloured runs), and whether it is the line in
+/// force, the one the box is about. A line may be a place that holds none, or a note such as "3 lines not shown".
 /// </summary>
 internal sealed partial class FileLineViewModel : ObservableObject
 {
@@ -17,6 +17,18 @@ internal sealed partial class FileLineViewModel : ObservableObject
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(IsComment), nameof(SpokenName))]
     public partial string Text { get; set; } = string.Empty;
+
+    /// <summary>
+    /// The line in coloured runs, when the file is code that has colours; none for a plain line.
+    /// </summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(IsColored))]
+    public partial IReadOnlyList<CodeSegment>? Segments { get; set; }
+
+    public bool IsColored
+    {
+        get { return Segments != null; }
+    }
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(SpokenName))]

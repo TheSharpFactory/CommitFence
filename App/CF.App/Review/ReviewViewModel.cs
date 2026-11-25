@@ -200,6 +200,11 @@ internal sealed partial class ReviewViewModel : ObservableObject
     /// </summary>
     public event Action<string>? OpenFileRequested;
 
+    /// <summary>
+    /// "Open Doctor" on a reason that says the machine is not ready: the window shows the Doctor screen.
+    /// </summary>
+    public event Action? OpenDoctorRequested;
+
     public event Action<string, int>? OpenLineRequested;
 
     private void OpenConfigLine(int line)
@@ -585,6 +590,29 @@ internal sealed partial class ReviewViewModel : ObservableObject
             Verdict = answer.HasPush ? Starting() : NoPush(answer);
     }
 
+    /// <summary>Whether one of the two saved review results contains this judgment.</summary>
+    public bool HoldsStructureJudgment(StructureJudgment judgment)
+    {
+        return !IsBusy && (MatchesJudgment(_result, judgment) || MatchesJudgment(_changesState?.Result, judgment) || MatchesJudgment(_folderState?.Result, judgment));
+    }
+
+    public bool ShowStructureJudgment(StructureJudgment judgment)
+    {
+        if(!HoldsStructureJudgment(judgment))
+            return false;
+
+        if(!MatchesJudgment(_result, judgment))
+            SelectedChoice = MatchesJudgment(_changesState?.Result, judgment) ? Choices[0] : Choices[1];
+
+        return true;
+    }
+
+    private static bool MatchesJudgment(ReviewResult? result, StructureJudgment judgment)
+    {
+        return result?.StructureJudgment is { } held && held.EndedAt == judgment.EndedAt &&
+            held.Folder == judgment.Folder && held.Breaches.SequenceEqual(judgment.Breaches);
+    }
+
     /// <summary>
     /// Names the folder or project file the folder review is of (an empty path is the whole repository). Nothing is started: the run
     /// button says "Review now".
@@ -902,7 +930,7 @@ internal sealed partial class ReviewViewModel : ObservableObject
         if(answer != null && answer.Scope == null)
             return new Ran(answer, null, null, new Dictionary<string, RuleInfo>(StringComparer.Ordinal));
 
-        var scope = answer?.Scope ?? ReviewScope.ForWholeFolder(target);
+        var scope = answer?.Scope?.WithSource(ReviewSource.App) ?? ReviewScope.ForWholeFolder(target);
 
         try
         {
@@ -957,7 +985,7 @@ internal sealed partial class ReviewViewModel : ObservableObject
         {
             return _rules.ListFileRules(_folder.SettingsPath).SelectMany(listing => listing.Rules).GroupBy(rule => rule.Id, StringComparer.Ordinal).ToDictionary(group => group.Key, group => group.First(), StringComparer.Ordinal);
         }
-        catch(CF.Core.Rules.RuleChangeException)
+        catch(Exception exception) when(exception is SettingsException || exception is CF.Core.Rules.RuleChangeException)
         {
             return new Dictionary<string, CF.Core.Code.FileRule>(StringComparer.Ordinal);
         }
@@ -1101,7 +1129,7 @@ internal sealed partial class ReviewViewModel : ObservableObject
     private void BuildReasons(ReviewResult result)
     {
         var entries = result.Outcome == ReviewOutcome.Incomplete ? result.Coverage.Where(entry => entry.Status != CoverageStatus.Reviewed).OrderBy(entry => entry.Kind == CoverageKind.Build ? 0 : 1).ToList() : new List<Coverage>();
-        var reasons = entries.Select((entry, index) => ReasonViewModel.Parse(entry.What, entry.Reason, index == 0)).ToList();
+        var reasons = entries.Select((entry, index) => ReasonViewModel.Parse(entry.What, entry.Reason, index == 0, () => OpenDoctorRequested?.Invoke())).ToList();
         var hasBuild = entries.Any(entry => entry.Kind == CoverageKind.Build);
         var line = reasons.Count == 0 ? string.Empty : (reasons.Count == 1 ? "1 reason" : $"{reasons.Count} reasons") + (hasBuild ? ", the build first" : string.Empty);
         SetReasons(reasons, line, false);

@@ -18,6 +18,8 @@ internal sealed class ToolchainReport
     private readonly List<string> _gaps = new List<string>();
     private IReadOnlyList<string> _treeAssemblies = new List<string>();
 
+    public bool RanBuild { get; set; }
+
     /// <summary>
     /// The facts of the units that answered, for keeping them.
     /// </summary>
@@ -71,7 +73,7 @@ internal sealed class ToolchainReport
 
     public ToolchainResult ToResult()
     {
-        return new ToolchainResult(FindingMerger.Merge(_findings), _coverage, _notes, ToAnswers(), _readings);
+        return new ToolchainResult(FindingMerger.Merge(_findings), _coverage, _notes, ToAnswers(), _readings) { RanBuild = RanBuild };
     }
 
     public MeaningAnswers ToAnswers()

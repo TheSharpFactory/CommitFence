@@ -7,15 +7,26 @@ public sealed record StatsReport(IReadOnlyList<StatsDay> Days, DateOnly? Oldest,
     IReadOnlyList<StatsFindingCount> MostBroken, IReadOnlyList<StatsRule> NeverFired, int RulesInForce, string? ReadError = null)
 {
     /// <summary>The explanation shown when there are no reviews.</summary>
-    public const string EmptySentence = "Every review of a push made on this machine is counted here: by the hook when you push, and on Review.";
+    public const string EmptySentence = "This counts push reviews on this machine from the hook, the command line, and Review.";
 
     /// <summary>The heading shown when the history is empty.</summary>
     public const string EmptyHeading = "No reviews yet";
 
-    /// <summary>The error shown above any records read before the history became unavailable.</summary>
+    /// <summary>
+    /// The notice for a history that could not be read: in full when some of it was read, since the numbers may then leave reviews
+    /// out, plain when none of it was. The reason is a clause of the sentence.
+    /// </summary>
     public string? ReadErrorNotice
     {
-        get { return ReadError == null ? null : $"The history of reviews could not be read: {ReadError.TrimEnd('.')}."; }
+        get
+        {
+            if(ReadError == null)
+                return null;
+
+            var reason = Clause(ReadError);
+            return Oldest == null ? $"The history of reviews could not be read ({reason})." :
+                $"The history of reviews could not be read in full ({reason}), so the numbers below may leave reviews out.";
+        }
     }
 
     /// <summary>Totals for the chart.</summary>
@@ -46,6 +57,13 @@ public sealed record StatsReport(IReadOnlyList<StatsDay> Days, DateOnly? Oldest,
                 _ => $"{UnreadableLines} reviews in the history could not be read and are left out."
             };
         }
+    }
+
+    /// <summary>A reason as the end of a sentence's clause: its first letter in lower case and its final stop removed.</summary>
+    private static string Clause(string reason)
+    {
+        var text = reason.Trim().TrimEnd('.');
+        return text.Length == 0 ? text : char.ToLowerInvariant(text[0]) + text[1..];
     }
 
     /// <summary>How many active rules found nothing in the period.</summary>

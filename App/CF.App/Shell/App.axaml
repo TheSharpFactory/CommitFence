@@ -2,9 +2,9 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              x:Class="CF.App.Shell.App"
              x:ClassModifier="internal"
-             RequestedThemeVariant="Default">
+             RequestedThemeVariant="Dark">
 
-  <!-- Light and dark follow the system's theme. Every colour comes from the token dictionaries;
+  <!-- The app has one theme, dark, whatever the system's theme. Every colour comes from the token dictionaries;
        no view writes a colour. -->
   <Application.Resources>
     <ResourceDictionary>

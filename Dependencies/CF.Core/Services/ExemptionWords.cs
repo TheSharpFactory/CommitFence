@@ -9,10 +9,10 @@ public static class ExemptionWords
     public const string EmptyTitle = "No exemptions";
 
     /// <summary>The sentence of the state with no exemption.</summary>
-    public const string EmptySentence = "No line of CommitFence sets a rule aside. When one has to, name the rule and say why, on the line or the line above:";
+    public const string EmptySentence = "No line in the last commit sets a rule aside. When one has to, name the rule and say why, on the line or the line above:";
 
     /// <summary>The example the state with no exemption gives.</summary>
-    public const string EmptyExample = "// commitfence:allow TEAM010: generated code keeps its braces";
+    public const string EmptyExample = "// commitfence:allow TEAM001: generated code keeps its braces";
 
     /// <summary>The title of a scan of a repository with no commit.</summary>
     public const string NoCommitTitle = "Nothing to scan yet";

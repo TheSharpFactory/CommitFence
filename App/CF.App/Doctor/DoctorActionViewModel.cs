@@ -14,13 +14,16 @@ internal sealed partial class DoctorActionViewModel : ObservableObject
     private readonly DoctorAction _action;
     private readonly Action<DoctorAction> _open;
 
-    public DoctorActionViewModel(DoctorAction action, Action<DoctorAction> open, Func<ITextClipboard?> clipboard)
+    public DoctorActionViewModel(DoctorAction action, bool isPrimary, Action<DoctorAction> open, Func<ITextClipboard?> clipboard)
     {
         _action = action;
         _open = open;
+        IsPrimary = isPrimary;
         if(action.Kind == DoctorActionKind.CopyText)
-            Copy = new CopyButtonViewModel(action.Label, () => action.Value, clipboard);
+            Copy = new CopyButtonViewModel(action.Label, () => action.Value, clipboard, isPrimary);
     }
+
+    public bool IsPrimary { get; }
 
     public string Label
     {

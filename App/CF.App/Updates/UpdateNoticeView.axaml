@@ -12,17 +12,21 @@
        edge, so nothing lies under it. Its own surface (hover) with a hairline of line-strong across the top, no shadow; padding 12 32
        (12 24 in one pane); its inside as wide as the frame above (1292 at most, 760 in one pane). From 1304 wide it is one row: the
        mark 28, the words, the bar 280 when there is one, the buttons. In one pane the mark and the words, then the bar across the
-       column, then the buttons at the right end. It takes no focus when it arrives and reads its title and line as a live region. -->
+       column, then the buttons under the words. It takes no focus when it arrives and reads its title and line as a live region. -->
   <Border Name="Slot" ClipToBounds="True">
     <Border Name="Strip" Background="{DynamicResource hover}" BorderBrush="{DynamicResource line-strong}" BorderThickness="0,1,0,0" Padding="32,12">
       <Border Name="Inner" MaxWidth="1292" MinHeight="40" HorizontalAlignment="Stretch">
-        <Grid Name="Layout" ColumnDefinitions="28,*,Auto,Auto" RowDefinitions="Auto,Auto,Auto" ColumnSpacing="14">
+        <Grid Name="Layout" ColumnDefinitions="28,*,Auto" RowDefinitions="Auto,Auto" ColumnSpacing="14">
 
           <!-- The mark: the logo, a tick, the refused badge, or the busy ring. -->
           <Panel Name="MarkHost" Width="28" Height="28" VerticalAlignment="Center">
-            <Viewbox Width="28" Height="28" IsVisible="{Binding IsLogoMark}" Focusable="False">
-              <parts:LogoMark/>
-            </Viewbox>
+            <Panel IsVisible="{Binding IsLogoMark}">
+              <Viewbox Width="28" Height="28" Focusable="False">
+                <parts:LogoMark/>
+              </Viewbox>
+              <Border Name="LogoEdge" CornerRadius="8" BorderBrush="{DynamicResource line-strong}" BorderThickness="1"
+                      IsVisible="False" IsHitTestVisible="False"/>
+            </Panel>
             <Border Width="28" Height="28" CornerRadius="8" Background="{DynamicResource req-ink}" IsVisible="{Binding IsTickMark}">
               <parts:Icon Data="{StaticResource i-check}" Width="16" Height="16" StrokeThickness="2.4" Stroke="{DynamicResource page}"
                           HorizontalAlignment="Center" VerticalAlignment="Center"/>
@@ -35,29 +39,30 @@
                                IsVisible="{Binding IsBusyMark}"/>
           </Panel>
 
-          <!-- The words: the title, 6, the line, on one line and wrapping when they must (from 1304 wide); in one pane the title
-               and, 2 under it, the line. -->
-          <WrapPanel Name="WordsWide" Grid.Column="1" Orientation="Horizontal" ItemSpacing="6" VerticalAlignment="Center">
-            <TextBlock Theme="{StaticResource type-body-strong}" TextWrapping="Wrap" Text="{Binding Title}" AutomationProperties.LiveSetting="Polite"/>
-            <TextBlock Theme="{StaticResource type-meta}" Foreground="{DynamicResource ink-2}" TextWrapping="Wrap" Text="{Binding Line}"
-                       AutomationProperties.LiveSetting="Polite"/>
-          </WrapPanel>
-          <StackPanel Name="WordsStacked" Grid.Column="1" Spacing="2" IsVisible="False" VerticalAlignment="Center">
-            <TextBlock Theme="{StaticResource type-body-strong}" TextWrapping="Wrap" Text="{Binding Title}" AutomationProperties.LiveSetting="Polite"/>
-            <TextBlock Theme="{StaticResource type-meta}" Foreground="{DynamicResource ink-2}" TextWrapping="Wrap" Text="{Binding Line}"
-                       AutomationProperties.LiveSetting="Polite"/>
-          </StackPanel>
+          <Grid Name="Message" Grid.Column="1" ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto" VerticalAlignment="Center">
+            <!-- The words wrap when space is tight. In one pane the line always starts 2 below the title. -->
+            <WrapPanel Name="WordsWide" Orientation="Horizontal" ItemSpacing="6" VerticalAlignment="Center">
+              <TextBlock Theme="{StaticResource type-body-strong}" TextWrapping="Wrap" Text="{Binding Title}" AutomationProperties.LiveSetting="Polite"/>
+              <TextBlock Theme="{StaticResource type-meta}" Foreground="{DynamicResource ink-2}" TextWrapping="Wrap" Text="{Binding Line}"
+                         AutomationProperties.LiveSetting="Polite"/>
+            </WrapPanel>
+            <StackPanel Name="WordsStacked" Spacing="2" IsVisible="False" VerticalAlignment="Center">
+              <TextBlock Theme="{StaticResource type-body-strong}" TextWrapping="Wrap" Text="{Binding Title}" AutomationProperties.LiveSetting="Polite"/>
+              <TextBlock Theme="{StaticResource type-meta}" Foreground="{DynamicResource ink-2}" TextWrapping="Wrap" Text="{Binding Line}"
+                         AutomationProperties.LiveSetting="Polite"/>
+            </StackPanel>
 
-          <!-- The bar: 10 high, radius 5, the percent 10 to its right. A piece that moves when the size is not known. -->
-          <Grid Name="BarHost" Grid.Column="2" Width="280" ColumnDefinitions="*,Auto" ColumnSpacing="10" VerticalAlignment="Center"
-                IsVisible="{Binding ShowsBar}">
-            <parts:ProgressTrack Fraction="{Binding BarFraction}" VerticalAlignment="Center"/>
-            <TextBlock Grid.Column="1" Theme="{StaticResource type-body}" Foreground="{DynamicResource ink-2}" FontFeatures="+tnum" MinWidth="34"
-                       TextAlignment="Right" VerticalAlignment="Center" IsVisible="{Binding ShowsPercent}" Text="{Binding PercentText}"/>
+            <!-- The bar follows the words. A piece moves in the track when the size is unknown. -->
+            <Grid Name="BarHost" Grid.Column="1" Width="280" ColumnDefinitions="*,Auto" ColumnSpacing="10" VerticalAlignment="Center"
+                  IsVisible="{Binding ShowsBar}">
+              <parts:ProgressTrack Fraction="{Binding BarFraction}" VerticalAlignment="Center"/>
+              <TextBlock Grid.Column="1" Theme="{StaticResource type-body}" Foreground="{DynamicResource ink-2}" FontFeatures="+tnum" MinWidth="34"
+                         TextAlignment="Right" VerticalAlignment="Center" IsVisible="{Binding ShowsPercent}" Text="{Binding PercentText}"/>
+            </Grid>
           </Grid>
 
           <!-- The buttons, 36 high, 8 apart, in the order of the table. -->
-          <StackPanel Name="ButtonsHost" Grid.Column="3" Orientation="Horizontal" Spacing="8" HorizontalAlignment="Right" VerticalAlignment="Center">
+          <StackPanel Name="ButtonsHost" Grid.Column="2" Orientation="Horizontal" Spacing="8" HorizontalAlignment="Right" VerticalAlignment="Center">
             <Button Name="LaterButton" Classes="cf outlined" Command="{Binding DismissCommand}" IsVisible="{Binding ShowsLater}" AutomationProperties.Name="Later">
               <TextBlock Theme="{StaticResource type-body-strong}" Text="Later"/>
             </Button>
@@ -74,7 +79,7 @@
                     AutomationProperties.Name="Open the release page">
               <TextBlock Theme="{StaticResource type-body-strong}" Text="Open the release page"/>
             </Button>
-            <Button Name="TryAgainButton" Classes="cf outlined" Command="{Binding TryAgainCommand}" IsVisible="{Binding ShowsTryAgain}" AutomationProperties.Name="Try again">
+            <Button Name="TryAgainButton" Classes="cf main" Command="{Binding TryAgainCommand}" IsVisible="{Binding ShowsTryAgain}" AutomationProperties.Name="Try again">
               <TextBlock Theme="{StaticResource type-body-strong}" Text="Try again"/>
             </Button>
             <Button Name="UpdateNowButton" Classes="cf main" Command="{Binding UpdateNowCommand}" IsVisible="{Binding ShowsUpdateNow}" AutomationProperties.Name="Update now">

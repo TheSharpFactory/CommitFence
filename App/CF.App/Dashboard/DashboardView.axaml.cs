@@ -1,13 +1,13 @@
 using System.ComponentModel;
 using Avalonia;
 using Avalonia.Controls;
-using Avalonia.Layout;
 using Avalonia.Input;
+using Avalonia.Layout;
 using Avalonia.Interactivity;
-using Avalonia.Media;
 using Avalonia.Threading;
 using Avalonia.VisualTree;
 using CF.App.Parts;
+using CF.App.Shell;
 using CF.Core.Services;
 
 namespace CF.App.Dashboard;
@@ -28,7 +28,11 @@ internal sealed partial class DashboardView : UserControl
     public DashboardView()
     {
         InitializeComponent();
-        _empty = new EmptyBlock { Heading = StatsReport.EmptyHeading, Lead = StatsReport.EmptySentence, ButtonText = "Review now" };
+        _empty = (EmptyBlock)Resources["DashboardEmpty"]!;
+        _empty.Heading = StatsReport.EmptyHeading;
+        _empty.Lead = StatsReport.EmptySentence;
+        Frame.SizeChanged += (_, _) => FitToWidth();
+        SideColumn.SizeChanged += (_, _) => SizeMainColumn();
         Chart.DayChosen += day => _model?.ChooseDay(day);
         NeverList.AddHandler(KeyDownEvent, OnRuleKey, RoutingStrategies.Tunnel);
         BrokenList.AddHandler(KeyDownEvent, OnRuleKey, RoutingStrategies.Tunnel);
@@ -48,11 +52,10 @@ internal sealed partial class DashboardView : UserControl
         Present();
     }
 
-    protected override void OnAttachedToVisualTree(VisualTreeAttachmentEventArgs e)
+    private void OnOpenDoctor(object? sender, RoutedEventArgs e)
     {
-        base.OnAttachedToVisualTree(e);
-        if(this.TryFindResource("i-review", out var icon) && icon is Geometry geometry)
-            _empty.ButtonIcon = geometry;
+        if(TopLevel.GetTopLevel(this)?.DataContext is MainWindowViewModel shell)
+            shell.ShowDoctor();
     }
 
     private void OnModelChanged(object? sender, PropertyChangedEventArgs e)
@@ -64,9 +67,14 @@ internal sealed partial class DashboardView : UserControl
 
     private void Present()
     {
-        var panel = _model?.HasReviews == true ? MostBroken : null;
+        var panel = _model?.HasReviews == true ? SideColumn : null;
         if(!ReferenceEquals(Frame.Panel, panel))
             Frame.Panel = panel;
+
+        if(panel != null)
+            FlattenPanelSurface();
+
+        SizeMainColumn();
 
         if(_model?.IsEmpty == true)
             Frame.Empty = _empty;
@@ -76,20 +84,30 @@ internal sealed partial class DashboardView : UserControl
         Frame.Sheet.IsVisible = Frame.Empty == null || _model is { IsEmpty: true, HasNotice: true };
     }
 
-    private void OnChartFocus(object? sender, FocusChangedEventArgs e)
+    /// <summary>
+    /// The two panels are cards of their own, 16 apart, on the page: the frame's surface round them keeps no colour and no room.
+    /// A style of this view cannot take them from the frame's own style, so they are set on the surface itself.
+    /// </summary>
+    private void FlattenPanelSurface()
     {
-        SetChartFocus(e.NavigationMethod != NavigationMethod.Pointer);
+        var surface = SideColumn.GetVisualAncestors().OfType<Border>().FirstOrDefault(border => border.Classes.Contains("panelsurface"));
+        if(surface == null || surface.Padding == default)
+            return;
+
+        surface.Padding = new Thickness(0);
+        surface.Bind(Border.BackgroundProperty, surface.GetResourceObservable("page"));
     }
 
-    private void OnChartBlur(object? sender, RoutedEventArgs e)
+    private void FitToWidth()
     {
-        SetChartFocus(false);
+        FlattenPanelSurface();
+        Chart.TwoColumns = PageLayout.IsTwoPanes(PageLayout.WindowWidthOf(Frame.Bounds.Width));
+        SizeMainColumn();
     }
 
-    private void SetChartFocus(bool keyboard)
+    private void SizeMainColumn()
     {
-        ChartRing.IsVisible = keyboard;
-        DayHelp.IsVisible = keyboard;
+        MainColumn.MinHeight = Frame.IsOnePane || Frame.Panel == null ? 0 : SideColumn.Bounds.Height;
     }
 
     private void OnRuleKey(object? sender, KeyEventArgs e)

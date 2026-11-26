@@ -19,6 +19,7 @@ internal sealed partial class UpdateNoticeView : UserControl
     private const double _arriveMilliseconds = 180;
     private const double _leaveMilliseconds = 140;
     private const double _barWidth = 280;
+    private const double _barGap = 24;
     private const double _rowGap = 10;
 
     private UpdatesViewModel? _model;
@@ -32,6 +33,7 @@ internal sealed partial class UpdateNoticeView : UserControl
     {
         InitializeComponent();
         DataContextChanged += OnDataContextChanged;
+        ActualThemeVariantChanged += (_, _) => LogoEdge.IsVisible = ActualThemeVariant == ThemeVariant.Dark;
         SizeChanged += (_, _) => ApplyLayout();
         AddHandler(KeyDownEvent, OnKeyDown, Avalonia.Interactivity.RoutingStrategies.Bubble);
         ApplyLayout();
@@ -153,7 +155,7 @@ internal sealed partial class UpdateNoticeView : UserControl
 
     /// <summary>
     /// One row from 1304 wide of window; under it the mark and the words, the bar across the column under them, the buttons under
-    /// the bar at the right end.
+    /// the bar at the left edge of the words.
     /// </summary>
     private void ApplyLayout()
     {
@@ -163,15 +165,18 @@ internal sealed partial class UpdateNoticeView : UserControl
         var side = PageLayout.Side(twoPanes);
         Strip.Padding = new Thickness(side, 12);
         Inner.MaxWidth = PageLayout.FrameMost(twoPanes);
+        // Keep the original gutter at the end of the narrow column and before the wide actions.
+        var gutter = Layout.ColumnSpacing;
+        Layout.Margin = twoPanes ? default : new Thickness(0, 0, gutter, 0);
         Layout.ColumnDefinitions[2].Width = twoPanes ? GridLength.Auto : new GridLength(0);
-        Layout.ColumnDefinitions[3].Width = twoPanes ? GridLength.Auto : new GridLength(0);
         MarkHost.VerticalAlignment = twoPanes ? VerticalAlignment.Center : VerticalAlignment.Top;
+        Message.HorizontalAlignment = twoPanes ? HorizontalAlignment.Left : HorizontalAlignment.Stretch;
         WordsWide.IsVisible = twoPanes;
         WordsStacked.IsVisible = !twoPanes;
-        Place(BarHost, twoPanes ? 0 : 1, twoPanes ? 2 : 1, twoPanes ? new Thickness(0) : new Thickness(0, _rowGap, 0, 0));
-        Place(ButtonsHost, twoPanes ? 0 : 2, twoPanes ? 3 : 1, twoPanes ? new Thickness(0) : new Thickness(0, _rowGap, 0, 0));
+        Place(BarHost, twoPanes ? 0 : 1, twoPanes ? 1 : 0, twoPanes ? new Thickness(_barGap, 0, 0, 0) : new Thickness(0, _rowGap, 0, 0));
+        Place(ButtonsHost, twoPanes ? 0 : 1, twoPanes ? 2 : 1, twoPanes ? new Thickness(gutter, 0, 0, 0) : new Thickness(0, _rowGap, 0, 0));
         BarHost.Width = twoPanes ? _barWidth : double.NaN;
-        BarHost.HorizontalAlignment = twoPanes ? HorizontalAlignment.Left : HorizontalAlignment.Stretch;
+        ButtonsHost.HorizontalAlignment = twoPanes ? HorizontalAlignment.Right : HorizontalAlignment.Left;
     }
 
     private static void Place(Control control, int row, int column, Thickness margin)

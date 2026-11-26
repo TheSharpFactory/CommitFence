@@ -6,7 +6,7 @@ using CommunityToolkit.Mvvm.Input;
 namespace CF.App.Exemptions;
 
 /// <summary>
-/// One row of the panel "By rule": the rule's source mark, its title, how many exemptions name it, its id, and a neutral bar with a
+/// One row of the panel "By rule": the rule's title, how many exemptions name it, its id, and a neutral bar with a
 /// red part for the exemptions that give no reason. A click chooses the rule, or shows all again when it is the chosen one.
 /// </summary>
 internal sealed partial class ExemptionRuleRowViewModel : ObservableObject
@@ -78,31 +78,21 @@ internal sealed partial class ExemptionRuleRowViewModel : ObservableObject
     }
 
     /// <summary>
-    /// "1 without a reason": the number in words beside a bar with a red part.
+    /// "1 without a reason": the number in words below a bar with a red part.
     /// </summary>
     public string WithoutReasonText
     {
         get { return $"{WithoutReason.ToString(CultureInfo.InvariantCulture)} without a reason"; }
     }
 
-    public bool IsCustom
-    {
-        get { return Rule.IsCustom; }
-    }
-
-    public bool IsFromFile
-    {
-        get { return Rule.IsFromFile; }
-    }
-
     public string SpokenName
     {
         get
         {
-            var source = Rule.IsCustom ? "custom rule" : (Rule.IsFromFile ? "rule of .editorconfig" : "rule the repository does not have");
+            var source = Rule.IsCustom ? "Custom rule" : (Rule.IsFromFile ? "Rule of .editorconfig" : "Rule the repository does not have");
             var red = HasWithoutReason ? $", {WithoutReasonText}" : string.Empty;
             var state = IsChosen ? ", chosen: press to show all again" : string.Empty;
-            return $"{Title}, {Rule.Id}, {Count} {(Count == 1 ? "exemption" : "exemptions")}{red}, {source}{state}";
+            return $"{Title}, {Rule.Id}, {Count} {(Count == 1 ? "exemption" : "exemptions")}{red}{state}, {source}";
         }
     }
 

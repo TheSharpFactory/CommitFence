@@ -297,6 +297,27 @@ public sealed class SettingsScreenTests
         }
     }
 
+    [AvaloniaTheory]
+    [InlineData(false, "Follows Windows: animations are on.", "Turn them off in Windows Settings, Accessibility, Visual effects.")]
+    [InlineData(true, "Follows Windows: animations are off.", "Turn them on in Windows Settings, Accessibility, Visual effects.")]
+    public void WindowsMotionExplainsHowToChangeTheCurrentSetting(bool reduced, string value, string instructions)
+    {
+        using var shell = new ShellHost();
+        var previous = Motion.Reduced;
+        try
+        {
+            Motion.Reduced = () => reduced;
+            var model = new SettingsViewModel(shell.Services, Samples.Folder(shell.RepositoryPath), shell.Model.Updates, Samples.InstallFolder, true);
+            var row = model.Facts.Single(fact => fact.Name == "Motion");
+            Assert.Equal(value, row.Value);
+            Assert.Equal(instructions, row.Second);
+        }
+        finally
+        {
+            Motion.Reduced = previous;
+        }
+    }
+
     private static Func<Button, bool> InSettings(string name)
     {
         return button => button.Name == name && button.IsEffectivelyVisible && button.FindAncestorOfType<SettingsView>() != null;

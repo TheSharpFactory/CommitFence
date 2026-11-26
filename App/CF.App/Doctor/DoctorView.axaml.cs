@@ -2,6 +2,7 @@ using System.ComponentModel;
 using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Platform.Storage;
+using Avalonia.VisualTree;
 using CF.App.Parts;
 using CF.App.Review;
 
@@ -15,8 +16,7 @@ internal sealed partial class DoctorView : UserControl
     private const double _paneGap = 40;
 
     private DoctorViewModel? _model;
-    private bool _checkAgainHadKeyboard;
-    private bool _keyboardWasInFix;
+    private (Button Button, DoctorCheckViewModel? Check, DoctorActionViewModel? Action)? _focusBeforeCheck;
 
     public DoctorView()
     {
@@ -32,18 +32,19 @@ internal sealed partial class DoctorView : UserControl
             _model.PropertyChanged -= OnModelChanged;
             _model.OpenFileRequested -= OnOpenFileRequested;
             _model.OpenWebRequested -= OnOpenWebRequested;
-            _model.FocusCheckAgainRequested -= OnFocusCheckAgainRequested;
-            _model.ChecksReplacing -= OnChecksReplacing;
+            _model.ChecksFinished -= OnChecksFinished;
+            _model.ChecksStarting -= OnChecksStarting;
         }
 
+        _focusBeforeCheck = null;
         _model = DataContext as DoctorViewModel;
         if(_model != null)
         {
             _model.PropertyChanged += OnModelChanged;
             _model.OpenFileRequested += OnOpenFileRequested;
             _model.OpenWebRequested += OnOpenWebRequested;
-            _model.FocusCheckAgainRequested += OnFocusCheckAgainRequested;
-            _model.ChecksReplacing += OnChecksReplacing;
+            _model.ChecksFinished += OnChecksFinished;
+            _model.ChecksStarting += OnChecksStarting;
             _model.Clipboard = new TopLevelClipboard(this);
         }
 
@@ -51,26 +52,11 @@ internal sealed partial class DoctorView : UserControl
     }
 
     /// <summary>
-    /// The panel stands only once a report has been read; in one pane it is 40 below the checks. While the checks run, "Check again"
-    /// is disabled and so cannot keep the keyboard: it gets it back when they are done.
+    /// The panel stands only once a report has been read; in one pane it is 40 below the checks.
     /// </summary>
     private void OnModelChanged(object? sender, PropertyChangedEventArgs e)
     {
         Fit();
-        if(_model == null)
-            return;
-
-        if(_model.IsChecking)
-        {
-            _checkAgainHadKeyboard = _checkAgainHadKeyboard || CheckAgainButton.IsFocused;
-            return;
-        }
-
-        if(!_checkAgainHadKeyboard)
-            return;
-
-        _checkAgainHadKeyboard = false;
-        CheckAgainButton.Focus(NavigationMethod.Tab);
     }
 
     private void Fit()
@@ -80,20 +66,39 @@ internal sealed partial class DoctorView : UserControl
         MachinePlace.Margin = new Avalonia.Thickness(0, onePane && _model?.HasReport == true ? _paneGap : 0, 0, 0);
     }
 
-    /// <summary>
-    /// Only the buttons of a fix are controls among the checks, so the keyboard inside them is the keyboard inside a fix.
-    /// </summary>
-    private void OnChecksReplacing()
+    private void OnChecksStarting()
     {
-        _keyboardWasInFix = GroupList.IsKeyboardFocusWithin;
+        var button = TopLevel.GetTopLevel(this)?.FocusManager?.GetFocusedElement() as Button;
+        _focusBeforeCheck = button != null && (button == CheckAgainButton || GroupList.IsKeyboardFocusWithin)
+            ? (button, ContextOf<DoctorCheckViewModel>(button), ContextOf<DoctorActionViewModel>(button))
+            : null;
     }
 
-    private void OnFocusCheckAgainRequested()
+    private void OnChecksFinished()
     {
-        if(_keyboardWasInFix)
-            CheckAgainButton.Focus(NavigationMethod.Tab);
+        var previous = _focusBeforeCheck;
+        _focusBeforeCheck = null;
 
-        _keyboardWasInFix = false;
+        var focused = TopLevel.GetTopLevel(this)?.FocusManager?.GetFocusedElement();
+        if(previous is not { } saved || !IsEffectivelyVisible || (focused != null && focused != saved.Button))
+            return;
+
+        if(saved.Check is { } check && saved.Action is { } action)
+        {
+            GroupList.UpdateLayout();
+            var replacement = GroupList.GetVisualDescendants().OfType<Button>().FirstOrDefault(button =>
+                button.IsEffectivelyVisible && ContextOf<DoctorCheckViewModel>(button) is { } row && row.Group == check.Group && row.Title == check.Title
+                && ContextOf<DoctorActionViewModel>(button) is { } fix && fix.Kind == action.Kind && fix.Label == action.Label);
+            if(replacement?.Focus(NavigationMethod.Tab) == true)
+                return;
+        }
+
+        CheckAgainButton.Focus(NavigationMethod.Tab);
+    }
+
+    private static T? ContextOf<T>(Control control) where T : class
+    {
+        return control.GetSelfAndVisualAncestors().OfType<Control>().Select(ancestor => ancestor.DataContext).OfType<T>().FirstOrDefault();
     }
 
     private async void OnOpenFileRequested(string path, int? line)

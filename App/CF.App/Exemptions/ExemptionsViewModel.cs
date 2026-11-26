@@ -103,6 +103,9 @@ internal sealed partial class ExemptionsViewModel : ObservableObject, IScreenMod
     public partial IReadOnlyList<ExemptionRuleRowViewModel> RuleRows { get; private set; } = [];
 
     [ObservableProperty]
+    public partial IReadOnlyList<object> RulePanelItems { get; private set; } = [];
+
+    [ObservableProperty]
     public partial string RulesHead { get; private set; } = string.Empty;
 
     [ObservableProperty]
@@ -499,7 +502,7 @@ internal sealed partial class ExemptionsViewModel : ObservableObject, IScreenMod
                 _ => throw new ArgumentOutOfRangeException(nameof(_filter))
             };
             _narrowed = new ExemptionCounts(narrowed);
-            _visible = new ExemptionCounts(narrowed.Where(Matches).ToList());
+            _visible = HasSearch ? new ExemptionCounts(_narrowed.Files.SelectMany(MatchingEntries).ToList()) : _narrowed;
             ShowSummary();
             ShowPanel();
             ShowChosen();
@@ -521,11 +524,18 @@ internal sealed partial class ExemptionsViewModel : ObservableObject, IScreenMod
         OnPropertyChanged(nameof(HasChosen));
     }
 
+    private IEnumerable<ExemptionEntry> MatchingEntries(ExemptionFileGroup file)
+    {
+        return GroupRows(file).Where(row => row.Any(Matches)).SelectMany(row => row);
+    }
+
+    private static IEnumerable<IGrouping<(string RuleId, string? Reason, bool IsFinding), ExemptionEntry>> GroupRows(ExemptionFileGroup file)
+    {
+        return file.Exemptions.GroupBy(entry => (entry.RuleId, Reason: string.IsNullOrWhiteSpace(entry.Reason) ? null : entry.Reason.Trim(), entry.IsFinding));
+    }
+
     private bool Matches(ExemptionEntry entry)
     {
-        if(SearchText.Length == 0)
-            return true;
-
         return entry.RuleId.Contains(SearchText, StringComparison.OrdinalIgnoreCase)
             || entry.File.Contains(SearchText, StringComparison.OrdinalIgnoreCase)
             || (entry.Reason?.Contains(SearchText, StringComparison.OrdinalIgnoreCase) ?? false);
@@ -578,8 +588,23 @@ internal sealed partial class ExemptionsViewModel : ObservableObject, IScreenMod
             IsChosen = _filter == ExemptionFilter.Rule && rule.RuleId == _filterRuleId,
             IsSteppedBack = _filter == ExemptionFilter.Rule && rule.RuleId != _filterRuleId
         }).ToList();
+        var items = new List<object>();
+        AddRuleGroup(items, "Custom rules", ExemptionRuleSource.Custom);
+        AddRuleGroup(items, "Rules of .editorconfig", ExemptionRuleSource.File);
+        AddRuleGroup(items, "Rules the repository does not have", ExemptionRuleSource.Unknown);
+        RulePanelItems = items;
         var count = _all.Rules.Count;
         RulesHead = _filter == ExemptionFilter.Rule ? $"1 of {count.ToString(CultureInfo.InvariantCulture)} rules shown" : $"{count.ToString(CultureInfo.InvariantCulture)} {(count == 1 ? "rule" : "rules")}";
+    }
+
+    private void AddRuleGroup(List<object> items, string title, ExemptionRuleSource source)
+    {
+        var rows = RuleRows.Where(row => row.Rule.Source == source).ToList();
+        if(rows.Count == 0)
+            return;
+
+        items.Add(new ExemptionRuleGroupHeading(title, rows.Count.ToString(CultureInfo.InvariantCulture), source, items.Count > 0));
+        items.AddRange(rows);
     }
 
     private void ShowChosen()
@@ -618,8 +643,8 @@ internal sealed partial class ExemptionsViewModel : ObservableObject, IScreenMod
     }
 
     /// <summary>
-    /// The list under the head. Up to 20 exemptions: every file starts open. More: every file starts folded but the first. The first
-    /// exemption of the first file starts open (every one does in the view of those with no reason). Past 50 files the rest wait for "Show".
+    /// The list under the head. Up to 20 exemptions: every file starts open. More: every file starts folded but the first.
+    /// Rows start closed, except in the view of those with no reason. Past 50 files the rest wait for "Show".
     /// </summary>
     private void LayOutItems()
     {
@@ -633,8 +658,9 @@ internal sealed partial class ExemptionsViewModel : ObservableObject, IScreenMod
         for(var index = 0; index < shown.Count; index++)
         {
             var file = shown[index];
-            var rows = file.Exemptions.Select((entry, at) => new ExemptionRowViewModel(entry, InfoOf(entry.RuleId), _filter == ExemptionFilter.WithoutReason || (index == 0 && at == 0), OpenLine, _openRule)).ToList();
-            var item = new ExemptionFileViewModel(file.Path, rows, _inFile.GetValueOrDefault(file.Path, rows.Count), allOpen || index == 0, FileToggled);
+            var rows = GroupRows(file).Select(row => new ExemptionRowViewModel(row.ToList(), InfoOf(row.Key.RuleId),
+                _filter == ExemptionFilter.WithoutReason, OpenLine, _openRule)).ToList();
+            var item = new ExemptionFileViewModel(file, rows, _inFile.GetValueOrDefault(file.Path, file.Exemptions.Count), allOpen || index == 0, FileToggled);
             Items.Add(item);
             if(item.IsOpen)
                 AddRows(Items.Count, rows);
@@ -698,9 +724,9 @@ internal sealed partial class ExemptionsViewModel : ObservableObject, IScreenMod
         OpenAllText = Items.OfType<ExemptionFileViewModel>().Any(item => !item.IsOpen) ? "Open all" : "Fold all";
     }
 
-    private void OpenLine(ExemptionRowViewModel row)
+    private void OpenLine(ExemptionEntry entry)
     {
-        OpenLineRequested?.Invoke(Path.Combine(_scan?.WorkFolder ?? _folder.FolderPath, row.Entry.File.Replace('/', Path.DirectorySeparatorChar)), row.Entry.Line);
+        OpenLineRequested?.Invoke(Path.Combine(_scan?.WorkFolder ?? _folder.FolderPath, entry.File.Replace('/', Path.DirectorySeparatorChar)), entry.Line);
     }
 
     private sealed record ReadResult(ExemptionScan? Scan, string? Failure, Dictionary<string, ExemptionRuleInfo> Rules);

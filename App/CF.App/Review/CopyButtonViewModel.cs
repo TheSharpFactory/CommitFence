@@ -20,9 +20,10 @@ internal sealed partial class CopyButtonViewModel : ObservableObject
     [NotifyPropertyChangedFor(nameof(SpokenName))]
     public partial bool IsCopied { get; set; }
 
-    public CopyButtonViewModel(string label, Func<string> text, Func<ITextClipboard?> clipboard)
+    public CopyButtonViewModel(string label, Func<string> text, Func<ITextClipboard?> clipboard, bool isPrimary = false)
     {
         Label = label;
+        IsPrimary = isPrimary;
         _text = text;
         _clipboard = clipboard;
     }
@@ -31,6 +32,8 @@ internal sealed partial class CopyButtonViewModel : ObservableObject
     /// What the button says at rest.
     /// </summary>
     public string Label { get; }
+
+    public bool IsPrimary { get; }
 
     public string SpokenName
     {

@@ -11,7 +11,7 @@ internal sealed partial class DashboardViewModel(IStatsService? stats, OpenedFol
     : ObservableObject, IScreenModel
 {
     private const int _firstNever = 3;
-    private const int _firstBroken = 8;
+    private const int _firstBroken = 7;
 
     private List<DashboardRuleRow> _never = [];
     private List<DashboardRuleRow> _broken = [];
@@ -41,17 +41,18 @@ internal sealed partial class DashboardViewModel(IStatsService? stats, OpenedFol
     {
         get
         {
-            var error = Report?.ReadErrorNotice;
             var unreadable = Report?.UnreadableNotice;
-            if(error == null)
+            if(Report?.ReadError == null)
                 return unreadable;
 
-            // with nothing read there are no numbers on the page to warn about
-            var warning = Report?.Oldest == null ? error : error + " The numbers below may leave reviews out.";
+            var warning = Report.ReadErrorNotice;
             return unreadable == null ? warning : warning + "\n" + unreadable;
         }
     }
-    public string? Period { get { return HasReviews ? Report?.Period : null; } }
+    public string? Period
+    {
+        get { return HasReviews ? Report?.Period : null; }
+    }
     public IReadOnlyList<StatsDay> Days { get { return Report?.Days ?? []; } }
     public StatsDay? Day { get { return Days.Count == 0 ? null : Days[DayIndex]; } }
     public string? DayLabel { get { return Day?.Label(DayIndex == Days.Count - 1); } }
@@ -69,10 +70,13 @@ internal sealed partial class DashboardViewModel(IStatsService? stats, OpenedFol
     public IReadOnlyList<StatsReviewCount> DayCounts { get { return Day?.Counts() ?? []; } }
     public IReadOnlyList<StatsReviewCount> Counts { get; private set; } = [];
     public string ChartName { get; private set; } = string.Empty;
-    public string ReviewNote { get; private set; } = string.Empty;
+    public string Verdict { get; private set; } = string.Empty;
     public string TimingLine { get; private set; } = string.Empty;
     public bool HasTiming { get { return TimingLine.Length != 0; } }
     public IReadOnlyList<DashboardTimeBand> Bands { get; private set; } = [];
+    public string SlowestLine { get; private set; } = string.Empty;
+    public bool HasSlowest { get { return SlowestLine.Length != 0; } }
+    public bool HasNever { get { return _never.Count != 0; } }
     public string NeverSentence { get; private set; } = string.Empty;
     public bool HasMoreNever { get { return !AllNever && _never.Count > _firstNever; } }
     public bool HasMoreBroken { get { return !AllBroken && _broken.Count > _firstBroken; } }
@@ -82,6 +86,19 @@ internal sealed partial class DashboardViewModel(IStatsService? stats, OpenedFol
     public string BrokenButton { get { return $"Show all {_broken.Count}"; } }
     public IReadOnlyList<DashboardRuleRow> NeverRows { get { return AllNever ? _never : _never.Take(_firstNever).ToList(); } }
     public IReadOnlyList<DashboardRuleRow> BrokenRows { get { return AllBroken ? _broken : _broken.Take(_firstBroken).ToList(); } }
+
+    public static string VerdictFor(StatsDay totals)
+    {
+        if(totals.Total == 0)
+            return totals.ReviewsText;
+
+        var didNotPass = totals.Refused + totals.Incomplete;
+        if(didNotPass == 0)
+            return $"{totals.ReviewsText} allowed";
+
+        var outcome = totals.Refused == 0 ? "incomplete" : totals.Incomplete == 0 ? "blocked" : "blocked or incomplete";
+        return didNotPass == totals.Total ? $"{totals.ReviewsText} {outcome}" : $"{didNotPass} of {totals.ReviewsText} {outcome}";
+    }
 
     public void ChooseDay(int day)
     {
@@ -154,13 +171,14 @@ internal sealed partial class DashboardViewModel(IStatsService? stats, OpenedFol
         var totals = report.Totals;
         Counts = totals.Counts();
         var all = totals.Total == 0 ? totals.ReviewsText : $"{totals.ReviewsText}: {totals.CountsText()}";
-        var scale = DashboardChart.ScaleLabel(DashboardChart.MaximumOf(Days));
-        ChartName = $"Reviews by day, the last 30 days. {scale.TrimEnd('.')}. {all}. Left and Right choose a day.";
-        ReviewNote = $"{totals.Total} in 30 days, by the hook and on Review";
+        var scale = DashboardChartLayout.ScaleLabel(DashboardChartLayout.ScaleTop(Days));
+        ChartName = $"Reviews by day, the last 30 days, {char.ToLowerInvariant(scale[0]) + scale[1..]}. {all}. Left and Right choose a day.";
+        Verdict = VerdictFor(totals);
         TimingLine = DashboardTimeBand.Summary(report.Timing);
         Bands = DashboardTimeBand.Of(report.Timing);
-        NeverSentence = report.NeverFired.Count == 0 ? report.NeverFiredSentence :
-            $"**{report.NeverFired.Count}** of the **{report.RulesInForce}** rules in force found nothing in 30 days.";
+        SlowestLine = DashboardTimeBand.Slowest(report.Timing);
+        NeverSentence = report.NeverFired.Count == 0 ? report.NeverFiredSentence.TrimEnd('.') :
+            $"**{report.NeverFired.Count}** of the **{report.RulesInForce}** rules in force found nothing in 30 days";
         _never = report.NeverFired.Select(rule => new DashboardRuleRow(rule.Id, rule, 0, 0)).ToList();
         var counts = report.MostBroken;
         var maximum = counts.Count == 0 || counts.All(row => row.Count == counts[0].Count) ? 0 : counts[0].Count;

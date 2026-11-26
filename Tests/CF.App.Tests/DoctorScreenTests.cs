@@ -37,14 +37,15 @@ public sealed class DoctorScreenTests
         Assert.Equal($"Checked today, {Samples.Now.ToLocalTime():HH:mm}, in 1.3 s", model.CheckedText);
         Assert.Equal(["Git and the hook", "C#"], model.Groups.Select(group => group.Name));
 
-        // only the failing check is open: its fix, the lines the body gives, the last in force, and its two buttons; the others are one line
+        // only the failing check is open: its fix, the lines the body gives, the proposed move, and its two buttons; the others are one line
         var rows = model.Groups.SelectMany(group => group.Checks).ToList();
         var open = Assert.Single(rows, row => row.HasFix);
         Assert.Equal("The pre-push hook runs CommitFence first", open.Title);
         Assert.Equal([1, 2, 3, 4], open.Lines.Select(line => line.Number));
-        Assert.Equal([false, false, false, true], open.Lines.Select(line => line.IsCurrent));
+        Assert.Equal([false, false, true, true], open.Lines.Select(line => line.IsFinding));
+        Assert.Equal([false, true, false, false], open.AfterMoveLines.Select(line => line.IsMoved));
         Assert.Equal(["Open the hook script", "Copy the hook line"], open.Actions.Select(action => action.Label));
-        Assert.Single(host.FindAll<FileLines>(lines => lines.IsEffectivelyVisible));
+        Assert.Equal(2, host.FindAll<FileLines>(lines => lines.IsEffectivelyVisible).Count);
 
         // Tab reaches "Check again" and the two buttons of the fix, and nothing else
         var stops = host.FindAll<Button>(button => button.IsEffectivelyVisible && button.Focusable && button.IsTabStop).Select(Avalonia.Automation.AutomationProperties.GetName);
@@ -77,7 +78,7 @@ public sealed class DoctorScreenTests
     }
 
     [AvaloniaFact]
-    public async Task CheckingKeepsTheLastResultsDisablesCheckAgainAndDropsALateReportForAnotherFolder()
+    public async Task CheckingHidesTheLastResultsDisablesCheckAgainAndDropsALateReportForAnotherFolder()
     {
         var other = new OpenedFolder("/work/billing", "/work/billing/commitfence.json", false, "billing", "main", true);
         var held = new TaskCompletionSource();
@@ -97,8 +98,9 @@ public sealed class DoctorScreenTests
                 held.Task.Wait();
             }
 
-            return FakeDoctorService.Report();
+            return FakeDoctorService.Report(hookFails: true);
         };
+        _doctor.StartedCount = 2;
         var model = Create(Samples.Folder("/work/invoicing"));
         using var host = new ViewHost(new DoctorView { DataContext = model }, 1440, 900);
 
@@ -114,10 +116,10 @@ public sealed class DoctorScreenTests
             firstHeld.SetResult();
         }
 
-        // the first report, then "Check again": the verdict says Checking, the rows keep their results behind the busy ring
+        // the first report, then "Check again": the old results and fix are hidden while the rows show their progress
         await first;
         host.Pump();
-        Assert.Equal("Ready for pushes", model.Heading);
+        Assert.Equal("1 check fails", model.Heading);
         Assert.True(model.AgainCommand.CanExecute(null));
         var again = model.CheckAsync();
         await entered.Task;
@@ -127,7 +129,13 @@ public sealed class DoctorScreenTests
         Assert.Equal($"Last checked today, {Samples.Now.ToLocalTime():HH:mm}", model.CheckedText);
         Assert.False(model.AgainCommand.CanExecute(null));
         Assert.False(host.Find<Button>(button => Avalonia.Automation.AutomationProperties.GetName(button) == "Check again")!.IsEffectivelyEnabled);
-        Assert.All(model.Groups.SelectMany(group => group.Checks), row => Assert.True(row.IsBusy && row.ShowsRing && !row.ShowsPass));
+        var rows = model.Groups.SelectMany(group => group.Checks).ToList();
+        Assert.Equal(["Finished", "Checking", "Waiting"], rows.Select(row => row.ProgressText));
+        Assert.Equal([false, true, false], rows.Select(row => row.ShowsRing));
+        Assert.Contains("Finished", rows[0].SpokenName, StringComparison.Ordinal);
+        Assert.All(rows, row => Assert.False(row.ShowsResult || row.HasFix));
+        Assert.Empty(host.FindAll<FileLines>(lines => lines.IsEffectivelyVisible));
+        Assert.Single(host.FindAll<TextBlock>(text => text.IsEffectivelyVisible && text.Text == "Waiting"));
 
         // the screen moves to another repository while that check runs: its report arrives late and is dropped
         await model.ShowFolderAsync(other);
@@ -192,7 +200,7 @@ public sealed class DoctorScreenTests
     }
 
     [AvaloniaFact]
-    public async Task F5WhileChecksRunStartsNoSecondCheckAndTheKeyboardMovesOnlyOutOfAFixThatWentAway()
+    public async Task F5WhileChecksRunStartsNoSecondCheckAndRestoresTheKeyboardToTheFixOrCheckAgain()
     {
         using var shell = new ShellHost();
         shell.Doctor.Answer = _ => FakeDoctorService.Report(hookFails: true);
@@ -209,7 +217,7 @@ public sealed class DoctorScreenTests
         {
             entered.TrySetResult();
             held.Task.Wait();
-            return FakeDoctorService.Report();
+            return FakeDoctorService.Report(hookFails: true);
         };
         var copy = host.Find<Button>(button => Avalonia.Automation.AutomationProperties.GetName(button) == "Copy the hook line")!;
         copy.Focus(NavigationMethod.Tab);
@@ -229,7 +237,14 @@ public sealed class DoctorScreenTests
         }
 
         Assert.Equal(2, shell.Doctor.Folders.Count);
+        host.Pump();
+        var replacement = host.Find<Button>(button => button.IsEffectivelyVisible && Avalonia.Automation.AutomationProperties.GetName(button) == "Copy the hook line")!;
+        Assert.NotSame(copy, replacement);
+        Assert.True(host.HasFocusWithin(replacement));
+
         // the fix the keyboard was in is gone: the keyboard is on "Check again"
+        shell.Doctor.Answer = _ => FakeDoctorService.Report();
+        await model.CheckAsync();
         host.Pump();
         var checkAgain = host.Find<Button>(button => Avalonia.Automation.AutomationProperties.GetName(button) == "Check again")!;
         Assert.True(host.HasFocusWithin(checkAgain));

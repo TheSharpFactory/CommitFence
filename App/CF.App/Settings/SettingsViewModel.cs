@@ -73,6 +73,11 @@ internal sealed partial class SettingsViewModel : ObservableObject, IScreenModel
 
     public string RepositoryName { get; }
 
+    public string RepositoryNote
+    {
+        get { return $"{RepositoryName}, kept in commitfence.json, for everyone who pulls it"; }
+    }
+
     public string VersionTitle { get; }
 
     public IReadOnlyList<FactRowViewModel> Facts { get; }
@@ -360,8 +365,10 @@ internal sealed partial class SettingsViewModel : ObservableObject, IScreenModel
         if(!_followsSystemMotion)
             return new FactRowViewModel("Motion", "Reduce motion", _machine.ReduceMotion, SaveReduceMotion);
 
-        var state = Motion.IsReduced ? "off" : "on";
-        return new FactRowViewModel("Motion", $"Follows Windows: animations are {state}.", false, "Turn them off in Windows Settings, Accessibility, Visual effects.");
+        var reduced = Motion.IsReduced;
+        var state = reduced ? "off" : "on";
+        var change = reduced ? "on" : "off";
+        return new FactRowViewModel("Motion", $"Follows Windows: animations are {state}.", false, $"Turn them {change} in Windows Settings, Accessibility, Visual effects.");
     }
 
     /// <summary>

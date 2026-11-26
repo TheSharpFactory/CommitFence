@@ -11,7 +11,7 @@ namespace CF.App.Doctor;
 
 /// <summary>
 /// The Doctor screen: whether this machine reviews the pushes of the repository. The checks run when the screen is first shown, on
-/// "Check again" and on F5, off the interface's thread; while they run each row keeps its last result. A report that comes back
+/// "Check again" and on F5, off the interface's thread; while they run each row shows its progress. A report that comes back
 /// after the screen has moved to another repository, or after a newer check began, is dropped. What the screen shows is what
 /// <see cref="IDoctorService"/> returns, in its words.
 /// </summary>
@@ -46,14 +46,14 @@ internal sealed partial class DoctorViewModel : ObservableObject, IScreenModel
     public event Action<string>? OpenWebRequested;
 
     /// <summary>
-    /// The checks shown are about to be replaced by a new report: the screen notes where the keyboard is.
+    /// The checks are about to hide their results: the screen notes where the keyboard is.
     /// </summary>
-    public event Action? ChecksReplacing;
+    public event Action? ChecksStarting;
 
     /// <summary>
-    /// A check that failed now passes: the keyboard goes to "Check again" if it was inside a fix, since the buttons it was on are gone.
+    /// The refreshed rows and "Check again" are available for restoring keyboard focus.
     /// </summary>
-    public event Action? FocusCheckAgainRequested;
+    public event Action? ChecksFinished;
 
     /// <summary>
     /// Where the app puts a text the person asked to copy. The window gives the system's clipboard.
@@ -199,26 +199,35 @@ internal sealed partial class DoctorViewModel : ObservableObject, IScreenModel
         _started = true;
         var run = ++_run;
         var path = _folder.FolderPath;
+        ChecksStarting?.Invoke();
         IsChecking = true;
-        MarkRows(true);
+        var rows = Groups.SelectMany(group => group.Checks).ToList();
+        MarkRows(rows, true);
         RaiseVerdict();
+        var progress = new Progress<int>(active =>
+        {
+            if(run == _run && IsChecking)
+                MarkProgress(rows, active);
+        });
         DoctorReport? report = null;
         try
         {
-            report = await Task.Run(() => _doctor.Check(path));
+            report = await Task.Run(() => _doctor.Check(path, progress));
+            if(run == _run)
+                SetReport(report);
         }
         finally
         {
             if(run == _run)
             {
                 IsChecking = false;
-                MarkRows(false);
+                if(report == null)
+                    MarkRows(rows, false);
+
                 RaiseVerdict();
+                ChecksFinished?.Invoke();
             }
         }
-
-        if(run == _run)
-            SetReport(report);
     }
 
     /// <summary>
@@ -232,17 +241,10 @@ internal sealed partial class DoctorViewModel : ObservableObject, IScreenModel
 
     private void SetReport(DoctorReport? report)
     {
-        var before = Groups.SelectMany(group => group.Checks).ToList();
-        ChecksReplacing?.Invoke();
         _report = report;
         Groups = report == null ? new List<DoctorGroupViewModel>() : GroupsOf(report);
         Machine = report == null ? new List<MachineRowViewModel>() : MachineOf(report.Machine);
         OnPropertyChanged(string.Empty);
-
-        var now = Groups.SelectMany(group => group.Checks).ToList();
-        var repaired = before.Any(old => old.Outcome == DoctorOutcome.Fails && now.Any(check => check.IsSameCheckAs(old) && check.Outcome == DoctorOutcome.Passes));
-        if(repaired)
-            FocusCheckAgainRequested?.Invoke();
     }
 
     /// <summary>
@@ -254,12 +256,19 @@ internal sealed partial class DoctorViewModel : ObservableObject, IScreenModel
         OnPropertyChanged(string.Empty);
     }
 
-    private void MarkRows(bool busy)
+    private static void MarkRows(IReadOnlyList<DoctorCheckViewModel> rows, bool busy)
     {
-        foreach(var check in Groups.SelectMany(group => group.Checks))
+        foreach(var check in rows)
         {
+            check.Progress = DoctorCheckProgress.Waiting;
             check.IsBusy = busy;
         }
+    }
+
+    private static void MarkProgress(List<DoctorCheckViewModel> rows, int active)
+    {
+        for(var index = 0; index < Math.Min(active, rows.Count); index++)
+            rows[index].Progress = index + 1 == active ? DoctorCheckProgress.Checking : DoctorCheckProgress.Finished;
     }
 
     private List<DoctorGroupViewModel> GroupsOf(DoctorReport report)

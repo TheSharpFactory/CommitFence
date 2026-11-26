@@ -34,6 +34,10 @@ internal sealed partial class FileLineViewModel : ObservableObject
     [NotifyPropertyChangedFor(nameof(SpokenName))]
     public partial bool IsCurrent { get; set; }
 
+    public bool IsFinding { get; init; }
+
+    public bool IsMoved { get; init; }
+
     /// <summary>
     /// Whether the place holds a line: a rule near the start or the end of its file has fewer lines than places.
     /// </summary>
@@ -66,7 +70,14 @@ internal sealed partial class FileLineViewModel : ObservableObject
     {
         get
         {
-            return $"Line {Number}: {Text}{(IsCurrent ? ". This line sets the rule." : string.Empty)}";
+            var mark = (IsCurrent, IsFinding, IsMoved) switch
+            {
+                (true, _, _) => ". This line sets the rule.",
+                (_, true, _) => ". The finding points to this line.",
+                (_, _, true) => ". The hook line moves here.",
+                _ => string.Empty
+            };
+            return $"Line {Number}: {Text}{mark}";
         }
     }
 

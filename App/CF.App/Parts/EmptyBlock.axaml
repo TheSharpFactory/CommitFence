@@ -6,8 +6,7 @@
 
   <!-- The state of a screen with nothing to show yet, as Review draws it: one block across the pane, at most 520 wide and in the
        middle, its middle at 40 percent of the pane's height and its top at least 32 below the pane's top. The logo 56, the
-       heading in type-title (the step of the screen's name above it), a lead in type-lead ink-2, what the screen puts between, and the main button. Nothing but its button
-       takes the keyboard. -->
+       heading in type-title (the step of the screen's name above it), a lead in type-lead ink-2, what the screen puts between, and its actions. Only the actions take the keyboard. -->
   <Panel Name="Room">
     <StackPanel Name="Body" MaxWidth="520" HorizontalAlignment="Center" VerticalAlignment="Top" Margin="32,32,32,0">
       <Viewbox Name="EmblemBox" Width="56" Height="56" Margin="0,0,0,20" Focusable="False">
@@ -18,12 +17,17 @@
       <TextBlock Name="LeadText" Theme="{StaticResource type-lead}" Foreground="{DynamicResource ink-2}" TextAlignment="Center" TextWrapping="Wrap"
                  Margin="0,8,0,0"/>
       <ContentPresenter Name="ExtraHost" HorizontalAlignment="Center" Margin="0,16,0,0"/>
-      <Button Name="MainButton" Classes="cf main" HorizontalAlignment="Center" Margin="0,24,0,0">
-        <StackPanel Orientation="Horizontal" Spacing="8">
-          <parts:Icon Name="ButtonIconMark" Width="16" Height="16" Stroke="{Binding $parent[Button].Foreground}"/>
-          <TextBlock Name="ButtonLabel" Theme="{StaticResource type-body-strong}"/>
-        </StackPanel>
-      </Button>
+      <TextBlock Name="DetailText" IsVisible="False" Theme="{StaticResource type-body}" Foreground="{DynamicResource ink-2}"
+                 TextAlignment="Center" TextWrapping="Wrap" Margin="0,12,0,0"/>
+      <parts:WrapRow Name="Actions" HorizontalAlignment="Center" ItemSpacing="8" Margin="0,24,0,0">
+        <Button Name="MainButton" Classes="cf main" HorizontalAlignment="Center">
+          <StackPanel Orientation="Horizontal" Spacing="8">
+            <parts:Icon Name="ButtonIconMark" Width="16" Height="16" Stroke="{Binding $parent[Button].Foreground}"/>
+            <TextBlock Name="ButtonLabel" Theme="{StaticResource type-body-strong}"/>
+          </StackPanel>
+        </Button>
+        <ContentControl Name="SecondaryHost" IsVisible="False"/>
+      </parts:WrapRow>
     </StackPanel>
   </Panel>
 

@@ -43,6 +43,55 @@ public sealed class GitFailureTests
         }
     }
 
+    [Fact]
+    public void ACheckoutTimeoutDoesNotPreventReviewingTheNextPushedRef()
+    {
+        using(var harness = new ReviewHarness())
+        {
+            var slow = harness.Fake.AddCommit("slow", new Dictionary<string, string> { ["about.txt"] = "first ref\n" });
+            var breaking = harness.Fake.AddCommit("breaking", new Dictionary<string, string>
+            {
+                ["commitfence.json"] = ReviewSources.Settings(ReviewSources.Team010),
+                ["Core.cs"] = ReviewSources.Class("Core", ReviewSources.SignBad)
+            });
+            var runner = new ScriptedProcessRunner()
+                .Route(request => request.Arguments.Contains("read-tree"), request => CheckoutForPush(harness.Fake, request))
+                .Route(request => request.Arguments.Contains("diff-files"), _ => ScriptedProcessRunner.Output(string.Empty));
+            harness.Snapshots = new GitSnapshotStore(runner, new FolderOfTest(Path.Combine(harness.Scratch, "data")));
+            var zero = new string('0', 40);
+            var input = $"refs/heads/slow {slow} refs/heads/slow {zero}\nrefs/heads/main {breaking} refs/heads/main {zero}\n";
+
+            var review = harness.RunWithInput(["review", "--hook", "pre-push", "origin", "local"], input);
+
+            Assert.Contains("refs/heads/slow: incomplete: git read-tree failed: checkout timed out", review.Text, StringComparison.Ordinal);
+            Assert.Contains("error TEAM010", review.Text, StringComparison.Ordinal);
+            Assert.Equal(ExitCode.Blocked, review.ExitCode);
+        }
+    }
+
+    private static ProcessResult CheckoutForPush(FakeGit git, ProcessRequest request)
+    {
+        var lockPath = request.Environment["GIT_INDEX_FILE"] + ".lock";
+        var folder = request.Environment["GIT_WORK_TREE"]!;
+        var partialPath = Path.Combine(folder, "partially-checked-out.txt");
+        var tree = request.Arguments[^1];
+        if(tree == FakeGit.TreeIdOf("slow"))
+        {
+            File.WriteAllText(lockPath, string.Empty);
+            File.WriteAllText(partialPath, "a file written before git stopped");
+            return new ProcessResult(-2, string.Empty, "checkout timed out", true);
+        }
+
+        if(File.Exists(lockPath))
+            return ScriptedProcessRunner.Failure(128, "the private index is still locked");
+
+        Assert.False(File.Exists(partialPath));
+        foreach(var file in git.FilesOf(tree))
+            File.WriteAllText(Path.Combine(folder, file.Key), file.Value);
+
+        return ScriptedProcessRunner.Output(string.Empty);
+    }
+
     private static ScriptedProcessRunner CreateGitScript(ReviewHarness harness, string scenario)
     {
         var diff = scenario == "MissingObjectInTheDiff"

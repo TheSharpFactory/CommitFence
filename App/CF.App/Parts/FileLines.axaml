@@ -12,6 +12,12 @@
     <Style Selector="parts|FileLines Border.fileline.current.band">
       <Setter Property="Background" Value="{DynamicResource hover}"/>
     </Style>
+    <Style Selector="parts|FileLines Border.fileline.finding">
+      <Setter Property="Background" Value="{DynamicResource diff-del}"/>
+    </Style>
+    <Style Selector="parts|FileLines Border.fileline.moved">
+      <Setter Property="Background" Value="{DynamicResource diff-add-mark}"/>
+    </Style>
     <Style Selector="parts|FileLines Border.fileline Border.bar">
       <Setter Property="IsVisible" Value="False"/>
     </Style>
@@ -47,10 +53,11 @@
     <ItemsControl.ItemTemplate>
       <DataTemplate DataType="parts:FileLineViewModel" x:DataType="parts:FileLineViewModel">
         <Border Classes="fileline" Classes.current="{Binding IsCurrent}"
-                Classes.band="{Binding $parent[parts:FileLines].BandsCurrent}"
+                Classes.band="{Binding $parent[parts:FileLines].BandsCurrent}" Classes.finding="{Binding IsFinding}" Classes.moved="{Binding IsMoved}"
                 MinHeight="20" IsVisible="{Binding IsPresent}" AutomationProperties.Name="{Binding SpokenName}">
           <Panel>
             <Border Classes="bar" Width="4" CornerRadius="2" HorizontalAlignment="Left" Background="{DynamicResource here}"/>
+            <Border Width="3" HorizontalAlignment="Left" Background="{DynamicResource block}" IsVisible="{Binding IsFinding}"/>
             <Grid ColumnDefinitions="Auto,*" Margin="0,0,12,0">
               <Border Width="{Binding $parent[parts:FileLines].NumberWidth}" VerticalAlignment="Top">
                 <TextBlock Classes="number" Theme="{StaticResource code}" HorizontalAlignment="Right"

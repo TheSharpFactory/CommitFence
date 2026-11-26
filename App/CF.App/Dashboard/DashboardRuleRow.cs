@@ -14,6 +14,8 @@ internal sealed record DashboardRuleRow(string Id, StatsRule? Rule, long Count, 
     public bool Blocks { get { return Rule?.Effect == Severity.Block; } }
     public bool Warns { get { return Rule?.Effect == Severity.Warn; } }
     public bool Off { get { return Rule is { Effect: null }; } }
+    /// <summary>"Off" after the title, 6 apart: two no-break spaces keep it with the title's last word.</summary>
+    public string OffTail { get { return Off ? "  " + Effect : string.Empty; } }
     public bool NeutralBar { get { return Off || Unlisted; } }
     public string Effect
     {

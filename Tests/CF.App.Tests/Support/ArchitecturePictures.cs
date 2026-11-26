@@ -21,7 +21,7 @@ internal static class ArchitecturePictures
             DataContext = shell.Model,
             Width = 1440,
             Height = 900,
-            RequestedThemeVariant = theme == "light" ? ThemeVariant.Light : ThemeVariant.Dark
+            RequestedThemeVariant = ThemeVariant.Dark
         };
         using var host = new ViewHost(window);
         var view = host.Find<ArchitectureView>(candidate => candidate.IsEffectivelyVisible)!;

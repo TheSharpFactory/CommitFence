@@ -14,6 +14,8 @@ internal sealed class FakeDoctorService : IDoctorService
 
     public Func<string, DoctorReport> Answer { get; set; } = _ => Report();
 
+    public int StartedCount { get; set; } = 3;
+
     public IReadOnlyList<string> Folders
     {
         get
@@ -25,13 +27,14 @@ internal sealed class FakeDoctorService : IDoctorService
         }
     }
 
-    public DoctorReport Check(string folder)
+    public DoctorReport Check(string folder, IProgress<int>? started = null)
     {
         lock(_syncRoot)
         {
             _folders.Add(folder);
         }
 
+        started?.Report(StartedCount);
         return Answer(folder);
     }
 
@@ -75,7 +78,7 @@ internal sealed class FakeDoctorService : IDoctorService
             new DoctorAction(DoctorActionKind.OpenFile, "Open global.json", "/work/invoicing/global.json", 3),
             new DoctorAction(DoctorActionKind.OpenWeb, "Open the .NET download page", "https://dotnet.microsoft.com/download")
         };
-        var fix = new DoctorFix(text, actions, DoctorExcerpt.Around("/work/invoicing/global.json", lines, 3));
+        var fix = new DoctorFix(text, actions, DoctorExcerpt.Around("/work/invoicing/global.json", lines, 3, 4));
         var checks = report.Checks.ToList();
         checks[2] = new DoctorCheckResult("C#", "The .NET SDK the repository needs is installed", DoctorOutcome.Fails, found, fix, DoctorImpact.Sdk);
         return report with { Checks = checks, Heading = "1 check fails", Verdict = new DoctorText("Until it is fixed, a full review cannot build the push, so the push ends as Review incomplete and is refused.") };
@@ -88,15 +91,18 @@ internal sealed class FakeDoctorService : IDoctorService
 
     private static DoctorCheckResult FailingHook()
     {
-        var lines = new List<string> { "#!/bin/sh", "command -v git-lfs >/dev/null 2>&1 || { echo >&2 \"git-lfs was not found\"; exit 2; }", "git lfs pre-push \"$@\"", HookLine };
+        const string path = "/work/invoicing/.git/hooks/pre-push";
+        var lines = new List<string> { "#!/bin/sh", "# Git LFS", "git lfs pre-push", HookLine };
+        var moved = new List<string> { lines[0], lines[3], lines[1], lines[2] };
         var found = new DoctorText("It runs on line 4 of ", DoctorTextPart.CodeText(".git/hooks/pre-push"), ". Line 3, ", DoctorTextPart.CodeText("git lfs pre-push"), ", reads the push's ref lines before it, so CommitFence gets none.");
         var text = new DoctorText("Move the hook line up, under the first line, so it reads the ref lines first. CommitFence does not change a hook script it did not write.");
         var actions = new List<DoctorAction>
         {
-            new DoctorAction(DoctorActionKind.OpenFile, "Open the hook script", "/work/invoicing/.git/hooks/pre-push", 4),
+            new DoctorAction(DoctorActionKind.OpenFile, "Open the hook script", path, 4),
             new DoctorAction(DoctorActionKind.CopyText, "Copy the hook line", HookLine)
         };
-        var fix = new DoctorFix(text, actions, DoctorExcerpt.Around("/work/invoicing/.git/hooks/pre-push", lines, 4));
+        var now = DoctorExcerpt.Around(path, lines, 4) with { RelatedLine = 3 };
+        var fix = new DoctorFix(text, actions, now, DoctorExcerpt.Around(path, moved, 2));
         return new DoctorCheckResult("Git and the hook", "The pre-push hook runs CommitFence first", DoctorOutcome.Fails, found, fix, DoctorImpact.HookOrder);
     }
 }

@@ -3,6 +3,41 @@
 What changed in each published release of CommitFence, newest first. Each section is also the text of that release on
 GitHub, with its downloads.
 
+## 1.0.0.4 — 2026-11-25
+
+### Reviews
+
+- **A push of several branches is reviewed in full even when git is slow.** When git ran out of time preparing one
+  branch, it left a lock behind and the next branch was not reviewed at all, so its findings were missing. Now the
+  branch that ran out of time is reported as incomplete, with the reason, and the next one is reviewed.
+
+### The app
+
+- **One theme, dark**, whatever the system's theme.
+- **Dashboard:** the headline says how many reviews were blocked or incomplete (an incomplete review also stops a push
+  through the hook); the period counts reviews from the hook, the command line and Review alike; a busy day is drawn
+  up to the top line with how many more were not drawn, tied to its own day; the chosen day is marked; time per review
+  stands under the rules most broken.
+- **Exemptions:** repeated exemptions are grouped by rule and by where the rule comes from; a finding opens on its own
+  line; each file says how many findings it has; rules the repository does not have get their own heading; "Show all"
+  keeps the keyboard in place; one line is counted once.
+- **Doctor:** a failed check shows the hook or `global.json` as it is now and after the fix, with every line the fix
+  names marked and its first button as the main one; while it checks, each row says whether it is waiting, checking
+  or finished; F5 keeps the keyboard where it was.
+- **Settings and the update notice:** clearer headings; the download's progress stays beside its words, and "Try
+  again" is easy to find.
+
+### Downloads
+
+| Download | What |
+|---|---|
+| `CommitFence-win-x64.zip`, `CommitFence-win-arm64.zip` | The app for Windows, with the command line beside it |
+| `CommitFence-osx-arm64.zip`, `CommitFence-osx-x64.zip` | The app for macOS (Apple silicon, Intel) |
+| `CommitFence-linux-x64.tar.gz` | The app for Linux |
+| `commitfence-cli-*` | The command line, `commitfence`, for the same systems |
+
+---
+
 ## 1.0.0.3 — 2026-11-25
 
 ### Architecture

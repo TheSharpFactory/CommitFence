@@ -19,6 +19,7 @@ public sealed class DoctorTests
     private const string _first = "#!/bin/sh\n" + HookLine.PrePush + "\n";
     private const string _late = "#!/bin/sh\n# Git LFS\ngit lfs pre-push\n" + HookLine.PrePush + "\n";
     private const string _lateFound = "It runs on line 4 of .git/hooks/pre-push. Line 3, git lfs pre-push, reads the push's ref lines before it, so CommitFence gets none.";
+    private const string _firstCommand = "printf '%s' example\n" + HookLine.PrePush;
     private const string _noStop = "#!/bin/sh\n\"$(git config --get commitfence.path)\" review --hook pre-push \"$@\"\nexit 0\n";
     private const string _global = "{\n  \"sdk\": {\n    \"version\": \"10.0.100\",\n    \"rollForward\": \"disable\"\n  }\n}\n";
     private static readonly SystemFileSystem _files = new SystemFileSystem();
@@ -26,6 +27,7 @@ public sealed class DoctorTests
     [Theory]
     [InlineData(_first, DoctorOutcome.Passes, "Line 2 of .git/hooks/pre-push, ending in || exit $?, so it can stop a push.", null)]
     [InlineData(_late, DoctorOutcome.Fails, _lateFound, 4)]
+    [InlineData(_firstCommand, DoctorOutcome.Fails, "It runs on line 2 of .git/hooks/pre-push. Line 1, printf '%s' example, runs before it and may read the push's ref lines.", 2)]
     [InlineData("#!/bin/sh\nprintf '%s' example\n" + HookLine.PrePush, DoctorOutcome.Fails, "It runs on line 3 of .git/hooks/pre-push. Line 2, printf '%s' example, runs before it and may read the push's ref lines.", 3)]
     [InlineData("#!/bin/sh\n# " + HookLine.PrePush + "\nexit 0\n", DoctorOutcome.Fails, "No line of .git/hooks/pre-push runs CommitFence.", null)]
     [InlineData(_noStop, DoctorOutcome.Fails, "Line 2 does not end in || exit $?, so it does not explicitly stop a push when CommitFence fails.", 2)]
@@ -47,6 +49,29 @@ public sealed class DoctorTests
         Assert.Equal(line, result.Fix?.Excerpt?.Line);
         if(result.Fix != null)
             Assert.Contains(result.Fix.Actions, action => action.Kind == DoctorActionKind.CopyText && action.Value == HookLine.PrePush);
+        if(script == _firstCommand)
+        {
+            Assert.StartsWith("Move the CommitFence line above line 1,", result.Fix!.Text.ToString(), StringComparison.Ordinal);
+            Assert.Null(result.Fix.AfterMove);
+        }
+    }
+
+    [Fact]
+    public void ShowsTheFourthHookLineMovedDirectlyUnderTheShebang()
+    {
+        using var folder = new TestFolder();
+        var git = new DoctorGitStub(folder.Path);
+        var path = git.FindPrePushHook(git.Repository);
+        Write(path, _late);
+        var result = new PrePushDoctorCheck(git, _files).Run(Context(git.Repository));
+
+        var now = Assert.IsType<DoctorExcerpt>(result.Fix?.Excerpt);
+        Assert.Equal([3, 4], now.Lines.Where(line => now.Marks(line.Number)).Select(line => line.Number));
+        var after = Assert.IsType<DoctorExcerpt>(result.Fix?.AfterMove);
+        Assert.Equal([1, 2, 3, 4], after.Lines.Select(line => line.Number));
+        Assert.Equal(["#!/bin/sh", HookLine.PrePush, "# Git LFS", "git lfs pre-push"], after.Lines.Select(line => line.Text));
+        Assert.Equal(2, Assert.Single(after.Lines, line => after.Marks(line.Number)).Number);
+        Assert.Equal(_late, File.ReadAllText(path));
     }
 
     [Theory]
@@ -91,6 +116,24 @@ public sealed class DoctorTests
         Assert.Equal(found, result.Found.ToString());
         Assert.Equal(selected && globalJson != null ? "10.0.100" : "11.0.100", result.SdkVersion);
         Assert.Equal(selected ? (int?)null : 3, result.Fix?.Excerpt?.Line);
+    }
+
+    [Theory]
+    [InlineData(_global, 3, 4)]
+    [InlineData("{\r\n  \"version\": \"10.0.100\",\r\n  \"sdk\": {\r\n    \"rollForward\": \"disable\",\r\n    \"extra\": {\"version\": \"10.0.100\"},\r\n    // The pinned SDK\r\n\r\n    \"version\":\r\n      \"10.0.100\",\r\n  },\r\n  \"rollForward\": \"latestMajor\"\r\n}", 8, 4)]
+    public void MarksTheSdkVersionAndRollForwardPolicy(string globalJson, int versionLine, int rollForwardLine)
+    {
+        using var folder = new TestFolder();
+        var repository = new RepositoryLocation(folder.Path, Path.Combine(folder.Path, ".git"));
+        Write(Path.Combine(folder.Path, "global.json"), globalJson);
+        var language = new CSharpLanguage(Dotnet(false, "10.0.100"), _files, new FolderOfTest(folder.Path));
+
+        var result = language.DoctorChecks[0].Run(Context(repository));
+
+        var fix = Assert.IsType<DoctorFix>(result.Fix);
+        var excerpt = Assert.IsType<DoctorExcerpt>(fix.Excerpt);
+        Assert.Equal(versionLine, Assert.Single(fix.Actions, action => action.Kind == DoctorActionKind.OpenFile).Line);
+        Assert.Equal(new List<int> { versionLine, rollForwardLine }.Order(), excerpt.Lines.Where(line => excerpt.Marks(line.Number)).Select(line => line.Number));
     }
 
     [Fact]
@@ -139,6 +182,18 @@ public sealed class DoctorTests
         Assert.Contains("[Pass] .editorconfig is found", failing.Output, StringComparison.Ordinal);
         Assert.Contains(verdict, failing.Output, StringComparison.Ordinal);
         Assert.Contains($"> {line} | " + script.Split('\n')[line - 1], failing.Output, StringComparison.Ordinal);
+        if(script == _late)
+        {
+            Assert.Contains("  Now", failing.Output, StringComparison.Ordinal);
+            Assert.Contains("> 3 | git lfs pre-push", failing.Output, StringComparison.Ordinal);
+            Assert.Contains("  After the move", failing.Output, StringComparison.Ordinal);
+            Assert.Contains("> 2 | " + HookLine.PrePush, failing.Output, StringComparison.Ordinal);
+        }
+        else
+        {
+            Assert.DoesNotContain("After the move", failing.Output, StringComparison.Ordinal);
+        }
+
         Assert.Contains("This machine", failing.Output, StringComparison.Ordinal);
         Assert.Contains("Checked 1970-01-01 00:00:00 +00:00, in 0.0 s", failing.Output, StringComparison.Ordinal);
         Assert.Empty(failing.Error);

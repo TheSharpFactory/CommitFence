@@ -188,7 +188,11 @@ public sealed class ReviewHistoryTests
         Assert.Empty(error.ToString());
         var text = output.ToString().ReplaceLineEndings("\n");
         if(readError != null)
-            Assert.StartsWith($"The history of reviews could not be read: {readError.TrimEnd('.')}.\n", text, StringComparison.Ordinal);
+        {
+            var notice = empty ? "The history of reviews could not be read (access denied)." :
+                "The history of reviews could not be read in full (read interrupted), so the numbers below may leave reviews out.";
+            Assert.StartsWith(notice + "\n", text, StringComparison.Ordinal);
+        }
 
         if(empty)
         {
@@ -200,8 +204,8 @@ public sealed class ReviewHistoryTests
             return;
         }
 
-        Assert.Contains("1 refused a push, 1 incomplete, 3 allowed\n12 s typical, 48 s slowest", text, StringComparison.Ordinal);
-        Assert.Contains("Today, 24 Nov: 4 reviews, 1 refused a push, 1 incomplete, 2 allowed", text, StringComparison.Ordinal);
+        Assert.Contains("5 reviews in 30 days\n1 blocked, 1 incomplete, 3 allowed\n12 s typical, 48 s slowest", text, StringComparison.Ordinal);
+        Assert.Contains("Today, 24 Nov: 4 reviews, 1 blocked, 1 incomplete, 2 allowed", text, StringComparison.Ordinal);
         Assert.Contains("Most broken\n4 rules had findings", text, StringComparison.Ordinal);
         Assert.Contains("REMOVED01: 2", text, StringComparison.Ordinal);
         Assert.Contains("ALLOW001 An exemption needs a reason (Blocks): 1", text, StringComparison.Ordinal);

@@ -5,9 +5,16 @@ using CommunityToolkit.Mvvm.ComponentModel;
 
 namespace CF.App.Doctor;
 
+internal enum DoctorCheckProgress
+{
+    Waiting,
+    Checking,
+    Finished
+}
+
 /// <summary>
 /// One check of the list: its mark, its title, what was found, and, when it fails, its fix open under it with the lines of the file
-/// it is about and its buttons. While the checks run every row keeps its last result and shows the busy ring in place of its mark.
+/// it is about and its buttons. While the checks run, each row shows its progress.
 /// </summary>
 internal sealed partial class DoctorCheckViewModel : ObservableObject
 {
@@ -16,16 +23,32 @@ internal sealed partial class DoctorCheckViewModel : ObservableObject
     public DoctorCheckViewModel(DoctorCheckResult result, Action<DoctorAction> open, Func<ITextClipboard?> clipboard)
     {
         _result = result;
-        Lines = LinesOf(result.Fix?.Excerpt);
-        Actions = (result.Fix?.Actions ?? new List<DoctorAction>()).Select(action => new DoctorActionViewModel(action, open, clipboard)).ToList();
+        Lines = LinesOf(result.Fix?.Excerpt, false);
+        AfterMoveLines = LinesOf(result.Fix?.AfterMove, true);
+        Actions = (result.Fix?.Actions ?? new List<DoctorAction>()).Select((action, index) => new DoctorActionViewModel(action, index == 0, open, clipboard)).ToList();
     }
 
     /// <summary>
-    /// The row shows the busy ring in place of its mark.
+    /// The report is being refreshed.
     /// </summary>
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(ShowsPass), nameof(ShowsFailure), nameof(ShowsNotChecked), nameof(ShowsRing))]
+    [NotifyPropertyChangedFor(nameof(ShowsPass), nameof(ShowsFailure), nameof(ShowsNotChecked), nameof(ShowsRing), nameof(ShowsQuietProgress), nameof(ShowsFinishedMark), nameof(ShowsResult))]
+    [NotifyPropertyChangedFor(nameof(HasFix), nameof(HasLines), nameof(HasActions), nameof(SpokenName))]
     public partial bool IsBusy { get; set; }
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(ShowsRing), nameof(ShowsQuietProgress), nameof(ShowsFinishedMark), nameof(ProgressText), nameof(SpokenName))]
+    public partial DoctorCheckProgress Progress { get; set; }
+
+    public bool ShowsResult
+    {
+        get { return !IsBusy; }
+    }
+
+    public string ProgressText
+    {
+        get { return Progress.ToString(); }
+    }
 
     public string Group
     {
@@ -49,7 +72,7 @@ internal sealed partial class DoctorCheckViewModel : ObservableObject
 
     public bool HasFix
     {
-        get { return Outcome == DoctorOutcome.Fails && _result.Fix != null; }
+        get { return ShowsFailure && _result.Fix != null; }
     }
 
     public IReadOnlyList<DoctorTextPart> FixText
@@ -65,6 +88,13 @@ internal sealed partial class DoctorCheckViewModel : ObservableObject
     public bool HasLines
     {
         get { return HasFix && Lines.Count > 0; }
+    }
+
+    public IReadOnlyList<FileLineViewModel> AfterMoveLines { get; }
+
+    public bool HasAfterMove
+    {
+        get { return AfterMoveLines.Count > 0; }
     }
 
     public IReadOnlyList<DoctorActionViewModel> Actions { get; }
@@ -91,7 +121,17 @@ internal sealed partial class DoctorCheckViewModel : ObservableObject
 
     public bool ShowsRing
     {
-        get { return IsBusy; }
+        get { return IsBusy && Progress == DoctorCheckProgress.Checking; }
+    }
+
+    public bool ShowsQuietProgress
+    {
+        get { return IsBusy && Progress == DoctorCheckProgress.Waiting; }
+    }
+
+    public bool ShowsFinishedMark
+    {
+        get { return IsBusy && Progress == DoctorCheckProgress.Finished; }
     }
 
     /// <summary>
@@ -101,6 +141,9 @@ internal sealed partial class DoctorCheckViewModel : ObservableObject
     {
         get
         {
+            if(IsBusy)
+                return $"{Title}, {ProgressText}.";
+
             var ended = Outcome switch
             {
                 DoctorOutcome.Passes => "passes",
@@ -112,21 +155,17 @@ internal sealed partial class DoctorCheckViewModel : ObservableObject
         }
     }
 
-    /// <summary>
-    /// Whether this is the same check as another result of the same list: the same group and the same title.
-    /// </summary>
-    public bool IsSameCheckAs(DoctorCheckViewModel other)
-    {
-        return Group == other.Group && Title == other.Title;
-    }
-
-    private static List<FileLineViewModel> LinesOf(DoctorExcerpt? excerpt)
+    private static List<FileLineViewModel> LinesOf(DoctorExcerpt? excerpt, bool afterMove)
     {
         var lines = new List<FileLineViewModel>();
-        foreach(var line in excerpt?.Lines ?? new List<CF.Core.Code.FileLine>())
+        if(excerpt == null)
+            return lines;
+
+        foreach(var line in excerpt.Lines)
         {
-            var model = new FileLineViewModel();
-            model.Take(line, line.Number == excerpt?.Line);
+            var marked = excerpt.Marks(line.Number);
+            var model = new FileLineViewModel { IsFinding = marked && !afterMove, IsMoved = marked && afterMove };
+            model.Take(line, false);
 
             // a plain run, so that the line is set in ink and not in the faint colour of a line that is not code
             model.Segments = [new CodeSegment(line.Text, null)];

@@ -30,7 +30,7 @@ public sealed record StatsDay(DateOnly Date, int Refused, int Incomplete, int Al
     {
         return new List<StatsReviewCount>
         {
-            new StatsReviewCount(ReviewOutcome.Blocked, Refused, "refused a push"),
+            new StatsReviewCount(ReviewOutcome.Blocked, Refused, "blocked"),
             new StatsReviewCount(ReviewOutcome.Incomplete, Incomplete, "incomplete"),
             new StatsReviewCount(ReviewOutcome.Clean, Allowed, "allowed")
         }.Where(piece => piece.Count > 0).ToList();

@@ -9,6 +9,20 @@
              x:ClassModifier="internal"
              x:DataType="screen:DashboardViewModel">
 
+  <UserControl.Resources>
+    <parts:EmptyBlock x:Key="DashboardEmpty" Detail="Pushed already and nothing is counted? Doctor checks the pre-push hook."
+                      ButtonText="Review now" ButtonIcon="{StaticResource i-review}">
+      <parts:EmptyBlock.SecondaryAction>
+        <Button Classes="cf outlined" AutomationProperties.Name="Open Doctor" Click="OnOpenDoctor">
+          <StackPanel Orientation="Horizontal" Spacing="8">
+            <parts:Icon Data="{StaticResource i-doc}" Width="16" Height="16" Stroke="{Binding $parent[Button].Foreground}"/>
+            <TextBlock Theme="{StaticResource type-body-strong}" Text="Open Doctor"/>
+          </StackPanel>
+        </Button>
+      </parts:EmptyBlock.SecondaryAction>
+    </parts:EmptyBlock>
+  </UserControl.Resources>
+
   <UserControl.Styles>
     <Style Selector="ListBox.dashboard-rules">
       <Setter Property="Background" Value="{DynamicResource page}"/>
@@ -62,30 +76,34 @@
     <Style Selector="parts|ScreenFrame.onepane parts|PanelPlace">
       <Setter Property="Margin" Value="0,48,0,0"/>
     </Style>
-    <Style Selector="Border.dashboard-key">
-      <Setter Property="BorderBrush" Value="{DynamicResource line-strong}"/>
-      <Setter Property="BorderThickness" Value="1"/>
-      <Setter Property="CornerRadius" Value="5"/>
-      <Setter Property="Padding" Value="6,0"/>
+    <Style Selector="parts|ScreenFrame.dashboard Border.panelsurface">
+      <Setter Property="Background" Value="{DynamicResource page}"/>
+      <Setter Property="Padding" Value="0"/>
+    </Style>
+    <Style Selector="Border.dashboard-panel">
+      <Setter Property="Background" Value="{DynamicResource side}"/>
+      <Setter Property="CornerRadius" Value="16"/>
+      <Setter Property="Padding" Value="8,12,8,8"/>
     </Style>
     <Style Selector="TextBlock.dashboard-unknown">
       <Setter Property="Foreground" Value="{DynamicResource ink-2}"/>
     </Style>
   </UserControl.Styles>
 
-  <parts:ScreenFrame Name="Frame" Title="Dashboard" Meta="{Binding Period}">
+  <parts:ScreenFrame Name="Frame" Classes="dashboard" Title="Dashboard" Meta="{Binding Period}">
     <parts:ScreenFrame.Main>
-      <StackPanel>
-        <Border IsVisible="{Binding HasNotice}" Background="{DynamicResource warn-tint}" CornerRadius="12" Padding="16,12" Margin="0,0,0,16">
+      <StackPanel Name="MainColumn">
+        <Border IsVisible="{Binding HasNotice}" Background="{DynamicResource warn-tint}" CornerRadius="12" Padding="16,12" Margin="0,0,0,24">
           <Grid ColumnDefinitions="Auto,*,Auto">
             <parts:EffectMark Classes="warn" Kind="Warn" Width="16" Height="16" VerticalAlignment="Top" Margin="0,2,0,0"/>
             <TextBlock Grid.Column="1" Margin="10,0,0,0" Theme="{StaticResource type-body}" TextWrapping="Wrap" Text="{Binding Notice}" AutomationProperties.LiveSetting="Polite"/>
-            <Button Grid.Column="2" Margin="10,0,0,0" Classes="cf outlined small" IsVisible="{Binding CanReadAgain}" Command="{Binding AgainCommand}" Content="Read again"/>
+            <Button Grid.Column="2" Margin="10,0,0,0" Classes="cf outlined small" FontWeight="SemiBold" IsVisible="{Binding CanReadAgain}" Command="{Binding AgainCommand}" Content="Read again"/>
           </Grid>
         </Border>
         <StackPanel IsVisible="{Binding HasReviews}">
-          <parts:SectionHead Title="Reviews" Note="{Binding ReviewNote}"/>
-          <parts:WrapRow ItemSpacing="24" LineSpacing="4" Margin="0,0,0,16">
+          <TextBlock Theme="{StaticResource type-verdict}" FontFeatures="+tnum" Text="{Binding Verdict}" TextWrapping="Wrap"
+                     AutomationProperties.HeadingLevel="2"/>
+          <parts:WrapRow ItemSpacing="24" LineSpacing="4" Margin="0,8,0,16">
             <ItemsControl ItemsSource="{Binding Counts}">
               <ItemsControl.ItemsPanel>
                 <ItemsPanelTemplate><parts:WrapRow ItemSpacing="24" LineSpacing="4"/></ItemsPanelTemplate>
@@ -106,13 +124,9 @@
             </StackPanel>
           </parts:WrapRow>
 
-          <Panel>
-            <screen:DashboardChart Name="Chart" Days="{Binding Days}" SelectedDay="{Binding DayIndex}"
-                                   AutomationProperties.Name="{Binding ChartName}"
-                                   AutomationProperties.HelpText="{Binding DayDescription}"
-                                   GotFocus="OnChartFocus" LostFocus="OnChartBlur"/>
-            <parts:FocusRing Name="ChartRing" IsVisible="False" ControlRadius="6" GapThickness="6" LineThickness="2" LineBrush="{DynamicResource focus}"/>
-          </Panel>
+          <screen:DashboardChart Name="Chart" Days="{Binding Days}" SelectedDay="{Binding DayIndex}"
+                                 AutomationProperties.Name="{Binding ChartName}"
+                                 AutomationProperties.HelpText="{Binding DayDescription}"/>
           <Border BorderBrush="{DynamicResource line}" BorderThickness="0,1,0,0" Margin="0,18,0,0" Padding="0,12,0,0">
             <parts:WrapRow ItemSpacing="20" LineSpacing="6">
               <TextBlock Theme="{StaticResource type-body-strong}" FontFeatures="+tnum" Text="{Binding DayLabel}"
@@ -132,29 +146,39 @@
                   </DataTemplate>
                 </ItemsControl.ItemTemplate>
               </ItemsControl>
-              <StackPanel Name="DayHelp" Orientation="Horizontal" Spacing="6" parts:WrapRow.AtEnd="True" IsVisible="False">
-                <Border Classes="dashboard-key"><TextBlock Theme="{StaticResource type-meta-strong}" Text="Left"/></Border>
-                <Border Classes="dashboard-key"><TextBlock Theme="{StaticResource type-meta-strong}" Text="Right"/></Border>
-                <TextBlock Theme="{StaticResource type-meta}" Foreground="{DynamicResource ink-2}" Text="another day" VerticalAlignment="Center"/>
-              </StackPanel>
             </parts:WrapRow>
           </Border>
 
           <parts:PanelPlace/>
           <StackPanel Margin="0,48,0,0">
-            <parts:SectionHead Title="Rules that never fired"/>
-            <format:MarkedText Theme="{StaticResource type-lead}" Foreground="{DynamicResource ink-2}" FontFeatures="+tnum"
-                               Marked="{Binding NeverSentence}" Margin="0,-6,0,8"/>
+            <parts:WrapRow MinHeight="28" ItemSpacing="12" LineSpacing="4">
+              <TextBlock Theme="{StaticResource type-h2}" Text="Rules that never fired" AutomationProperties.HeadingLevel="2"/>
+              <format:MarkedText Theme="{StaticResource type-meta}" Foreground="{DynamicResource ink-2}" FontFeatures="+tnum"
+                                 Marked="{Binding NeverSentence}"/>
+            </parts:WrapRow>
+            <parts:WrapRow IsVisible="{Binding HasNever}" Margin="12,8,12,4" ItemSpacing="16" LineSpacing="4"
+                           AutomationProperties.AccessibilityView="Raw">
+              <StackPanel Orientation="Horizontal" Spacing="6">
+                <parts:Icon Data="{StaticResource i-pen}" Width="13" Height="13" Stroke="{DynamicResource ink-3}" VerticalAlignment="Center"/>
+                <TextBlock Theme="{StaticResource type-meta}" Foreground="{DynamicResource ink-2}" Text="Custom rule"
+                           AutomationProperties.AccessibilityView="Raw"/>
+              </StackPanel>
+              <StackPanel Orientation="Horizontal" Spacing="6">
+                <parts:Icon Data="{StaticResource i-file}" Width="13" Height="13" Stroke="{DynamicResource ink-3}" VerticalAlignment="Center"/>
+                <TextBlock Theme="{StaticResource type-meta}" Foreground="{DynamicResource ink-2}" Text="Rule of .editorconfig"
+                           AutomationProperties.AccessibilityView="Raw"/>
+              </StackPanel>
+            </parts:WrapRow>
             <ListBox Name="NeverList" Classes="dashboard-rules" Classes.expanded="{Binding AllNever}"
-                     ItemsSource="{Binding NeverRows}" AutomationProperties.Name="Rules that never fired"
+                     IsVisible="{Binding HasNever}" ItemsSource="{Binding NeverRows}" AutomationProperties.Name="Rules that never fired"
                      Tapped="OnRuleTap">
               <ListBox.ItemTemplate>
                 <DataTemplate x:DataType="screen:DashboardRuleRow">
                   <Grid ColumnDefinitions="92,*,96,16" ColumnSpacing="12" Margin="10,3" MinHeight="38"
                         AutomationProperties.Name="{Binding SpokenName}">
                     <StackPanel Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
-                      <parts:Icon Data="{StaticResource i-pen}" Width="13" Height="13" Stroke="{DynamicResource ink-3}" IsVisible="{Binding FromTeam}"/>
-                      <parts:Icon Data="{StaticResource i-file}" Width="13" Height="13" Stroke="{DynamicResource ink-3}" IsVisible="{Binding FromFile}"/>
+                      <parts:Icon Data="{StaticResource i-pen}" Width="13" Height="13" Stroke="{DynamicResource ink-3}" IsVisible="{Binding FromTeam}" AutomationProperties.Name="Custom rule"/>
+                      <parts:Icon Data="{StaticResource i-file}" Width="13" Height="13" Stroke="{DynamicResource ink-3}" IsVisible="{Binding FromFile}" AutomationProperties.Name="Rule of .editorconfig"/>
                       <TextBlock Theme="{StaticResource code}" Text="{Binding Id}"/>
                     </StackPanel>
                     <TextBlock Grid.Column="1" Theme="{StaticResource type-body-strong}" TextWrapping="Wrap" MaxLines="2"
@@ -169,81 +193,93 @@
                 </DataTemplate>
               </ListBox.ItemTemplate>
             </ListBox>
-            <parts:WrapRow Margin="12,8,0,0">
+            <parts:WrapRow Margin="12,8,0,0" IsVisible="{Binding HasMoreNever}">
               <Button Classes="cf outlined small" IsVisible="{Binding HasMoreNever}" Command="{Binding ShowNeverCommand}" Click="OnShowNever">
                 <TextBlock Theme="{StaticResource type-meta-strong}" Text="{Binding NeverButton}"/>
               </Button>
               <TextBlock IsVisible="{Binding HasMoreNever}" Theme="{StaticResource type-meta}" Foreground="{DynamicResource ink-2}"
-                         Text="Custom rules first, then the rules of .editorconfig by id"/>
+                         Text="Custom rules first, then by id"/>
             </parts:WrapRow>
           </StackPanel>
 
-          <StackPanel Margin="0,48,0,0">
-            <parts:SectionHead Title="Time per review" Note="How long a push waited for its review"/>
-            <ItemsControl ItemsSource="{Binding Bands}">
-              <ItemsControl.ItemsPanel>
-                <ItemsPanelTemplate><StackPanel Spacing="2"/></ItemsPanelTemplate>
-              </ItemsControl.ItemsPanel>
-              <ItemsControl.ItemTemplate>
-                <DataTemplate x:DataType="screen:DashboardTimeBand">
-                  <Grid ColumnDefinitions="88,32,*" ColumnSpacing="14" MinHeight="36">
-                    <TextBlock Theme="{StaticResource type-body}" Foreground="{DynamicResource ink-2}" FontFeatures="+tnum" Text="{Binding Label}" VerticalAlignment="Center"/>
-                    <TextBlock Grid.Column="1" Theme="{StaticResource type-body-strong}" FontFeatures="+tnum" Text="{Binding Count}" TextAlignment="Right" VerticalAlignment="Center"/>
-                    <parts:WrapRow Grid.Column="2" ItemSpacing="12" LineSpacing="4" VerticalAlignment="Center">
-                      <Border IsVisible="{Binding HasBar}" Width="{Binding Width}" Height="12" Background="{DynamicResource data}" CornerRadius="4"/>
-                      <format:MarkedText Theme="{StaticResource type-meta}" Foreground="{DynamicResource ink-2}" FontFeatures="+tnum" Marked="{Binding Note}"/>
-                    </parts:WrapRow>
-                  </Grid>
-                </DataTemplate>
-              </ItemsControl.ItemTemplate>
-            </ItemsControl>
-          </StackPanel>
         </StackPanel>
       </StackPanel>
     </parts:ScreenFrame.Main>
 
     <parts:ScreenFrame.Panel>
-      <StackPanel Name="MostBroken">
-        <parts:WrapRow Margin="10,0,4,0" ItemSpacing="8" LineSpacing="4" MinHeight="28">
-          <TextBlock Theme="{StaticResource type-h3}" Text="Most broken"/>
-          <TextBlock Theme="{StaticResource type-meta}" Foreground="{DynamicResource ink-2}" Text="{Binding BrokenNote}" IsVisible="{Binding HasBroken}"/>
-        </parts:WrapRow>
-        <TextBlock IsVisible="{Binding !HasBroken}" Margin="10,8" Theme="{StaticResource type-body}"
-                   Foreground="{DynamicResource ink-2}" Text="No findings in 30 days."/>
-        <ListBox Name="BrokenList" Classes="dashboard-rules panel" Classes.expanded="{Binding AllBroken}"
-                 IsVisible="{Binding HasBroken}" ItemsSource="{Binding BrokenRows}" AutomationProperties.Name="Most broken"
-                 Tapped="OnRuleTap">
-          <ListBox.ItemTemplate>
-            <DataTemplate x:DataType="screen:DashboardRuleRow">
-              <Grid ColumnDefinitions="15,*,Auto" RowDefinitions="Auto,Auto" ColumnSpacing="10" Margin="8,7,10,7"
-                    AutomationProperties.Name="{Binding SpokenName}">
-                <parts:EffectMark Classes="block" Kind="Block" Width="15" Height="15" IsVisible="{Binding Blocks}" VerticalAlignment="Top" Margin="0,3,0,0"/>
-                <parts:EffectMark Classes="warn" Kind="Warn" Width="15" Height="15" IsVisible="{Binding Warns}" VerticalAlignment="Top" Margin="0,3,0,0"/>
-                <parts:EffectMark Classes="off" Kind="Off" Width="15" Height="15" IsVisible="{Binding Off}" VerticalAlignment="Top" Margin="0,3,0,0"/>
-                <DockPanel Grid.Column="1">
-                  <TextBlock DockPanel.Dock="Left" Theme="{StaticResource type-meta}" Foreground="{DynamicResource ink-2}"
-                             VerticalAlignment="Top" Margin="0,2,6,0" IsVisible="{Binding Off}" Text="{Binding Effect}"/>
-                  <TextBlock Theme="{StaticResource type-body-strong}" Classes.dashboard-unknown="{Binding Unlisted}"
-                             TextWrapping="Wrap" Text="{Binding Title}"/>
-                </DockPanel>
-                <TextBlock Grid.Column="2" Theme="{StaticResource type-card}" FontFeatures="+tnum" MinWidth="24" TextAlignment="Right" Text="{Binding Count}"/>
-                <Grid Grid.Row="1" Grid.Column="1" Grid.ColumnSpan="2" Height="18" Margin="0,3,0,0">
-                  <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="Auto" MinWidth="58"/>
-                    <ColumnDefinition Width="*"/>
-                  </Grid.ColumnDefinitions>
-                  <TextBlock Theme="{StaticResource code}" Foreground="{DynamicResource ink-2}" VerticalAlignment="Center" IsVisible="{Binding CanOpen}" Text="{Binding Id}"/>
-                  <review:FractionBar Grid.Column="1" Margin="10,0,0,0" Fraction="{Binding Share}" Fill="{DynamicResource block}" IsVisible="{Binding Blocks}"/>
-                  <review:FractionBar Grid.Column="1" Margin="10,0,0,0" Fraction="{Binding Share}" Fill="{DynamicResource warn}" IsVisible="{Binding Warns}"/>
-                  <review:FractionBar Grid.Column="1" Margin="10,0,0,0" Fraction="{Binding Share}" Fill="{DynamicResource data}" IsVisible="{Binding NeutralBar}"/>
-                </Grid>
-              </Grid>
-            </DataTemplate>
-          </ListBox.ItemTemplate>
-        </ListBox>
-        <Button Classes="cf outlined small" Margin="10,8,4,4" IsVisible="{Binding HasMoreBroken}" Command="{Binding ShowBrokenCommand}" Click="OnShowBroken">
-          <TextBlock Theme="{StaticResource type-meta-strong}" Text="{Binding BrokenButton}"/>
-        </Button>
+      <StackPanel Name="SideColumn" Spacing="16">
+        <Border Classes="dashboard-panel">
+          <StackPanel>
+            <parts:WrapRow Margin="10,0,4,0" ItemSpacing="8" LineSpacing="4" MinHeight="28">
+              <TextBlock Theme="{StaticResource type-h3}" Text="Most broken"/>
+              <TextBlock Theme="{StaticResource type-meta}" Foreground="{DynamicResource ink-2}" Text="{Binding BrokenNote}" IsVisible="{Binding HasBroken}"/>
+              <TextBlock parts:WrapRow.AtEnd="True" Margin="0,0,8,0" Theme="{StaticResource type-meta}" Foreground="{DynamicResource ink-2}"
+                         Text="Findings" IsVisible="{Binding HasBroken}" AutomationProperties.AccessibilityView="Raw"/>
+            </parts:WrapRow>
+            <TextBlock IsVisible="{Binding !HasBroken}" Margin="10,8" Theme="{StaticResource type-body}"
+                       Foreground="{DynamicResource ink-2}" Text="No findings in 30 days."/>
+            <ListBox Name="BrokenList" Classes="dashboard-rules panel" Classes.expanded="{Binding AllBroken}"
+                     IsVisible="{Binding HasBroken}" ItemsSource="{Binding BrokenRows}" AutomationProperties.Name="Most broken"
+                     Tapped="OnRuleTap">
+              <ListBox.ItemTemplate>
+                <DataTemplate x:DataType="screen:DashboardRuleRow">
+                  <Grid ColumnDefinitions="15,*,Auto" RowDefinitions="Auto,Auto" ColumnSpacing="10" Margin="8,7,10,7"
+                        AutomationProperties.Name="{Binding SpokenName}">
+                    <parts:EffectMark Classes="block" Kind="Block" Width="15" Height="15" IsVisible="{Binding Blocks}" VerticalAlignment="Top" Margin="0,3,0,0"/>
+                    <parts:EffectMark Classes="warn" Kind="Warn" Width="15" Height="15" IsVisible="{Binding Warns}" VerticalAlignment="Top" Margin="0,3,0,0"/>
+                    <parts:EffectMark Classes="off" Kind="Off" Width="15" Height="15" IsVisible="{Binding Off}" VerticalAlignment="Top" Margin="0,3,0,0"/>
+                    <TextBlock Grid.Column="1" Theme="{StaticResource type-body-strong}" Classes.dashboard-unknown="{Binding Unlisted}"
+                               TextWrapping="Wrap">
+                      <Run Text="{Binding Title}"/><Run Text="{Binding OffTail}" FontSize="13" FontWeight="Normal" Foreground="{DynamicResource ink-2}"/>
+                    </TextBlock>
+                    <TextBlock Grid.Column="2" Theme="{StaticResource type-card}" FontFeatures="+tnum" MinWidth="24" TextAlignment="Right" Text="{Binding Count}"/>
+                    <Grid Grid.Row="1" Grid.Column="1" Grid.ColumnSpan="2" Height="18" Margin="0,3,0,0">
+                      <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto" MinWidth="58"/>
+                        <ColumnDefinition Width="*"/>
+                      </Grid.ColumnDefinitions>
+                      <TextBlock Theme="{StaticResource code}" Foreground="{DynamicResource ink-2}" VerticalAlignment="Center" IsVisible="{Binding CanOpen}" Text="{Binding Id}"/>
+                      <review:FractionBar Grid.Column="1" Margin="10,0,0,0" Fraction="{Binding Share}" Fill="{DynamicResource block}" IsVisible="{Binding Blocks}"/>
+                      <review:FractionBar Grid.Column="1" Margin="10,0,0,0" Fraction="{Binding Share}" Fill="{DynamicResource warn}" IsVisible="{Binding Warns}"/>
+                      <review:FractionBar Grid.Column="1" Margin="10,0,0,0" Fraction="{Binding Share}" Fill="{DynamicResource data}" IsVisible="{Binding NeutralBar}"/>
+                    </Grid>
+                  </Grid>
+                </DataTemplate>
+              </ListBox.ItemTemplate>
+            </ListBox>
+            <Button Classes="cf outlined small" Margin="10,8,4,4" IsVisible="{Binding HasMoreBroken}" Command="{Binding ShowBrokenCommand}" Click="OnShowBroken">
+              <TextBlock Theme="{StaticResource type-meta-strong}" Text="{Binding BrokenButton}"/>
+            </Button>
+          </StackPanel>
+        </Border>
+        <Border Classes="dashboard-panel">
+          <StackPanel>
+            <parts:WrapRow Margin="10,0,4,0" ItemSpacing="8" LineSpacing="4" MinHeight="28">
+              <TextBlock Theme="{StaticResource type-h3}" Text="Time per review" AutomationProperties.HeadingLevel="3"/>
+              <TextBlock parts:WrapRow.AtEnd="True" Margin="0,0,8,0" Theme="{StaticResource type-meta}" Foreground="{DynamicResource ink-2}"
+                         Text="Reviews" AutomationProperties.AccessibilityView="Raw"/>
+            </parts:WrapRow>
+            <ItemsControl ItemsSource="{Binding Bands}" AutomationProperties.Name="Review duration bands">
+              <ItemsControl.ItemsPanel>
+                <ItemsPanelTemplate><StackPanel Spacing="2"/></ItemsPanelTemplate>
+              </ItemsControl.ItemsPanel>
+              <ItemsControl.ItemTemplate>
+                <DataTemplate x:DataType="screen:DashboardTimeBand">
+                  <Grid ColumnDefinitions="80,*,32" ColumnSpacing="12" MinHeight="32" Margin="10,0,12,0"
+                        AutomationProperties.Name="{Binding SpokenName}">
+                    <TextBlock Theme="{StaticResource type-body}" Foreground="{DynamicResource ink-2}" FontFeatures="+tnum"
+                               Text="{Binding Label}" VerticalAlignment="Center"/>
+                    <review:FractionBar Grid.Column="1" Fraction="{Binding Share}" Fill="{DynamicResource ink-3}" IsVisible="{Binding HasBar}"/>
+                    <TextBlock Grid.Column="2" Theme="{StaticResource type-card}" FontFeatures="+tnum"
+                               Text="{Binding Count}" TextAlignment="Right" VerticalAlignment="Center"/>
+                  </Grid>
+                </DataTemplate>
+              </ItemsControl.ItemTemplate>
+            </ItemsControl>
+            <format:MarkedText Theme="{StaticResource type-meta}" Foreground="{DynamicResource ink-2}" FontFeatures="+tnum"
+                               Marked="{Binding SlowestLine}" IsVisible="{Binding HasSlowest}" Margin="10,10,12,6"/>
+          </StackPanel>
+        </Border>
       </StackPanel>
     </parts:ScreenFrame.Panel>
   </parts:ScreenFrame>

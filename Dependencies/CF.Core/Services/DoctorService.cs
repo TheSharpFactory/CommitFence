@@ -33,12 +33,12 @@ public sealed class DoctorService : IDoctorService
     }
 
     /// <inheritdoc />
-    public DoctorReport Check(string folder)
+    public DoctorReport Check(string folder, IProgress<int>? started = null)
     {
-        var started = _clock.Now;
+        var startTime = _clock.Now;
         var version = ProductVersion.TryParseOwn(_product.Version)?.ToString() ?? _product.Version;
         var program = _machine.ProgramPath;
-        var checks = Run(folder, program, version, out var gitVersion);
+        var checks = Run(folder, program, version, started, out var gitVersion);
         var machine = new DoctorMachineFacts(program, version, gitVersion, checks.Select(check => check.SdkVersion).FirstOrDefault(sdk => sdk != null), ReadDataFolder());
         var checkedAt = _clock.Now;
         var failed = checks.Where(check => check.Outcome == DoctorOutcome.Fails).ToList();
@@ -49,7 +49,7 @@ public sealed class DoctorService : IDoctorService
             1 => "1 check fails",
             _ => $"{failed.Count} checks fail"
         };
-        return new DoctorReport(checks, machine, checkedAt, checkedAt >= started ? checkedAt - started : TimeSpan.Zero, heading, Verdict(failed, checks.All(check => check.Outcome == DoctorOutcome.Passes)));
+        return new DoctorReport(checks, machine, checkedAt, checkedAt >= startTime ? checkedAt - startTime : TimeSpan.Zero, heading, Verdict(failed, checks.All(check => check.Outcome == DoctorOutcome.Passes)));
     }
 
     private string? ReadDataFolder()
@@ -65,7 +65,7 @@ public sealed class DoctorService : IDoctorService
         }
     }
 
-    private List<DoctorCheckResult> Run(string folder, string program, string version, out string? gitVersion)
+    private List<DoctorCheckResult> Run(string folder, string program, string version, IProgress<int>? started, out string? gitVersion)
     {
         gitVersion = null;
         RepositoryLocation? repository;
@@ -92,7 +92,15 @@ public sealed class DoctorService : IDoctorService
         }
 
         var context = new DoctorContext(repository, program, version, _machine, _git);
-        return _checks.Select(check => check.Run(context)).ToList();
+        var results = new List<DoctorCheckResult>();
+        started?.Report(1);
+        foreach(var check in _checks)
+        {
+            results.Add(check.Run(context));
+            started?.Report(results.Count + 1);
+        }
+
+        return results;
     }
 
     private List<DoctorCheckResult> CannotStart(DoctorText found, DoctorText fix, bool needsGit)

@@ -285,10 +285,17 @@
                       <TextBlock Grid.Column="2" Theme="{StaticResource code}" TextWrapping="Wrap" VerticalAlignment="Center">
                         <Run Foreground="{DynamicResource ink-2}" Text="{Binding Folders}"/><Run FontWeight="SemiBold" Foreground="{DynamicResource ink}" Text="{Binding Name}"/>
                       </TextBlock>
-                      <StackPanel Grid.Column="3" Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
-                        <parts:Icon Data="{StaticResource i-exempt}" Width="14" Height="14" Stroke="{DynamicResource ink-3}" VerticalAlignment="Center"/>
-                        <TextBlock Theme="{StaticResource type-meta-strong}" FontFeatures="+tnum" VerticalAlignment="Center" Text="{Binding TallyNumber}"/>
-                        <TextBlock Theme="{StaticResource type-meta}" Foreground="{DynamicResource ink-2}" VerticalAlignment="Center" Text="{Binding TallyWords}"/>
+                      <StackPanel Grid.Column="3" Orientation="Horizontal" Spacing="16" VerticalAlignment="Center">
+                        <StackPanel IsVisible="{Binding HasFindings}" Orientation="Horizontal" Spacing="5">
+                          <parts:EffectMark Classes="block" Kind="Block" Width="14" Height="14" VerticalAlignment="Center"/>
+                          <TextBlock Theme="{StaticResource type-meta-strong}" Foreground="{DynamicResource block-ink}"
+                                     VerticalAlignment="Center" Text="{Binding FindingsText}"/>
+                        </StackPanel>
+                        <StackPanel Orientation="Horizontal" Spacing="6">
+                          <parts:Icon Data="{StaticResource i-exempt}" Width="14" Height="14" Stroke="{DynamicResource ink-3}" VerticalAlignment="Center"/>
+                          <TextBlock Theme="{StaticResource type-meta-strong}" FontFeatures="+tnum" VerticalAlignment="Center" Text="{Binding TallyNumber}"/>
+                          <TextBlock Theme="{StaticResource type-meta}" Foreground="{DynamicResource ink-2}" VerticalAlignment="Center" Text="{Binding TallyWords}"/>
+                        </StackPanel>
                       </StackPanel>
                     </Grid>
                   </Button>
@@ -314,37 +321,44 @@
                           </StackPanel>
                           <TextBlock IsVisible="{Binding HasQuietNoReason}" Theme="{StaticResource type-body}" Foreground="{DynamicResource ink-2}" Text="{Binding NoReason}"/>
                           <WrapPanel Orientation="Horizontal" ItemSpacing="8" LineSpacing="2">
-                            <TextBlock IsVisible="{Binding IsFinding}" Theme="{StaticResource type-effect}" VerticalAlignment="Center" Text="{Binding FindingLead}"/>
                             <TextBlock IsVisible="{Binding HasRuleTitle}" Theme="{StaticResource type-meta}" Foreground="{DynamicResource ink-2}" TextWrapping="Wrap"
                                        VerticalAlignment="Center" Text="{Binding RuleTitle}"/>
-                            <TextBlock IsVisible="{Binding HasForm}" Theme="{StaticResource code}" Foreground="{DynamicResource ink-3}" VerticalAlignment="Center" Text="{Binding FormText}"/>
+                            <TextBlock IsVisible="{Binding HasForm}" Theme="{StaticResource code}" Foreground="{DynamicResource ink-3}"
+                                       TextWrapping="Wrap" VerticalAlignment="Center" Text="{Binding FormText}"/>
                           </WrapPanel>
+                          <TextBlock IsVisible="{Binding HasMultipleLines}" Theme="{StaticResource type-meta}" Foreground="{DynamicResource ink-2}"
+                                     FontFeatures="+tnum" TextWrapping="Wrap" Text="{Binding LinesMeta}"/>
                         </StackPanel>
                         <TextBlock Grid.Column="2" Theme="{StaticResource code}" Foreground="{DynamicResource ink-2}" VerticalAlignment="Top" Text="{Binding LineText}"/>
                         <parts:Icon Grid.Column="3" Classes="chevron" Classes.open="{Binding IsOpen}" Data="{StaticResource i-right}" Width="16" Height="16"
                                     Stroke="{DynamicResource ink-3}" VerticalAlignment="Top"/>
                       </Grid>
                     </Button>
-                    <StackPanel Classes="exbody" IsVisible="{Binding IsOpen}">
-                      <settings:MarkedText IsVisible="{Binding IsFinding}" Theme="{StaticResource type-body}" Foreground="{DynamicResource ink-2}" Margin="0,0,0,12"
-                                           Marked="{Binding HintMarked}"/>
+                    <StackPanel Classes="exbody" IsVisible="{Binding IsOpen}" Spacing="12">
+                      <settings:MarkedText IsVisible="{Binding IsFinding}" Theme="{StaticResource type-body}"
+                                           Foreground="{DynamicResource ink-2}" Marked="{Binding HintMarked}"/>
                       <Border CornerRadius="12" BorderThickness="1" BorderBrush="{DynamicResource line}" Padding="0,8" ClipToBounds="True" Background="{DynamicResource page}">
-                        <parts:FileLines ItemsSource="{Binding Lines}" NumberWidth="44" NumberGap="14"/>
+                        <parts:FileLines ItemsSource="{Binding ExcerptLines}" NumberWidth="44" NumberGap="14"/>
                       </Border>
-                      <WrapPanel Orientation="Horizontal" ItemSpacing="8" LineSpacing="8" Margin="0,12,0,0">
-                        <Button Classes="cf outlined small" Command="{Binding OpenLineCommand}" AutomationProperties.Name="{Binding OpenLineText}">
-                          <StackPanel Orientation="Horizontal" Spacing="6">
-                            <parts:Icon Data="{StaticResource i-open}" Width="14" Height="14" Stroke="{Binding $parent[Button].Foreground}"/>
-                            <TextBlock Theme="{StaticResource type-meta-strong}" Text="{Binding OpenLineText}"/>
-                          </StackPanel>
-                        </Button>
-                        <Button Classes="cf outlined small" IsVisible="{Binding CanOpenRule}" Command="{Binding OpenRuleCommand}" AutomationProperties.Name="Open the rule">
-                          <StackPanel Orientation="Horizontal" Spacing="6">
-                            <parts:Icon Data="{StaticResource i-rules}" Width="14" Height="14" Stroke="{Binding $parent[Button].Foreground}"/>
-                            <TextBlock Theme="{StaticResource type-meta-strong}" Text="Open the rule"/>
-                          </StackPanel>
-                        </Button>
-                      </WrapPanel>
+                      <ItemsControl ItemsSource="{Binding Actions}">
+                        <ItemsControl.ItemsPanel>
+                          <ItemsPanelTemplate>
+                            <WrapPanel Orientation="Horizontal" ItemSpacing="8" LineSpacing="8"/>
+                          </ItemsPanelTemplate>
+                        </ItemsControl.ItemsPanel>
+                        <ItemsControl.ItemTemplate>
+                          <DataTemplate x:DataType="screen:ExemptionRowAction">
+                            <Button Classes="cf small" Classes.outlined="{Binding !IsQuiet}" Classes.quiet="{Binding IsQuiet}"
+                                    Click="OnRowActionClicked" Command="{Binding Command}" AutomationProperties.Name="{Binding Text}">
+                              <StackPanel Orientation="Horizontal" Spacing="6">
+                                <parts:Icon IsVisible="{Binding OpensLine}" Data="{StaticResource i-open}" Width="14" Height="14" Stroke="{Binding $parent[Button].Foreground}"/>
+                                <parts:Icon IsVisible="{Binding OpensRule}" Data="{StaticResource i-rules}" Width="14" Height="14" Stroke="{Binding $parent[Button].Foreground}"/>
+                                <TextBlock Theme="{StaticResource type-meta-strong}" Text="{Binding Text}"/>
+                              </StackPanel>
+                            </Button>
+                          </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                      </ItemsControl>
                     </StackPanel>
                   </StackPanel>
                 </Border>

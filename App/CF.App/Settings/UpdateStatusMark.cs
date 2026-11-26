@@ -16,6 +16,11 @@ internal enum UpdateStatusMark
     Tick,
 
     /// <summary>
+    /// The download mark of an available update.
+    /// </summary>
+    Download,
+
+    /// <summary>
     /// The busy ring.
     /// </summary>
     Ring,

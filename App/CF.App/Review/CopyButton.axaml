@@ -6,10 +6,10 @@
              x:ClassModifier="internal"
              x:DataType="review:CopyButtonViewModel">
 
-  <!-- A second-kind button that puts a prompt on the clipboard. After a click the icon is a tick and the label reads "Copied"
+  <!-- A button that puts text on the clipboard. After a click the icon is a tick and the label reads "Copied"
        until the view model says it is time to return. Both labels stand in one place and the one at rest keeps the room, so the
        button never changes its width. -->
-  <Button Classes="cf outlined" Command="{Binding CopyCommand}" AutomationProperties.Name="{Binding SpokenName}">
+  <Button Classes="cf" Classes.main="{Binding IsPrimary}" Classes.outlined="{Binding !IsPrimary}" Command="{Binding CopyCommand}" AutomationProperties.Name="{Binding SpokenName}">
     <StackPanel Orientation="Horizontal" Spacing="8">
       <Panel>
         <parts:Icon Data="{StaticResource i-copy}" Width="16" Height="16" Stroke="{Binding $parent[Button].Foreground}" IsVisible="{Binding !IsCopied}"/>

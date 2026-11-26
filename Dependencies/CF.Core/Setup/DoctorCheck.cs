@@ -47,9 +47,9 @@ public abstract class DoctorCheck : IDoctorCheck
 
     /// <summary>Builds a failing result with its fix.</summary>
     protected DoctorCheckResult Fail(DoctorText found, DoctorText fix, DoctorImpact impact = DoctorImpact.Review,
-        IReadOnlyList<DoctorAction>? actions = null, DoctorExcerpt? excerpt = null, string? sdkVersion = null)
+        IReadOnlyList<DoctorAction>? actions = null, DoctorExcerpt? excerpt = null, string? sdkVersion = null, DoctorExcerpt? afterMove = null)
     {
-        return new DoctorCheckResult(Group, Title, DoctorOutcome.Fails, found, new DoctorFix(fix, actions ?? [], excerpt), impact, sdkVersion);
+        return new DoctorCheckResult(Group, Title, DoctorOutcome.Fails, found, new DoctorFix(fix, actions ?? [], excerpt, afterMove), impact, sdkVersion);
     }
 
     /// <summary>Whether an exception is an expected machine or settings problem.</summary>

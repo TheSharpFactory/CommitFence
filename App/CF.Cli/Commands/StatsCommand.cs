@@ -53,7 +53,7 @@ internal sealed class StatsCommand(IStatsService stats, CommandEnvironment envir
     private static void WriteReviews(TextWriter output, StatsReport report)
     {
         output.WriteLine(report.Period);
-        output.WriteLine($"Reviews: {report.Totals.Total} in 30 days, by the hook and on Review");
+        output.WriteLine($"{report.Totals.ReviewsText} in 30 days");
         if(report.Totals.Total > 0)
             output.WriteLine(report.Totals.CountsText());
 

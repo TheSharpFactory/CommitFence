@@ -72,16 +72,22 @@ internal sealed partial class PrePushDoctorCheck(IDoctorGit git, IFileSystem fil
         var consequence = readsInput
             ? ", reads the push's ref lines before it, so CommitFence gets none."
             : ", runs before it and may read the push's ref lines.";
-        return ScriptFailure(path, lines, review + 1,
-            new DoctorText($"It runs on line {review + 1} of ", shownPath, $". Line {first + 1}, ", CodeText(prior), consequence),
-            new DoctorText("Move the hook line up, under the first line, so it reads the ref lines first. CommitFence does not change a hook script it did not write."),
-            readsInput ? DoctorImpact.HookOrder : DoctorImpact.HookOrderUncertain);
+        var found = new DoctorText($"It runs on line {review + 1} of ", shownPath, $". Line {first + 1}, ", CodeText(prior), consequence);
+        var move = first == 0 ? "Move the CommitFence line above line 1" : "Move the hook line up, under the first line";
+        var fix = new DoctorText(move + ", so it reads the ref lines first. CommitFence does not change a hook script it did not write.");
+        var impact = readsInput ? DoctorImpact.HookOrder : DoctorImpact.HookOrderUncertain;
+        var (now, afterMove) = DoctorExcerpt.HookMove(path, lines, first + 1, review + 1);
+        return Fail(found, fix, impact, ScriptActions(path, now.Line), now, afterMove: afterMove);
     }
 
     private DoctorCheckResult ScriptFailure(string path, IReadOnlyList<string> lines, int? line, DoctorText found, DoctorText fix, DoctorImpact impact)
     {
-        var actions = new List<DoctorAction> { new DoctorAction(DoctorActionKind.OpenFile, "Open the hook script", path, line), CopyLine() };
-        return Fail(found, fix, impact, actions, DoctorExcerpt.Around(path, lines, line));
+        return Fail(found, fix, impact, ScriptActions(path, line), DoctorExcerpt.Around(path, lines, line));
+    }
+
+    private static List<DoctorAction> ScriptActions(string path, int? line)
+    {
+        return [new DoctorAction(DoctorActionKind.OpenFile, "Open the hook script", path, line), CopyLine()];
     }
 
     private static string ShownPath(DoctorContext context, string path)

@@ -91,7 +91,7 @@ internal sealed class GitRunner
     private static ProcessResult RefuseTimeout(IReadOnlyList<string> arguments, ProcessResult result)
     {
         if(result.TimedOut)
-            throw new GitException(Describe(arguments, result));
+            throw new GitException(Describe(arguments, result), timedOut: true);
 
         return result;
     }

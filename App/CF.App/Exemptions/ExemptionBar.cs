@@ -12,6 +12,8 @@ namespace CF.App.Exemptions;
 internal sealed class ExemptionBar : Control
 {
     private const double _least = 8;
+    private const double _leastRed = 10;
+    private const double _leastNeutral = 4;
 
     public static readonly StyledProperty<double> FractionProperty = AvaloniaProperty.Register<ExemptionBar, double>(nameof(Fraction));
 
@@ -105,11 +107,9 @@ internal sealed class ExemptionBar : Control
 
     public override void Render(DrawingContext context)
     {
-        var whole = Math.Min(Bounds.Width, Math.Max(_least, Math.Clamp(Fraction, 0, 1) * Bounds.Width));
-        var red = RedFraction <= 0 ? 0 : Math.Min(whole, Math.Max(_least / 2, Math.Clamp(RedFraction, 0, 1) * Bounds.Width));
+        var (neutral, red) = SegmentWidths(Bounds.Width);
         var top = (Bounds.Height - Thickness) / 2;
         var radius = Thickness / 2;
-        var neutral = whole - red;
         if(neutral > 0)
         {
             var corners = red > 0 ? new CornerRadius(radius, 0, 0, radius) : new CornerRadius(radius);
@@ -121,5 +121,21 @@ internal sealed class ExemptionBar : Control
             var corners = neutral > 0 ? new CornerRadius(0, radius, radius, 0) : new CornerRadius(radius);
             context.DrawRectangle(RedFill, null, new RoundedRect(new Rect(neutral, top, red, Thickness), corners));
         }
+    }
+
+    public (double Neutral, double Red) SegmentWidths(double available)
+    {
+        var whole = Math.Min(available, Math.Max(_least, Math.Clamp(Fraction, 0, 1) * available));
+        if(RedFraction <= 0)
+            return (whole, 0);
+
+        if(RedFraction >= Fraction)
+            return (0, whole);
+
+        // If the whole bar is shorter than both minima combined, keep the joint within its original length.
+        var red = whole < _leastRed + _leastNeutral
+            ? whole * (_leastRed / (_leastRed + _leastNeutral))
+            : Math.Clamp(RedFraction * available, _leastRed, whole - _leastNeutral);
+        return (whole - red, red);
     }
 }

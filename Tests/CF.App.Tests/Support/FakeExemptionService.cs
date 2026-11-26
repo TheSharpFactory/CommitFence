@@ -78,7 +78,7 @@ internal static class ExemptionSamples
     /// </summary>
     public static ExemptionScan Many(int files, int perFile)
     {
-        var entries = Enumerable.Range(0, files).SelectMany(file => Enumerable.Range(1, perFile).Select(at => Entry(($"src/Area{file / 10}/File{file:000}.cs", (at * 10) + 5, "TEAM001", "Kept as it was"))));
+        var entries = Enumerable.Range(0, files).SelectMany(file => Enumerable.Range(1, perFile).Select(at => Entry(($"src/Area{file / 10}/File{file:000}.cs", (at * 10) + 5, "TEAM001", $"Reason {at}"))));
         return ExemptionScan.Of("main", "4f2a91c".PadRight(40, '0'), entries.ToList());
     }
 

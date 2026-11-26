@@ -3,6 +3,7 @@ using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Interactivity;
 using Avalonia.Media;
+using Avalonia.Threading;
 using Avalonia.VisualTree;
 using CF.App.Parts;
 
@@ -125,6 +126,25 @@ internal sealed partial class ExemptionsView : UserControl
             return;
 
         e.Handled = true;
+    }
+
+    private void OnRowActionClicked(object? sender, RoutedEventArgs e)
+    {
+        if(sender is not Button { IsFocused: true, DataContext: ExemptionRowAction { IsQuiet: true } action } button)
+            return;
+
+        var actions = button.FindAncestorOfType<ItemsControl>();
+        if(actions == null)
+            return;
+
+        // Show all is replaced by the first newly revealed line at the same index.
+        var index = actions.Items.IndexOf(action);
+        Dispatcher.UIThread.Post(() =>
+        {
+            actions.UpdateLayout();
+            var next = actions.ContainerFromIndex(index)?.GetVisualDescendants().OfType<Button>().FirstOrDefault();
+            next?.Focus(NavigationMethod.Tab);
+        }, DispatcherPriority.Loaded);
     }
 
     /// <summary>

@@ -1,4 +1,5 @@
 using System.Globalization;
+using CF.Core.Services;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 
@@ -12,14 +13,16 @@ internal sealed partial class ExemptionFileViewModel : ExemptionListItem
 {
     private readonly Action<ExemptionFileViewModel> _toggled = _ => { };
 
-    public ExemptionFileViewModel(string path, IReadOnlyList<ExemptionRowViewModel> rows, int totalInFile, bool startsOpen, Action<ExemptionFileViewModel> toggled)
+    public ExemptionFileViewModel(ExemptionFileGroup file, IReadOnlyList<ExemptionRowViewModel> rows, int totalInFile, bool startsOpen, Action<ExemptionFileViewModel> toggled)
     {
-        Path = path;
+        Path = file.Path;
         Rows = rows;
+        ShownInFile = file.Exemptions.Count;
         TotalInFile = totalInFile;
-        var slash = path.LastIndexOf('/');
-        Folders = slash < 0 ? string.Empty : path[..(slash + 1)];
-        Name = path[(slash + 1)..];
+        Findings = file.Exemptions.Count(entry => entry.IsFinding);
+        var slash = Path.LastIndexOf('/');
+        Folders = slash < 0 ? string.Empty : Path[..(slash + 1)];
+        Name = Path[(slash + 1)..];
         IsOpen = startsOpen;
 
         // the list is told of a change the person makes, not of how the line starts
@@ -44,14 +47,28 @@ internal sealed partial class ExemptionFileViewModel : ExemptionListItem
 
     public IReadOnlyList<ExemptionRowViewModel> Rows { get; }
 
+    public int ShownInFile { get; }
+
     /// <summary>
     /// How many exemptions the file holds in all.
     /// </summary>
     public int TotalInFile { get; }
 
+    private int Findings { get; }
+
+    public bool HasFindings
+    {
+        get { return Findings > 0; }
+    }
+
+    public string FindingsText
+    {
+        get { return Findings == 1 ? "1 finding" : $"{Findings.ToString(CultureInfo.InvariantCulture)} findings"; }
+    }
+
     public bool IsPartial
     {
-        get { return Rows.Count < TotalInFile; }
+        get { return ShownInFile < TotalInFile; }
     }
 
     /// <summary>
@@ -59,7 +76,7 @@ internal sealed partial class ExemptionFileViewModel : ExemptionListItem
     /// </summary>
     public string TallyNumber
     {
-        get { return Rows.Count.ToString(CultureInfo.InvariantCulture); }
+        get { return ShownInFile.ToString(CultureInfo.InvariantCulture); }
     }
 
     /// <summary>
@@ -76,7 +93,11 @@ internal sealed partial class ExemptionFileViewModel : ExemptionListItem
 
     public string SpokenName
     {
-        get { return $"{Path}, {TallyNumber} {TallyWords}, {(IsOpen ? "expanded" : "folded")}"; }
+        get
+        {
+            var findings = HasFindings ? $", {FindingsText}" : string.Empty;
+            return $"{Path}, {TallyNumber} {TallyWords}, {(IsOpen ? "expanded" : "folded")}{findings}";
+        }
     }
 
     [RelayCommand]

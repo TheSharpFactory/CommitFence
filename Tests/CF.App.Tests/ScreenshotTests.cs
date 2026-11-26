@@ -1,6 +1,8 @@
 using Avalonia.Controls;
 using Avalonia.Headless.XUnit;
+using Avalonia.Input;
 using Avalonia.Styling;
+using CF.App.Exemptions;
 using CF.App.Parts;
 using CF.App.Review;
 using CF.App.Rules;
@@ -23,6 +25,9 @@ public sealed class ScreenshotTests
 {
     private const string _variable = "CF_SCREENSHOTS";
 
+    // the app has one theme, dark
+    private static readonly string[] _themes = ["dark"];
+
     [AvaloniaFact]
     public async Task EachScreenIsSavedWhenAFolderIsNamed()
     {
@@ -30,7 +35,7 @@ public sealed class ScreenshotTests
         if(string.IsNullOrWhiteSpace(folder))
             Assert.Skip(_variable + " names no folder.");
 
-        foreach(var theme in new[] { "light", "dark" })
+        foreach(var theme in _themes)
         {
             var fileRules = new[]
             {
@@ -48,7 +53,7 @@ public sealed class ScreenshotTests
                 DataContext = shell.Model,
                 Width = 1440,
                 Height = 900,
-                RequestedThemeVariant = theme == "light" ? ThemeVariant.Light : ThemeVariant.Dark
+                RequestedThemeVariant = ThemeVariant.Dark
             };
             using var host = new ViewHost(window);
             await arrived;
@@ -141,6 +146,9 @@ public sealed class ScreenshotTests
             shell.Model.CurrentScreen = Screen.Dashboard;
             host.Pump();
             host.Save(folder, $"notice-available-{theme}-1440.png");
+            Assert.True(host.Find<Button>(button => button.Name == "UpdateNowButton" && button.IsEffectivelyVisible)!.Focus(NavigationMethod.Tab));
+            host.Save(folder, $"notice-focus-{theme}-1440.png");
+            host.Window.FocusManager?.Focus(null);
             window.Width = 760;
             window.Height = 1000;
             host.Pump();
@@ -160,6 +168,9 @@ public sealed class ScreenshotTests
             await install;
             host.Pump();
             host.Save(folder, $"notice-failed-{theme}-1440.png");
+            Assert.True(host.Find<Button>(button => button.Name == "TryAgainButton" && button.IsEffectivelyVisible)!.Focus(NavigationMethod.Tab));
+            host.Save(folder, $"notice-failed-focus-{theme}-1440.png");
+            host.Window.FocusManager?.Focus(null);
             window.Width = 760;
             window.Height = 560;
             host.Pump();
@@ -175,6 +186,13 @@ public sealed class ScreenshotTests
             await shell.Model.Doctor.CheckAsync();
             host.Pump();
             host.Save(folder, $"doctor-fail-{theme}-1440.png");
+            var checkAgain = host.Find<Button>(button => button.Name == "CheckAgainButton" && button.IsEffectivelyVisible)!;
+            Assert.True(checkAgain.Focus(NavigationMethod.Tab));
+            host.Press(PhysicalKey.Tab);
+            var openHook = host.Find<Button>(button => button.IsEffectivelyVisible && Avalonia.Automation.AutomationProperties.GetName(button) == "Open the hook script")!;
+            Assert.True(host.HasFocusWithin(openHook));
+            host.Save(folder, $"doctor-focus-{theme}-1440.png");
+            host.Window.FocusManager?.Focus(null);
             window.Width = 760;
             window.Height = 1700;
             host.Pump();
@@ -191,17 +209,28 @@ public sealed class ScreenshotTests
             host.Window.FocusManager?.Focus(null);
             host.Pump();
             host.Save(folder, $"doctor-ready-{theme}-1440.png");
+            shell.Doctor.Answer = _ => FakeDoctorService.Report(hookFails: true);
+            await shell.Model.Doctor.CheckAsync();
             using var held = new ManualResetEventSlim();
+            var entered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            shell.Doctor.StartedCount = 2;
             shell.Doctor.Answer = _ =>
             {
+                entered.SetResult();
                 held.Wait();
                 return FakeDoctorService.Report();
             };
             var checking = shell.Model.Doctor.CheckAsync();
-            host.Pump();
-            host.Save(folder, $"doctor-checking-{theme}-1440.png");
-            held.Set();
-            await checking;
+            try
+            {
+                await entered.Task;
+                host.Save(folder, $"doctor-checking-{theme}-1440.png");
+            }
+            finally
+            {
+                held.Set();
+                await checking;
+            }
 
             // Settings: up to date (1440 and 760), the notes of the version installed shown, a custom mapping in the file, then an update
             // that is available, downloading and failed (1440, and the whole page at 760)
@@ -215,6 +244,11 @@ public sealed class ScreenshotTests
             host.Window.FocusManager?.Focus(null);
             host.Pump();
             host.Save(folder, $"settings-{theme}-1440.png");
+            var strictness = host.Find<SegmentedList>(list => list.Name == "StrictnessChoice" && list.IsEffectivelyVisible)!;
+            Assert.True(strictness.ContainerFromIndex(strictness.SelectedIndex)!.Focus(NavigationMethod.Tab));
+            host.Pump();
+            host.Save(folder, $"settings-focus-{theme}-1440.png");
+            host.Window.FocusManager?.Focus(null);
             window.Width = 760;
             window.Height = 1300;
             host.Pump();
@@ -266,6 +300,10 @@ public sealed class ScreenshotTests
             await settingsInstall;
             host.Pump();
             host.Save(folder, $"settings-failed-{theme}-1440.png");
+            Assert.True(host.Find<Button>(button => button.Name == "TryUpdateAgainButton" && button.IsEffectivelyVisible)!.Focus(NavigationMethod.Tab));
+            host.Pump();
+            host.Save(folder, $"settings-failed-focus-{theme}-1440.png");
+            host.Window.FocusManager?.Focus(null);
             window.Width = 760;
             window.Height = 1500;
             host.Pump();
@@ -292,7 +330,7 @@ public sealed class ScreenshotTests
             DataContext = shell.Model,
             Width = 1440,
             Height = 900,
-            RequestedThemeVariant = theme == "light" ? ThemeVariant.Light : ThemeVariant.Dark
+            RequestedThemeVariant = ThemeVariant.Dark
         };
         using var host = new ViewHost(window);
         var model = shell.Model.Exemptions;
@@ -301,10 +339,18 @@ public sealed class ScreenshotTests
         host.Window.FocusManager?.Focus(null);
         host.Pump();
         host.Save(folder, $"exemptions-{theme}-1440.png");
+        var merged = model.Items.OfType<ExemptionFileViewModel>().First().Rows.Single(row => row.HasMultipleLines);
+        merged.IsOpen = true;
+        host.Save(folder, $"exemptions-merged-{theme}-1440.png");
+        merged.IsOpen = false;
+
         window.Width = 760;
         window.Height = 1300;
         host.Pump();
         host.Save(folder, $"exemptions-{theme}-760.png");
+        model.TogglePanelCommand.Execute(null);
+        host.Save(folder, $"exemptions-by-rule-{theme}-760.png");
+        model.TogglePanelCommand.Execute(null);
         window.Width = 1440;
         window.Height = 900;
 

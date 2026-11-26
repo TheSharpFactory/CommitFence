@@ -23,56 +23,57 @@ internal static class DashboardPictures
             DataContext = shell.Model,
             Width = 1440,
             Height = 900,
-            RequestedThemeVariant = theme == "light" ? ThemeVariant.Light : ThemeVariant.Dark
+            RequestedThemeVariant = ThemeVariant.Dark
         };
         using var host = new ViewHost(window);
         host.Save(folder, $"dashboard-{theme}-1440.png");
-        if(theme == "light")
-        {
-            window.Height = 1200;
-            host.Save(folder, "dashboard-full-1440.png");
-            window.Height = 900;
-            var chart = host.Find<DashboardChart>(control => control.IsEffectivelyVisible)!;
-            chart.Focus(NavigationMethod.Tab);
-            for(var i = 0; i < 7; i++)
-                host.Press(PhysicalKey.ArrowLeft);
+        window.Height = 1200;
+        host.Save(folder, $"dashboard-full-{theme}-1440.png");
+        window.Height = 900;
+        var chart = host.Find<DashboardChart>(control => control.IsEffectivelyVisible)!;
+        chart.Focus(NavigationMethod.Tab);
+        for(var i = 0; i < 7; i++)
+            host.Press(PhysicalKey.ArrowLeft);
 
-            host.Save(folder, "dashboard-day-1440.png");
-            host.Press(PhysicalKey.End);
-            window.Focusable = true;
-            window.Focus(NavigationMethod.Pointer);
-            window.Width = 760;
-            window.Height = 1000;
-            host.Save(folder, "dashboard-light-760.png");
-            window.Height = 1800;
-            host.Save(folder, "dashboard-full-760.png");
+        host.Save(folder, $"dashboard-day-{theme}-1440.png");
+        host.Press(PhysicalKey.End);
+        window.Focusable = true;
+        window.Focus(NavigationMethod.Pointer);
+        window.Width = 760;
+        window.Height = 1000;
+        host.Save(folder, $"dashboard-{theme}-760.png");
+        window.Height = 1800;
+        host.Save(folder, $"dashboard-full-{theme}-760.png");
 
-            var days = shell.Stats.Report.Days.ToList();
-            var lastDay = days[^1];
-            days[^1] = lastDay with { Refused = 9, Incomplete = 2, Allowed = 30 };
-            var timing = shell.Stats.Report.Timing;
-            var bands = timing.Bands.ToList();
-            bands[1] = bands[1] with { Count = bands[1].Count + days[^1].Total - lastDay.Total };
-            shell.Stats.Report = shell.Stats.Report with { Days = days, Timing = timing with { Bands = bands }, ReadError = "The read was interrupted" };
-            await shell.Model.Dashboard.AgainCommand.ExecuteAsync(null);
-            window.Width = 1440;
-            window.Height = 900;
-            host.Save(folder, "dashboard-busy-day-read-error-1440.png");
-            shell.Stats.Report = Month();
-            await shell.Model.Dashboard.AgainCommand.ExecuteAsync(null);
-            shell.Model.Dashboard.ShowBrokenCommand.Execute(null);
-            host.Pump();
-            var dashboard = host.Find<DashboardView>(view => view.IsEffectivelyVisible)!;
-            dashboard.BrokenList.ScrollIntoView(shell.Model.Dashboard.BrokenRows.Count - 1);
-            host.Save(folder, "dashboard-all-broken-1440.png");
-        }
+        var days = shell.Stats.Report.Days.ToList();
+        var lastDay = days[^1];
+        days[^1] = lastDay with { Refused = 9, Incomplete = 2, Allowed = 30 };
+        var timing = shell.Stats.Report.Timing;
+        var bands = timing.Bands.ToList();
+        bands[1] = bands[1] with { Count = bands[1].Count + days[^1].Total - lastDay.Total };
+        shell.Stats.Report = shell.Stats.Report with { Days = days, Timing = timing with { Bands = bands }, ReadError = "The read was interrupted." };
+        await shell.Model.Dashboard.AgainCommand.ExecuteAsync(null);
+        window.Width = 1440;
+        window.Height = 900;
+        host.Save(folder, $"dashboard-busy-day-read-error-{theme}-1440.png");
+        window.Width = 760;
+        window.Height = 1000;
+        host.Save(folder, $"dashboard-busy-day-read-error-{theme}-760.png");
+        window.Width = 1440;
+        window.Height = 900;
+        shell.Stats.Report = Month();
+        await shell.Model.Dashboard.AgainCommand.ExecuteAsync(null);
+        shell.Model.Dashboard.ShowBrokenCommand.Execute(null);
+        host.Pump();
+        var dashboard = host.Find<DashboardView>(view => view.IsEffectivelyVisible)!;
+        dashboard.BrokenList.ScrollIntoView(shell.Model.Dashboard.BrokenRows.Count - 1);
+        host.Save(folder, $"dashboard-all-broken-{theme}-1440.png");
 
         shell.Stats.Report = shell.Stats.Report with { Oldest = null };
         await shell.Model.Dashboard.AgainCommand.ExecuteAsync(null);
         window.Width = 1440;
         window.Height = 900;
-        var suffix = theme == "light" ? string.Empty : "-dark";
-        host.Save(folder, $"dashboard-empty{suffix}-1440.png");
+        host.Save(folder, $"dashboard-empty-{theme}-1440.png");
     }
 
     public static StatsReport Month()

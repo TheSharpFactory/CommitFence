@@ -1,3 +1,4 @@
+using System.Text;
 using System.Text.Json;
 using System.Text.RegularExpressions;
 using CF.Core.Ports;
@@ -85,13 +86,15 @@ internal sealed partial class SdkDoctorCheck(string language, DotnetTool dotnet,
         var found = new DoctorText(CodeText(_globalJson), " asks for ", CodeText(requested), policy, CodeText(available));
         var fix = new DoctorText("Install the .NET SDK ", CodeText(requested), ", or let ", CodeText(_globalJson),
             " roll forward to a newer one. CommitFence does not change ", CodeText(_globalJson), ".");
-        return FromFile(found, fix, global, text, FindVersionLine(text, requested), installed.LastOrDefault());
+        var lines = FindSdkLines(text);
+        return FromFile(found, fix, global, text, lines.Version, installed.LastOrDefault(), lines.RollForward);
     }
 
-    private DoctorCheckResult FromFile(DoctorText found, DoctorText fix, string path, string text, int? line, string? version)
+    private DoctorCheckResult FromFile(DoctorText found, DoctorText fix, string path, string text, int? line, string? version, int? relatedLine = null)
     {
         var actions = new List<DoctorAction> { new DoctorAction(DoctorActionKind.OpenFile, "Open global.json", path, line), _download };
-        return Fail(found, fix, DoctorImpact.Sdk, actions, DoctorExcerpt.Around(path, DoctorExcerpt.ReadLines(text), line), version);
+        var excerpt = DoctorExcerpt.Around(path, DoctorExcerpt.ReadLines(text), line, relatedLine);
+        return Fail(found, fix, DoctorImpact.Sdk, actions, excerpt, version);
     }
 
     private string? FindGlobalJson(string folder)
@@ -116,16 +119,57 @@ internal sealed partial class SdkDoctorCheck(string language, DotnetTool dotnet,
             .Select(line => line.Split(' ', 2)[0]).Where(version => SdkVersion().IsMatch(version)).ToList();
     }
 
-    private static int? FindVersionLine(string text, string version)
+    private static (int? Version, int? RollForward) FindSdkLines(string text)
     {
-        var lines = DoctorExcerpt.ReadLines(text);
-        var value = "\"" + version + "\"";
-        for(var index = 0; index < lines.Count; index++)
+        // The SDK options were already read. Walk the same JSON to find their source locations.
+        var bytes = Encoding.UTF8.GetBytes(text);
+        var options = DoctorGlobalJsonContext.Default.Options;
+        var reader = new Utf8JsonReader(bytes, new JsonReaderOptions
         {
-            if(lines[index].TrimStart().StartsWith("\"version\"", StringComparison.Ordinal) && lines[index].Contains(value, StringComparison.Ordinal))
-                return index + 1;
+            CommentHandling = options.ReadCommentHandling,
+            AllowTrailingCommas = options.AllowTrailingCommas
+        });
+
+        (int? Version, int? RollForward) lines = default;
+        while(reader.Read())
+        {
+            if(reader.TokenType != JsonTokenType.PropertyName)
+                continue;
+
+            var isSdk = reader.ValueTextEquals("sdk"u8);
+            reader.Read();
+            if(isSdk)
+                lines = ReadSdkLines(ref reader, bytes);
+
+            reader.Skip();
         }
 
-        return null;
+        return lines;
+    }
+
+    private static (int? Version, int? RollForward) ReadSdkLines(ref Utf8JsonReader reader, byte[] bytes)
+    {
+        if(reader.TokenType != JsonTokenType.StartObject)
+            return default;
+
+        int? version = null;
+        int? rollForward = null;
+        while(reader.Read() && reader.TokenType == JsonTokenType.PropertyName)
+        {
+            if(reader.ValueTextEquals("version"u8))
+                version = LineAt(bytes, reader.TokenStartIndex);
+            else if(reader.ValueTextEquals("rollForward"u8))
+                rollForward = LineAt(bytes, reader.TokenStartIndex);
+
+            reader.Skip();
+        }
+
+        return (version, rollForward);
+    }
+
+    private static int LineAt(byte[] bytes, long offset)
+    {
+        var preceding = Encoding.UTF8.GetString(bytes, 0, (int)offset).ReplaceLineEndings("\n");
+        return preceding.AsSpan().Count('\n') + 1;
     }
 }

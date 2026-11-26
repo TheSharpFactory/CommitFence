@@ -156,7 +156,8 @@ internal sealed partial class UpdateStatusViewModel : ObservableObject
                 UpdateStatusKind.UpToDate or UpdateStatusKind.Installed or UpdateStatusKind.InstalledCouldNotRestart => UpdateStatusMark.Tick,
                 UpdateStatusKind.Checking or UpdateStatusKind.Cancelling or UpdateStatusKind.Replacing => UpdateStatusMark.Ring,
                 UpdateStatusKind.Failed => UpdateStatusMark.Failure,
-                UpdateStatusKind.NeverChecked or UpdateStatusKind.LastChecked or UpdateStatusKind.CouldNotCheck or UpdateStatusKind.Available or UpdateStatusKind.CannotUpdate or UpdateStatusKind.Downloading
+                UpdateStatusKind.Available or UpdateStatusKind.CannotUpdate => UpdateStatusMark.Download,
+                UpdateStatusKind.NeverChecked or UpdateStatusKind.LastChecked or UpdateStatusKind.CouldNotCheck or UpdateStatusKind.Downloading
                     or UpdateStatusKind.SizeNotKnown or UpdateStatusKind.Cancelled => UpdateStatusMark.None,
                 _ => throw new ArgumentOutOfRangeException(nameof(Kind))
             };
@@ -171,6 +172,11 @@ internal sealed partial class UpdateStatusViewModel : ObservableObject
     public bool ShowsTick
     {
         get { return Mark == UpdateStatusMark.Tick; }
+    }
+
+    public bool ShowsDownloadMark
+    {
+        get { return Mark == UpdateStatusMark.Download; }
     }
 
     public bool ShowsRing

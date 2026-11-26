@@ -276,6 +276,28 @@ public sealed class UpdateNoticeTests
     }
 
     [AvaloniaFact]
+    public async Task FailedNoticeMakesTryAgainItsMainActionAndEscapeClosesIt()
+    {
+        var updates = Create();
+        await Reach(updates, UpdateNoticeState.Failed);
+        using var host = new ViewHost(new UpdateNoticeView { DataContext = updates }, 1440, 200);
+        var buttons = host.FindAll<Button>(button => button.IsEffectivelyVisible);
+
+        Assert.Collection(buttons,
+            close => Assert.Contains("outlined", close.Classes),
+            releasePage => Assert.Contains("outlined", releasePage.Classes),
+            tryAgain =>
+            {
+                Assert.Equal("TryAgainButton", tryAgain.Name);
+                Assert.Contains("main", tryAgain.Classes);
+            });
+
+        Assert.True(buttons[2].Focus(NavigationMethod.Tab));
+        host.Press(PhysicalKey.Escape);
+        Assert.False(updates.IsNoticeVisible);
+    }
+
+    [AvaloniaFact]
     public async Task WhatsNewFocusesUpdateNowInSettingsAndTheNoticeReturnsOnOtherScreens()
     {
         using var shell = new ShellHost();

@@ -6,11 +6,15 @@
              x:ClassModifier="internal"
              x:DataType="screen:ExemptionsViewModel">
 
-  <!-- The panel "By rule": the key at its top, then a row for each rule. Beside the files from 1304 wide; in one pane it stands in the
+  <!-- The panel "By rule": the rules grouped by source. Beside the files from 1304 wide; in one pane it stands in the
        page as one line, "By rule", the number of rules and a small "Show". The rules are one tab stop; Up and Down move between them. -->
   <UserControl.Styles>
+    <Style Selector="Border.exrule-group.following">
+      <!-- The list's 2-pixel spacing supplies the rest of the gap. -->
+      <Setter Property="Margin" Value="0,14,0,0"/>
+    </Style>
     <Style Selector="Button.exrule">
-      <Setter Property="Padding" Value="10,9,12,9"/>
+      <Setter Property="Padding" Value="29,9,12,9"/>
       <Setter Property="CornerRadius" Value="12"/>
       <Setter Property="Background" Value="Transparent"/>
       <Setter Property="HorizontalAlignment" Value="Stretch"/>
@@ -62,11 +66,13 @@
   <Border Background="{DynamicResource side}" CornerRadius="16" Padding="8,12,8,8">
     <StackPanel Name="RulePanel">
 
-      <Grid ColumnDefinitions="Auto,*,Auto" Margin="4,0,0,8" MinHeight="28">
+      <Grid ColumnDefinitions="Auto,*,Auto,Auto" Margin="4,0,0,8" MinHeight="28">
         <TextBlock Theme="{StaticResource type-h3}" VerticalAlignment="Center" Text="By rule"/>
         <TextBlock Grid.Column="1" Theme="{StaticResource type-meta}" Foreground="{DynamicResource ink-2}" Margin="10,2,8,0" VerticalAlignment="Center"
                    TextTrimming="CharacterEllipsis" Text="{Binding RulesHead}"/>
-        <Button Grid.Column="2" Name="PanelToggleButton" Classes="cf quiet small" IsVisible="{Binding IsOnePane}" VerticalAlignment="Center"
+        <TextBlock Grid.Column="2" IsVisible="{Binding PanelIsListed}" Theme="{StaticResource type-meta}" Foreground="{DynamicResource ink-2}"
+                   Margin="0,0,12,0" VerticalAlignment="Center" Text="Exemptions" AutomationProperties.AccessibilityView="Raw"/>
+        <Button Grid.Column="3" Name="PanelToggleButton" Classes="cf quiet small" IsVisible="{Binding IsOnePane}" VerticalAlignment="Center"
                 Command="{Binding TogglePanelCommand}" AutomationProperties.Name="{Binding PanelToggleText, StringFormat='{}{0} the count by rule'}">
           <StackPanel Orientation="Horizontal" Spacing="6">
             <TextBlock Theme="{StaticResource type-meta-strong}" Text="{Binding PanelToggleText}"/>
@@ -75,54 +81,49 @@
         </Button>
       </Grid>
 
-      <!-- The key: what the colours and the two marks of the rows mean. -->
-      <WrapPanel Name="KeyRow" IsVisible="{Binding PanelIsListed}" Margin="10,0,4,8" ItemSpacing="16" LineSpacing="4" Orientation="Horizontal">
-        <StackPanel Orientation="Horizontal" Spacing="4">
-          <Border Width="12" Height="8" CornerRadius="2" Background="{DynamicResource data}" VerticalAlignment="Center"/>
-          <TextBlock Theme="{StaticResource type-meta}" Foreground="{DynamicResource ink-2}" Text="With a reason"/>
-        </StackPanel>
-        <StackPanel Orientation="Horizontal" Spacing="4">
-          <Border Width="12" Height="8" CornerRadius="2" Background="{DynamicResource block}" VerticalAlignment="Center"/>
-          <TextBlock Theme="{StaticResource type-meta}" Foreground="{DynamicResource ink-2}" Text="Without a reason"/>
-        </StackPanel>
-        <StackPanel Orientation="Horizontal" Spacing="4">
-          <parts:Icon Data="{StaticResource i-pen}" Width="13" Height="13" Stroke="{DynamicResource ink-3}" VerticalAlignment="Center"/>
-          <TextBlock Theme="{StaticResource type-meta}" Foreground="{DynamicResource ink-2}" Text="Custom rule"/>
-        </StackPanel>
-        <StackPanel Orientation="Horizontal" Spacing="4">
-          <parts:Icon Data="{StaticResource i-file}" Width="13" Height="13" Stroke="{DynamicResource ink-3}" VerticalAlignment="Center"/>
-          <TextBlock Theme="{StaticResource type-meta}" Foreground="{DynamicResource ink-2}" Text="Rule of .editorconfig"/>
-        </StackPanel>
-      </WrapPanel>
-
-      <ItemsControl Name="RuleList" ItemsSource="{Binding RuleRows}" IsVisible="{Binding PanelIsListed}" KeyboardNavigation.TabNavigation="Once">
+      <ItemsControl Name="RuleList" ItemsSource="{Binding RulePanelItems}" IsVisible="{Binding PanelIsListed}"
+                    Grid.IsSharedSizeScope="True" KeyboardNavigation.TabNavigation="Once">
         <ItemsControl.ItemsPanel>
           <ItemsPanelTemplate>
             <StackPanel Spacing="2"/>
           </ItemsPanelTemplate>
         </ItemsControl.ItemsPanel>
-        <ItemsControl.ItemTemplate>
+        <ItemsControl.DataTemplates>
+          <DataTemplate DataType="screen:ExemptionRuleGroupHeading" x:DataType="screen:ExemptionRuleGroupHeading">
+            <Border Classes="exrule-group" Classes.following="{Binding FollowsGroup}" Padding="10,0,4,6">
+              <StackPanel Orientation="Horizontal" Spacing="6">
+                <parts:Icon IsVisible="{Binding IsCustom}" Data="{StaticResource i-pen}" Width="13" Height="13"
+                            Stroke="{DynamicResource ink-3}" VerticalAlignment="Center"/>
+                <parts:Icon IsVisible="{Binding IsFromFile}" Data="{StaticResource i-file}" Width="13" Height="13"
+                            Stroke="{DynamicResource ink-3}" VerticalAlignment="Center"/>
+                <TextBlock Theme="{StaticResource type-meta-strong}" Foreground="{DynamicResource ink-2}" Text="{Binding Title}"
+                           AutomationProperties.HeadingLevel="3" AutomationProperties.Name="{Binding SpokenName}"/>
+                <TextBlock Theme="{StaticResource type-meta}" Foreground="{DynamicResource ink-3}" FontFeatures="+tnum" Text="{Binding CountText}"
+                           AutomationProperties.AccessibilityView="Raw"/>
+              </StackPanel>
+            </Border>
+          </DataTemplate>
           <DataTemplate DataType="screen:ExemptionRuleRowViewModel" x:DataType="screen:ExemptionRuleRowViewModel">
             <Button Classes="exrule" Classes.chosen="{Binding IsChosen}" Classes.back="{Binding IsSteppedBack}"
                     Command="{Binding ChooseCommand}" AutomationProperties.Name="{Binding SpokenName}">
-              <Grid ColumnDefinitions="Auto,*,Auto" RowDefinitions="Auto,Auto" ColumnSpacing="10">
-                <parts:Icon IsVisible="{Binding IsCustom}" Data="{StaticResource i-pen}" Width="15" Height="15" Stroke="{DynamicResource ink-3}"
-                            VerticalAlignment="Top" Margin="0,3,0,0"/>
-                <parts:Icon IsVisible="{Binding IsFromFile}" Data="{StaticResource i-file}" Width="15" Height="15" Stroke="{DynamicResource ink-3}"
-                            VerticalAlignment="Top" Margin="0,3,0,0"/>
-                <TextBlock Grid.Column="1" Classes="title" Theme="{StaticResource type-body-strong}" TextWrapping="Wrap" Text="{Binding Title}"/>
-                <TextBlock Grid.Column="2" Classes="number" Theme="{StaticResource type-card}" FontFeatures="+tnum" MinWidth="24" TextAlignment="Right" Text="{Binding CountText}"/>
-                <Grid Grid.Row="1" Grid.Column="1" Grid.ColumnSpan="2" ColumnDefinitions="Auto,*,Auto" Height="18" Margin="0,3,0,0">
-                  <TextBlock IsVisible="{Binding ShowsId}" Theme="{StaticResource code}" Foreground="{DynamicResource ink-2}" MinWidth="58" VerticalAlignment="Center" Text="{Binding RuleId}"/>
-                  <screen:ExemptionBar Grid.Column="1" Margin="10,0,0,0" Fraction="{Binding Fraction}" RedFraction="{Binding RedFraction}"
+              <Grid ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto" ColumnSpacing="10">
+                <TextBlock Classes="title" Theme="{StaticResource type-body-strong}" TextWrapping="Wrap" Text="{Binding Title}"/>
+                <TextBlock Grid.Column="1" Classes="number" Theme="{StaticResource type-card}" FontFeatures="+tnum" MinWidth="24" TextAlignment="Right" Text="{Binding CountText}"/>
+                <Grid Grid.Row="1" Grid.ColumnSpan="2" RowDefinitions="18,Auto" ColumnSpacing="10" Margin="0,3,0,0">
+                  <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" MinWidth="58" SharedSizeGroup="RuleId"/>
+                    <ColumnDefinition Width="*"/>
+                  </Grid.ColumnDefinitions>
+                  <TextBlock IsVisible="{Binding ShowsId}" Theme="{StaticResource code}" Foreground="{DynamicResource ink-2}" VerticalAlignment="Center" Text="{Binding RuleId}"/>
+                  <screen:ExemptionBar Grid.Column="1" Fraction="{Binding Fraction}" RedFraction="{Binding RedFraction}"
                                        RedFill="{DynamicResource block}"/>
-                  <TextBlock Grid.Column="2" IsVisible="{Binding HasWithoutReason}" Margin="10,0,0,0" Theme="{StaticResource type-meta}" FontWeight="600"
-                             Foreground="{DynamicResource block-ink}" VerticalAlignment="Center" Text="{Binding WithoutReasonText}"/>
+                  <TextBlock Grid.Row="1" Grid.Column="1" IsVisible="{Binding HasWithoutReason}" Margin="0,2,0,0" Theme="{StaticResource type-meta}"
+                             FontWeight="600" Foreground="{DynamicResource block-ink}" Text="{Binding WithoutReasonText}"/>
                 </Grid>
               </Grid>
             </Button>
           </DataTemplate>
-        </ItemsControl.ItemTemplate>
+        </ItemsControl.DataTemplates>
       </ItemsControl>
 
     </StackPanel>

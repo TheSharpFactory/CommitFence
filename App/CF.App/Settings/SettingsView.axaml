@@ -15,6 +15,9 @@
     <Style Selector="ListBox.segmented.large.strictness ListBoxItem">
       <Setter Property="MinWidth" Value="132"/>
     </Style>
+    <Style Selector="ListBox.segmented.large.strictness ListBoxItem:disabled TextBlock.segment">
+      <Setter Property="Foreground" Value="{DynamicResource ink-2}"/>
+    </Style>
     <Style Selector="Border.fact">
       <Setter Property="BorderBrush" Value="{DynamicResource line}"/>
       <Setter Property="BorderThickness" Value="0,0,0,1"/>
@@ -48,17 +51,19 @@
         <!-- ======== This repository ======== -->
         <StackPanel Name="RepositoryColumn">
           <Border BorderBrush="{DynamicResource line}" BorderThickness="0,0,0,1" Padding="0,0,0,12">
-            <StackPanel Orientation="Horizontal" Spacing="8">
+            <Grid ColumnDefinitions="Auto,Auto,*" ColumnSpacing="8">
               <parts:Icon Data="{StaticResource i-branch}" Width="16" Height="16" Stroke="{DynamicResource ink-2}" VerticalAlignment="Center"/>
-              <TextBlock Theme="{StaticResource type-h3}" VerticalAlignment="Center" Text="{Binding RepositoryName}"/>
-              <TextBlock Theme="{StaticResource type-meta}" Foreground="{DynamicResource ink-2}" VerticalAlignment="Center"
-                         Text="Kept in commitfence.json, for everyone who pulls it"/>
-            </StackPanel>
+              <TextBlock Grid.Column="1" Theme="{StaticResource type-h2}" VerticalAlignment="Center" Text="This repository"/>
+              <TextBlock Grid.Column="2" Theme="{StaticResource type-meta}" Foreground="{DynamicResource ink-2}" VerticalAlignment="Center"
+                         TextWrapping="Wrap" Text="{Binding RepositoryNote}"/>
+            </Grid>
           </Border>
 
           <!-- Strictness: the choice, the table with the column in force marked, the sentence with its three counts. -->
           <StackPanel Margin="0,24,0,0" IsVisible="{Binding HasStrictness}">
-            <parts:SectionHead Title="Strictness"/>
+            <parts:WrapRow MinHeight="28" Margin="0,0,0,12">
+              <TextBlock Theme="{StaticResource type-h3}" VerticalAlignment="Center" Text="Strictness"/>
+            </parts:WrapRow>
             <TextBlock Theme="{StaticResource type-body}" Foreground="{DynamicResource ink-2}" Margin="0,-5,0,12"
                        Text="What the words of .editorconfig do to a push."/>
 
@@ -91,8 +96,11 @@
                 </DataTemplate>
               </parts:SegmentedList.ItemTemplate>
             </parts:SegmentedList>
-            <TextBlock Name="CustomNote" IsVisible="{Binding IsCustom}" Theme="{StaticResource type-meta}" Foreground="{DynamicResource ink-2}"
-                       TextWrapping="Wrap" MaxWidth="640" HorizontalAlignment="Left" Margin="0,8,0,0" Text="{Binding CustomNote}"/>
+            <Grid IsVisible="{Binding IsCustom}" ColumnDefinitions="Auto,*" ColumnSpacing="6" MaxWidth="640" HorizontalAlignment="Left" Margin="0,8,0,0">
+              <parts:Icon Data="{StaticResource i-lock-line}" Width="12" Height="12" Stroke="{DynamicResource ink-2}" VerticalAlignment="Top" Margin="0,4,0,0"/>
+              <TextBlock Grid.Column="1" Name="CustomNote" Theme="{StaticResource type-meta}" Foreground="{DynamicResource ink-2}"
+                         TextWrapping="Wrap" Text="{Binding CustomNote}"/>
+            </Grid>
 
             <!-- What each word of the file does under each choice. It is not a control: the choice above is. -->
             <StackPanel Margin="0,16,0,0" AutomationProperties.Name="What each word of the file does, by strictness">
@@ -178,7 +186,9 @@
 
           <!-- Languages: a card per language, no switch. -->
           <StackPanel Margin="0,40,0,0">
-            <parts:SectionHead Title="Languages"/>
+            <parts:WrapRow MinHeight="28" Margin="0,0,0,12">
+              <TextBlock Theme="{StaticResource type-h3}" VerticalAlignment="Center" Text="Languages"/>
+            </parts:WrapRow>
             <ItemsControl ItemsSource="{Binding LanguageCards}" Focusable="False">
               <ItemsControl.ItemTemplate>
                 <DataTemplate DataType="screen:LanguageCardViewModel" x:DataType="screen:LanguageCardViewModel">
@@ -206,7 +216,7 @@
           <Border Name="AppHead" BorderBrush="{DynamicResource line}" BorderThickness="0,0,0,1" Padding="0,0,0,12">
             <StackPanel Orientation="Horizontal" Spacing="8">
               <parts:Icon Data="{StaticResource i-set}" Width="16" Height="16" Stroke="{DynamicResource ink-2}" VerticalAlignment="Center"/>
-              <TextBlock Theme="{StaticResource type-h3}" VerticalAlignment="Center" Text="This app"/>
+              <TextBlock Theme="{StaticResource type-h2}" VerticalAlignment="Center" Text="This app"/>
               <TextBlock Theme="{StaticResource type-meta}" Foreground="{DynamicResource ink-2}" VerticalAlignment="Center" Text="On this machine only"/>
             </StackPanel>
           </Border>
@@ -217,7 +227,7 @@
               <parts:LogoMark/>
             </Viewbox>
             <StackPanel Grid.Column="1" VerticalAlignment="Center">
-              <TextBlock Theme="{StaticResource type-h2}" Text="{Binding VersionTitle}"/>
+              <TextBlock Theme="{StaticResource type-h3}" Text="{Binding VersionTitle}"/>
               <TextBlock Theme="{StaticResource type-meta}" Foreground="{DynamicResource ink-2}" Text="The app and the command line beside it"/>
             </StackPanel>
           </Grid>
@@ -229,6 +239,7 @@
             <Grid ColumnDefinitions="Auto,*,Auto" RowDefinitions="Auto,Auto,Auto">
               <Panel Name="StatusMark" IsVisible="{Binding ShowsMark}" Margin="0,0,10,0" MinWidth="16" MinHeight="16">
                 <parts:Icon IsVisible="{Binding ShowsTick}" Data="{StaticResource i-check}" Width="16" Height="16" StrokeThickness="2.2" Stroke="{DynamicResource req-ink}"/>
+                <parts:Icon IsVisible="{Binding ShowsDownloadMark}" Data="{StaticResource i-get}" Width="16" Height="16" Stroke="{DynamicResource ink}"/>
                 <parts:TurningRing IsVisible="{Binding ShowsRing}" Width="14" Height="14" HorizontalAlignment="Center" VerticalAlignment="Center"/>
                 <Border IsVisible="{Binding ShowsFailureBadge}" Width="24" Height="24" CornerRadius="7" Background="{DynamicResource block}"
                         HorizontalAlignment="Center" VerticalAlignment="Center">
@@ -267,7 +278,7 @@
                         AutomationProperties.Name="Cancel the update">
                   <TextBlock Theme="{StaticResource type-meta-strong}" Text="Cancel"/>
                 </Button>
-                <Button Name="TryUpdateAgainButton" Classes="cf outlined small" Command="{Binding Updates.TryAgainCommand}" IsVisible="{Binding ShowsTryUpdateAgain}"
+                <Button Name="TryUpdateAgainButton" Classes="cf main small" Command="{Binding Updates.TryAgainCommand}" IsVisible="{Binding ShowsTryUpdateAgain}"
                         AutomationProperties.Name="Try again">
                   <TextBlock Theme="{StaticResource type-meta-strong}" Text="Try again"/>
                 </Button>

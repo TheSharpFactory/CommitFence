@@ -111,11 +111,35 @@ public sealed class GitSnapshotStore : ISnapshotStore, ISnapshotInspector
 
     private void MoveIndexAndFiles(RepositoryLocation repository, IReadOnlyDictionary<string, string?> environment, string? previous, string tree, string treeFolder, string indexPath)
     {
-        if(previous != null && TryMove(repository, environment, new List<string> { "read-tree", "-u", "-m", previous, tree }))
-            return;
+        var lockPath = indexPath + ".lock";
+        var lockWasPresent = File.Exists(lockPath);
+        try
+        {
+            if(previous != null && TryMove(repository, environment, new List<string> { "read-tree", "-u", "-m", previous, tree }))
+                return;
 
-        StartOver(treeFolder, indexPath);
-        _git.RunChecked(repository, WithSettings(new List<string> { "read-tree", "-u", "--reset", tree }), environment, null);
+            StartOver(treeFolder, indexPath);
+            _git.RunChecked(repository, WithSettings(new List<string> { "read-tree", "-u", "--reset", tree }), environment, null);
+        }
+        catch(GitException exception) when(exception.TimedOut && !lockWasPresent)
+        {
+            DiscardInterruptedCheckout(treeFolder, indexPath, lockPath);
+            throw;
+        }
+    }
+
+    private static void DiscardInterruptedCheckout(string treeFolder, string indexPath, string lockPath)
+    {
+        try
+        {
+            // A stopped read-tree can leave both the private index lock and files that the old index does not track.
+            StartOver(treeFolder, indexPath);
+            File.Delete(lockPath);
+        }
+        catch(Exception exception) when(exception is IOException || exception is UnauthorizedAccessException)
+        {
+            // Keep the checkout timeout as the reason this ref could not be reviewed.
+        }
     }
 
     /// <summary>

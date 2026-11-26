@@ -27,13 +27,19 @@ internal sealed partial class EmptyBlock : UserControl
 
     public static readonly StyledProperty<ICommand?> ButtonCommandProperty = AvaloniaProperty.Register<EmptyBlock, ICommand?>(nameof(ButtonCommand));
 
+    public static readonly StyledProperty<string?> DetailProperty = AvaloniaProperty.Register<EmptyBlock, string?>(nameof(Detail));
+    public static readonly StyledProperty<Control?> SecondaryActionProperty =
+        AvaloniaProperty.Register<EmptyBlock, Control?>(nameof(SecondaryAction));
+
     static EmptyBlock()
     {
         HeadingProperty.Changed.AddClassHandler<EmptyBlock>((block, _) => block.Show());
         LeadProperty.Changed.AddClassHandler<EmptyBlock>((block, _) => block.Show());
         ShowsEmblemProperty.Changed.AddClassHandler<EmptyBlock>((block, _) => block.Show());
         EmblemProperty.Changed.AddClassHandler<EmptyBlock>((block, _) => block.Show());
-        ExtraProperty.Changed.AddClassHandler<EmptyBlock>((block, _) => block.ExtraHost.Content = block.Extra);
+        ExtraProperty.Changed.AddClassHandler<EmptyBlock>((block, _) => block.Show());
+        DetailProperty.Changed.AddClassHandler<EmptyBlock>((block, _) => block.Show());
+        SecondaryActionProperty.Changed.AddClassHandler<EmptyBlock>((block, _) => block.Show());
         ButtonTextProperty.Changed.AddClassHandler<EmptyBlock>((block, _) => block.Show());
         ButtonIconProperty.Changed.AddClassHandler<EmptyBlock>((block, _) => block.Show());
         ButtonCommandProperty.Changed.AddClassHandler<EmptyBlock>((block, _) => block.MainButton.Command = block.ButtonCommand);
@@ -154,7 +160,7 @@ internal sealed partial class EmptyBlock : UserControl
     }
 
     /// <summary>
-    /// The button of the block, the one stop of the keyboard in it.
+    /// The main button of the block.
     /// </summary>
     public Button Button
     {
@@ -164,11 +170,27 @@ internal sealed partial class EmptyBlock : UserControl
         }
     }
 
+    public string? Detail
+    {
+        get { return GetValue(DetailProperty); }
+        set { SetValue(DetailProperty, value); }
+    }
+
+    public Control? SecondaryAction
+    {
+        get { return GetValue(SecondaryActionProperty); }
+        set { SetValue(SecondaryActionProperty, value); }
+    }
+
     private void Show()
     {
         HeadingText.Text = Heading;
         LeadText.Text = Lead;
         LeadText.IsVisible = !string.IsNullOrEmpty(Lead);
+        ExtraHost.Content = Extra;
+        ExtraHost.IsVisible = Extra != null || string.IsNullOrEmpty(Detail);
+        DetailText.Text = Detail;
+        DetailText.IsVisible = !string.IsNullOrEmpty(Detail);
         EmblemHost.Content = Emblem;
         EmblemHost.IsVisible = ShowsEmblem && Emblem != null;
         EmblemBox.IsVisible = ShowsEmblem && Emblem == null;
@@ -176,6 +198,9 @@ internal sealed partial class EmptyBlock : UserControl
         ButtonIconMark.Data = ButtonIcon;
         ButtonIconMark.IsVisible = ButtonIcon != null;
         MainButton.IsVisible = !string.IsNullOrEmpty(ButtonText);
+        SecondaryHost.Content = SecondaryAction;
+        SecondaryHost.IsVisible = SecondaryAction != null;
+        Actions.IsVisible = MainButton.IsVisible || SecondaryHost.IsVisible;
         MainButton.SetValue(Avalonia.Automation.AutomationProperties.NameProperty, ButtonText);
     }
 

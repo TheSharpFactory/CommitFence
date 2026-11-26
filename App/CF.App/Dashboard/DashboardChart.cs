@@ -3,9 +3,9 @@ using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Media;
+using Avalonia.Media.TextFormatting;
 using Avalonia.Styling;
 using CF.App.Rules.Page.Code;
-using CF.Core.Review;
 using CF.Core.Services;
 
 namespace CF.App.Dashboard;
@@ -13,13 +13,8 @@ namespace CF.App.Dashboard;
 /// <summary>Draws the thirty-day chart and gives it one keyboard stop.</summary>
 internal sealed class DashboardChart : Control
 {
-    private const double _gutter = 40;
-    private const double _plotTop = 30;
-    private const double _labels = 28;
-    private const double _busyHeight = 240;
-    private const double _boxStep = 24;
-    private const int _fullSizeMaximum = 10;
-    private const int _maximumIndividualReviews = 40;
+    private const double _gutter = ChartFrame.Gutter;
+    private static readonly FontFeatureCollection _tabularNumbers = FontFeatureCollection.Parse("+tnum");
 
     public static readonly StyledProperty<IReadOnlyList<StatsDay>> DaysProperty =
         AvaloniaProperty.Register<DashboardChart, IReadOnlyList<StatsDay>>(nameof(Days), []);
@@ -27,22 +22,30 @@ internal sealed class DashboardChart : Control
     public static readonly StyledProperty<int> SelectedDayProperty =
         AvaloniaProperty.Register<DashboardChart, int>(nameof(SelectedDay));
 
+    public static readonly StyledProperty<bool> TwoColumnsProperty =
+        AvaloniaProperty.Register<DashboardChart, bool>(nameof(TwoColumns));
+
     static DashboardChart()
     {
-        AffectsMeasure<DashboardChart>(DaysProperty);
-        AffectsRender<DashboardChart>(DaysProperty, SelectedDayProperty);
+        AffectsMeasure<DashboardChart>(DaysProperty, TwoColumnsProperty);
+        AffectsRender<DashboardChart>(DaysProperty, SelectedDayProperty, TwoColumnsProperty);
     }
 
     public DashboardChart()
     {
         Focusable = true;
+        FocusAdorner = null;
+        LostFocus += (_, _) => SetKeyboardFocus(false);
         ActualThemeVariantChanged += (_, _) => InvalidateVisual();
     }
 
     private FontFamily _labelFamily = FontFamily.Default;
     private double _labelSize;
+    private int _captionLines = 1;
 
     public event Action<int>? DayChosen;
+
+    public bool KeyboardFocus { get; private set; }
 
     protected override void OnAttachedToVisualTree(VisualTreeAttachmentEventArgs e)
     {
@@ -71,23 +74,25 @@ internal sealed class DashboardChart : Control
         set { SetValue(SelectedDayProperty, value); }
     }
 
-    public static int MaximumOf(IReadOnlyList<StatsDay> days)
+    /// <summary>Whether the screen has two columns, which gives the scale more height.</summary>
+    public bool TwoColumns
     {
-        return days.Select(day => day.Total).DefaultIfEmpty(0).Max();
+        get { return GetValue(TwoColumnsProperty); }
+        set { SetValue(TwoColumnsProperty, value); }
     }
 
-    public static string ScaleLabel(int maximum)
-    {
-        return maximum > _maximumIndividualReviews
-            ? "A day here has more reviews than fit as boxes: each block is a day's reviews of one kind."
-            : "Each box is one review";
-    }
+    private double ScaleHeight { get { return DashboardChartLayout.ScaleHeight(TwoColumns); } }
 
     protected override Size MeasureOverride(Size availableSize)
     {
-        var maximum = MaximumOf(Days);
-        var top = AxisTicks(maximum)[^1];
-        return new Size(0, _plotTop + (top * StepFor(maximum, top)) + _labels);
+        _captionLines = CaptionLines(availableSize.Width);
+        return new Size(0, PlotTop(DashboardChartLayout.ScaleTop(Days)) + ScaleHeight + DashboardChartLayout.LabelsHeight);
+    }
+
+    protected override void OnGotFocus(FocusChangedEventArgs e)
+    {
+        base.OnGotFocus(e);
+        SetKeyboardFocus(e.NavigationMethod != NavigationMethod.Pointer);
     }
 
     protected override void OnKeyDown(KeyEventArgs e)
@@ -96,18 +101,21 @@ internal sealed class DashboardChart : Control
         if(Days.Count == 0 || e.Key is not (Key.Left or Key.Right or Key.Home or Key.End))
             return;
 
-        var day = SelectedDay;
-        if(e.Key == Key.Left)
-            day--;
-        else if(e.Key == Key.Right)
-            day++;
-        else if(e.Key == Key.Home)
-            day = 0;
-        else
-            day = Days.Count - 1;
-
-        DayChosen?.Invoke(Math.Clamp(day, 0, Days.Count - 1));
+        SetKeyboardFocus(true);
+        DayChosen?.Invoke(Math.Clamp(DayForKey(e.Key), 0, Days.Count - 1));
         e.Handled = true;
+    }
+
+    /// <summary>The day a key moves to: Left and Right one day, Home the first, End the last.</summary>
+    private int DayForKey(Key key)
+    {
+        if(key == Key.Left)
+            return SelectedDay - 1;
+
+        if(key == Key.Right)
+            return SelectedDay + 1;
+
+        return key == Key.Home ? 0 : Days.Count - 1;
     }
 
     protected override void OnPointerPressed(PointerPressedEventArgs e)
@@ -118,9 +126,16 @@ internal sealed class DashboardChart : Control
             return;
 
         Focus(NavigationMethod.Pointer);
+        SetKeyboardFocus(false);
         var day = (int)((x - _gutter) * Days.Count / (Bounds.Width - _gutter));
         DayChosen?.Invoke(Math.Min(day, Days.Count - 1));
         e.Handled = true;
+    }
+
+    private void SetKeyboardFocus(bool keyboard)
+    {
+        KeyboardFocus = keyboard;
+        InvalidateVisual();
     }
 
     public override void Render(DrawingContext context)
@@ -129,102 +144,133 @@ internal sealed class DashboardChart : Control
             return;
 
         context.DrawRectangle(ThemeBrushes.Find(this, "page"), null, new Rect(Bounds.Size));
-        var maximum = MaximumOf(Days);
-        var aggregate = maximum > _maximumIndividualReviews;
-        var ticks = AxisTicks(maximum);
-        var top = ticks[^1];
-        var step = StepFor(maximum, top);
-        var baseline = _plotTop + (top * step);
-        var column = (Bounds.Width - _gutter) / Days.Count;
-        var boxWidth = Math.Clamp(column - 6, 10, 26);
-        var selected = Days[Math.Clamp(SelectedDay, 0, Days.Count - 1)];
-        var selectedHeight = Math.Max(1, selected.Total) * step + 4;
-        var selectedLeft = _gutter + (Math.Clamp(SelectedDay, 0, Days.Count - 1) * column) + ((column - boxWidth) / 2);
-        context.DrawRectangle(ThemeBrushes.Find(this, "hover"), null,
-            new Rect(selectedLeft - 5, baseline - selectedHeight, boxWidth + 10, selectedHeight), 7, 7);
-        foreach(var tick in ticks)
-            DrawAxis(context, tick, baseline - (tick * step), tick == 0 ? "line-strong" : "line");
-        Label(context, ScaleLabel(maximum), Bounds.Width - 2, 3, "ink-2", true);
-        var refused = ReviewMark.InkOf(this, ReviewOutcome.Blocked);
-        var incomplete = ReviewMark.InkOf(this, ReviewOutcome.Incomplete);
-        var allowed = ReviewMark.InkOf(this, ReviewOutcome.Clean);
+        var top = DashboardChartLayout.ScaleTop(Days);
+        var baseline = PlotTop(top) + ScaleHeight;
+        var step = ScaleHeight / top;
+        var frame = new ChartFrame(Bounds.Width, Days.Count);
+        var selected = Math.Clamp(SelectedDay, 0, Days.Count - 1);
+        foreach(var tick in DashboardChartLayout.AxisLines(top))
+            DrawAxis(context, tick, baseline - (tick * step), "line");
+
+        DrawCaption(context, top);
+        DrawSelection(context, frame.BoxLeft(selected), frame.Box, baseline, DashboardChartLayout.ColumnHeight(Days[selected], top, ScaleHeight));
         for(var day = 0; day < Days.Count; day++)
+            DrawDay(context, Days[day], frame.BoxLeft(day), baseline, frame.Box, top);
+
+        foreach(var total in DashboardChartLayout.TotalLabels(Days, top, frame, StrongWidth))
         {
-            var x = _gutter + (day * column) + ((column - boxWidth) / 2);
-            var data = Days[day];
-            var y = baseline;
-            y = DrawStack(context, x, y, boxWidth, step, data.Refused, ReviewOutcome.Blocked, refused, aggregate);
-            y = DrawStack(context, x, y, boxWidth, step, data.Incomplete, ReviewOutcome.Incomplete, incomplete, aggregate);
-            DrawStack(context, x, y, boxWidth, step, data.Allowed, ReviewOutcome.Clean, allowed, aggregate);
-            if(day == Days.Count - 1)
-                Label(context, "Today", x + boxWidth, baseline + 7, "ink", true, FontWeight.SemiBold);
-            else if(day < Days.Count - 3 && data.Date.DayOfWeek == DayOfWeek.Monday)
-                Label(context, data.Date.ToString("d MMM", CultureInfo.InvariantCulture), x, baseline + 7, "ink-3", false);
-        }
-    }
-
-    private static double StepFor(int maximum, long top)
-    {
-        if(maximum <= _fullSizeMaximum)
-            return _boxStep;
-
-        // Keep individual boxes the same size. Grouped days share a fixed plot height.
-        return _busyHeight / (maximum <= _maximumIndividualReviews ? maximum : top);
-    }
-
-    public static IReadOnlyList<long> AxisTicks(int maximum)
-    {
-        if(maximum <= _fullSizeMaximum)
-            return [0, 5, 10];
-
-        long magnitude = 1;
-        while(maximum > 100 * magnitude)
-            magnitude *= 10;
-
-        var (middle, top) = (maximum / (double)magnitude) switch
-        {
-            <= 20 => (10, 20),
-            <= 25 => (10, 25),
-            <= 50 => (25, 50),
-            _ => (50, 100)
-        };
-        return [0, middle * magnitude, top * magnitude];
-    }
-
-    private static double DrawStack(DrawingContext context, double x, double bottom, double width, double step, int count,
-        ReviewOutcome outcome, ReviewMarkInk ink, bool aggregate)
-    {
-        if(aggregate && count > 0)
-        {
-            var band = count * step;
-            var height = Math.Max(1, band - 4);
-            ReviewMark.Draw(context, new Rect(x, bottom - height, width, height), outcome, ink, false);
-            return bottom - band;
+            var topLine = baseline - ScaleHeight;
+            Label(context, total, topLine - 10);
+            if(total.Anchor is { } anchor)
+            {
+                var labelCentre = total.Left + (StrongWidth(total.Text) / 2);
+                var pen = new Pen(ThemeBrushes.Find(this, "ink-3"), 1);
+                context.DrawLine(pen, new Point(labelCentre, topLine - 6), new Point(anchor, topLine + 4));
+            }
         }
 
-        var boxHeight = step - 4;
-        for(var i = 0; i < count; i++)
+        foreach(var date in DashboardChartLayout.DateLabels(Days, selected, frame, StrongWidth))
+            Label(context, date, baseline + 22);
+
+        DrawAxis(context, 0, baseline, "line-strong");
+    }
+
+    private double PlotTop(long top)
+    {
+        return DashboardChartLayout.SpaceAbove(Days.Any(day => day.Total > top), _captionLines);
+    }
+
+    private int CaptionLines(double width)
+    {
+        if(_labelSize <= 0 || double.IsInfinity(width) || width <= 0 || Days.Count == 0)
+            return 1;
+
+        using var text = CaptionLayout(DashboardChartLayout.ScaleTop(Days), width);
+        return Math.Max(1, text.TextLines.Count);
+    }
+
+    private TextLayout CaptionLayout(long top, double width)
+    {
+        var type = new Typeface(_labelFamily);
+        var caption = DashboardChartLayout.ScaleLabel(top) + DashboardChartLayout.CaptionTail;
+        return new TextLayout(caption, type, _labelSize, ThemeBrushes.Find(this, "ink-2"), TextAlignment.Right,
+            TextWrapping.Wrap, maxWidth: width, lineHeight: DashboardChartLayout.CaptionLine, fontFeatures: _tabularNumbers);
+    }
+
+    /// <summary>The chart's own line, right-aligned at the chart's right edge; it wraps when the chart is narrower than it.</summary>
+    private void DrawCaption(DrawingContext context, long top)
+    {
+        if(_labelSize <= 0)
+            return;
+
+        using var text = CaptionLayout(top, Bounds.Width);
+        text.Draw(context, new Point(0, DashboardChartLayout.CaptionLine - text.TextLines[0].Baseline));
+    }
+
+    private double StrongWidth(string label)
+    {
+        if(_labelSize <= 0)
+            return 0;
+
+        using var text = new TextLayout(label, new Typeface(_labelFamily, weight: FontWeight.SemiBold), _labelSize, null, fontFeatures: _tabularNumbers);
+        return text.Width;
+    }
+
+    private void DrawSelection(DrawingContext context, double x, double width, double baseline, double columnHeight)
+    {
+        var thickness = KeyboardFocus ? 2.0 : 1.0;
+        var inset = thickness / 2;
+        var height = Math.Max(4, columnHeight + 3);
+        var pen = new Pen(ThemeBrushes.Find(this, KeyboardFocus ? "focus" : "ink-3"), thickness);
+        context.DrawRectangle(ThemeBrushes.Find(this, "hover"), pen,
+            new Rect(x - 3 + inset, baseline - height + inset, width + 6 - thickness, height - thickness), 7 - inset, 7 - inset);
+    }
+
+    private void DrawDay(DrawingContext context, StatsDay day, double x, double baseline, double width, long top)
+    {
+        var bottom = baseline;
+        if(DashboardChartLayout.UsesBlocks(top))
         {
-            ReviewMark.Draw(context, new Rect(x, bottom - boxHeight, width, boxHeight), outcome, ink, boxHeight >= 12);
-            bottom -= step;
+            foreach(var block in DashboardChartLayout.BlocksOf(day, top, ScaleHeight))
+            {
+                ReviewMark.Draw(context, new Rect(x, bottom - block.Height, width, block.Height), block.Kind, ReviewMark.InkOf(this, block.Kind));
+                bottom -= block.Height + 4;
+            }
+
+            return;
         }
 
-        return bottom;
+        var step = ScaleHeight / top;
+        foreach(var group in DashboardChartLayout.BoxesOf(day, top))
+        {
+            var ink = ReviewMark.InkOf(this, group.Kind);
+            for(var i = 0; i < group.Count; i++)
+            {
+                ReviewMark.Draw(context, new Rect(x, bottom - (step - 4), width, step - 4), group.Kind, ink);
+                bottom -= step;
+            }
+        }
     }
 
     private void DrawAxis(DrawingContext context, long value, double y, string line)
     {
         context.DrawRectangle(ThemeBrushes.Find(this, line), null, new Rect(_gutter, y, Bounds.Width - _gutter, 1));
-        Label(context, value.ToString(CultureInfo.InvariantCulture), _gutter - 12, y - 8, "ink-3", true);
+        Label(context, value.ToString(CultureInfo.InvariantCulture), _gutter - 12, y + 5, "ink-3", TextAlignment.Right);
     }
 
-    private void Label(DrawingContext context, string label, double x, double y, string token, bool right, FontWeight weight = FontWeight.Normal)
+    private void Label(DrawingContext context, ChartLabel label, double baseline)
+    {
+        Label(context, label.Text, label.Left, baseline, label.Strong ? "ink" : "ink-3", TextAlignment.Left, label.Strong ? FontWeight.SemiBold : FontWeight.Normal);
+    }
+
+    private void Label(DrawingContext context, string label, double x, double baseline, string token, TextAlignment alignment, FontWeight weight = FontWeight.Normal)
     {
         if(_labelSize <= 0)
             return;
 
         var type = new Typeface(_labelFamily, weight: weight);
-        var text = new FormattedText(label, CultureInfo.InvariantCulture, FlowDirection.LeftToRight, type, _labelSize, ThemeBrushes.Find(this, token));
-        context.DrawText(text, new Point(right ? x - text.Width : x, y));
+        using var text = new TextLayout(label, type, _labelSize, ThemeBrushes.Find(this, token), fontFeatures: _tabularNumbers);
+        var left = alignment == TextAlignment.Right ? x - text.Width : x;
+        text.Draw(context, new Point(left, baseline - text.TextLines[0].Baseline));
     }
 }

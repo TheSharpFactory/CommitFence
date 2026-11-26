@@ -46,17 +46,31 @@ internal sealed class DoctorCommand(IDoctorService doctor, TextWriter output)
         if(fix.Excerpt != null)
         {
             output.WriteLine($"  {fix.Excerpt.Path}");
-            foreach(var line in fix.Excerpt.Lines)
-            {
-                var mark = line.Number == fix.Excerpt.Line ? '>' : ' ';
-                output.WriteLine($"  {mark} {line.Number.ToString(CultureInfo.InvariantCulture)} | {line.Text}");
-            }
+            if(fix.AfterMove != null)
+                output.WriteLine($"  {DoctorFix.NowHeading}");
+
+            ShowExcerpt(fix.Excerpt);
+        }
+
+        if(fix.AfterMove != null)
+        {
+            output.WriteLine($"  {DoctorFix.AfterMoveHeading}");
+            ShowExcerpt(fix.AfterMove);
         }
 
         foreach(var action in fix.Actions)
         {
             if(action.Kind != DoctorActionKind.OpenFile)
                 output.WriteLine($"  {action.Label}: {action.Value}");
+        }
+    }
+
+    private void ShowExcerpt(DoctorExcerpt excerpt)
+    {
+        foreach(var line in excerpt.Lines)
+        {
+            var mark = excerpt.Marks(line.Number) ? '>' : ' ';
+            output.WriteLine($"  {mark} {line.Number.ToString(CultureInfo.InvariantCulture)} | {line.Text}");
         }
     }
 

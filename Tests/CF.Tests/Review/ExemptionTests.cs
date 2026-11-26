@@ -152,8 +152,8 @@ public sealed class ExemptionTests
         var none = Run(service, folder.Path, "exemptions", "list");
         Assert.Equal(ExitCode.Passed, none.ExitCode);
         Assert.Contains(ExemptionWords.EmptyTitle, none.Output, StringComparison.Ordinal);
-        Assert.Contains(ExemptionWords.EmptySentence, none.Output, StringComparison.Ordinal);
-        Assert.Contains(ExemptionWords.EmptyExample, none.Output, StringComparison.Ordinal);
+        Assert.Contains("No line in the last commit sets a rule aside. When one has to, name the rule and say why, on the line or the line above:", none.Output, StringComparison.Ordinal);
+        Assert.Contains("// commitfence:allow TEAM001: generated code keeps its braces", none.Output, StringComparison.Ordinal);
     }
 
     private static ExemptionEntry Entry(string file, int line, string rule, bool isFinding)

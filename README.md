@@ -61,8 +61,8 @@ of the push.
 
 ![The Review screen after a refused push: two findings block it and one only warns, with the code of the first finding](docs/images/review-screen.png)
 
-**Dashboard.** The reviews of pushes on this machine in the last 30 days: how many were refused, which rules found the
-most, which never fired, and how long a push waited.
+**Dashboard.** The reviews of pushes on this machine in the last 30 days: how many were blocked or incomplete, which
+rules found the most, which never fired, and how long a push waited.
 
 ![The Dashboard: a chart with one box per review by day, the rules that never fired, and the rules most broken](docs/images/dashboard-screen.png)
 

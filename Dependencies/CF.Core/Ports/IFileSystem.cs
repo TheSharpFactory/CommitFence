@@ -34,6 +34,12 @@ public interface IFileSystem
     /// </remarks>
     void WriteNewFile(string path, string content);
 
+    /// <summary>Creates a new file with exactly these bytes, under the same rules as the text overload.</summary>
+    void WriteNewFile(string path, ReadOnlySpan<byte> content)
+    {
+        throw new NotSupportedException();
+    }
+
     /// <summary>
     /// Moves the file to the destination, replacing the file that is there.
     /// </summary>

@@ -39,11 +39,16 @@ public sealed class SystemFileSystem : IFileSystem
     /// <inheritdoc />
     public void WriteNewFile(string path, string content)
     {
+        WriteNewFile(path, _utf8WithoutMark.GetBytes(content));
+    }
+
+    /// <inheritdoc />
+    public void WriteNewFile(string path, ReadOnlySpan<byte> content)
+    {
         using var stream = new FileStream(path, FileMode.CreateNew, FileAccess.Write, FileShare.None);
         try
         {
-            var bytes = _utf8WithoutMark.GetBytes(content);
-            stream.Write(bytes, 0, bytes.Length);
+            stream.Write(content);
             stream.Flush(true);
         }
         catch(Exception exception) when(exception is IOException || exception is UnauthorizedAccessException)

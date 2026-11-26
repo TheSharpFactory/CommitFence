@@ -67,6 +67,7 @@ internal sealed partial class ReviewView : UserControl
         if(_model != null)
         {
             _model.FileRevealRequested -= OnFileRevealRequested;
+            _model.FindingFocusRequested -= OnFindingFocusRequested;
             _model.OpenFileRequested -= OnOpenFileRequested;
             _model.OpenLineRequested -= OnOpenLineRequested;
             _model.ChooseRequested -= OnChooseRequested;
@@ -79,6 +80,7 @@ internal sealed partial class ReviewView : UserControl
         if(_model != null)
         {
             _model.FileRevealRequested += OnFileRevealRequested;
+            _model.FindingFocusRequested += OnFindingFocusRequested;
             _model.OpenFileRequested += OnOpenFileRequested;
             _model.OpenLineRequested += OnOpenLineRequested;
             _model.ChooseRequested += OnChooseRequested;
@@ -185,6 +187,24 @@ internal sealed partial class ReviewView : UserControl
         var top = container.TranslatePoint(new Point(0, 0), Scroller);
         if(top != null)
             Scroller.Offset = new Vector(0, Math.Max(0, Scroller.Offset.Y + top.Value.Y));
+    }
+
+    private void OnFindingFocusRequested(FindingViewModel finding)
+    {
+        Dispatcher.UIThread.Post(() =>
+        {
+            var index = _model?.Items.IndexOf(finding) ?? -1;
+            if(index < 0 || !IsEffectivelyVisible)
+                return;
+
+            Rows.ScrollIntoView(index);
+            Rows.UpdateLayout();
+            if(Rows.ContainerFromIndex(index) is Control container)
+            {
+                var button = container.GetVisualDescendants().OfType<Button>().FirstOrDefault(candidate => candidate.Classes.Contains("findinghead"));
+                button?.Focus(NavigationMethod.Tab);
+            }
+        }, DispatcherPriority.Loaded);
     }
 
     private async void OnOpenLineRequested(string path, int line)

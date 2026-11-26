@@ -77,6 +77,12 @@ public sealed class Finding
     /// </summary>
     public string? TargetFramework { get; }
 
+    /// <summary>The project file relative to the tree, from the build that produced the finding.</summary>
+    public string? ProjectFile { get; init; }
+
+    /// <summary>The framework of that build, even if the finding was merged with other builds for display.</summary>
+    public string? BuildFramework { get; init; }
+
     /// <summary>
     /// The file, when the finding has a place.
     /// </summary>
@@ -113,11 +119,11 @@ public sealed class Finding
     /// </summary>
     public Finding HoldingFor(string? project, string? targetFramework)
     {
-        return new Finding(RuleId, Source, Severity, Language, project, targetFramework, File, Line, Column, Message, Why, Reach) { FileSeverity = FileSeverity };
+        return new Finding(RuleId, Source, Severity, Language, project, targetFramework, File, Line, Column, Message, Why, Reach) { FileSeverity = FileSeverity, ProjectFile = ProjectFile, BuildFramework = BuildFramework };
     }
 
     internal Finding WithSeverity(Severity severity)
     {
-        return new Finding(RuleId, Source, severity, Language, Project, TargetFramework, File, Line, Column, Message, Why, Reach) { FileSeverity = FileSeverity };
+        return new Finding(RuleId, Source, severity, Language, Project, TargetFramework, File, Line, Column, Message, Why, Reach) { FileSeverity = FileSeverity, ProjectFile = ProjectFile, BuildFramework = BuildFramework };
     }
 }

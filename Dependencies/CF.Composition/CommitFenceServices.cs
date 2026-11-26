@@ -12,7 +12,7 @@ public sealed class CommitFenceServices
     /// <summary>
     /// Creates the set of services.
     /// </summary>
-    public CommitFenceServices(IProductInfoService productInfo, IClock clock, IReadOnlyList<ILanguage> languages, IRuleService rules, IReviewService review, ISetupService setup, IFolderService folders, IUpdater updater, IUpdateCheckRecord updateChecks, IDoctorService? doctor = null, ISettingsService? settings = null, IStructureService? structure = null, ILanguageService? languageReports = null, IMachineSettings? machine = null, IExemptionService? exemptions = null, IStatsService? stats = null)
+    public CommitFenceServices(IProductInfoService productInfo, IClock clock, IReadOnlyList<ILanguage> languages, IRuleService rules, IReviewService review, ISetupService setup, IFolderService folders, IUpdater updater, IUpdateCheckRecord updateChecks, IDoctorService? doctor = null, ISettingsService? settings = null, IStructureService? structure = null, ILanguageService? languageReports = null, IMachineSettings? machine = null, IExemptionService? exemptions = null, IStatsService? stats = null, IFixService? fixes = null)
     {
         ProductInfo = productInfo;
         Clock = clock;
@@ -30,6 +30,7 @@ public sealed class CommitFenceServices
         Machine = machine!;
         Exemptions = exemptions!;
         Stats = stats!;
+        Fixes = fixes!;
     }
 
     /// <summary>
@@ -97,4 +98,7 @@ public sealed class CommitFenceServices
 
     /// <summary>Statistics about the reviews of pushes from a repository.</summary>
     public IStatsService Stats { get; }
+
+    /// <summary>Previews and applies fixes for findings.</summary>
+    public IFixService Fixes { get; }
 }

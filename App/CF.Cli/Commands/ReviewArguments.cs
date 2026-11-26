@@ -34,9 +34,9 @@ internal sealed class ReviewArguments
     /// </summary>
     public bool AsPrompt { get; internal set; }
 
-    public static ReviewArgumentsResult Parse(string[] args)
+    public static ReviewArgumentsResult Parse(string[] args, bool allowPushHead = false)
     {
-        return new ReviewArgumentsReader(args).Read();
+        return new ReviewArgumentsReader(args, allowPushHead).Read();
     }
 
     public static ReviewArguments ForFiles(IReadOnlyList<string> files, string? settingsPath)
@@ -49,9 +49,9 @@ internal sealed class ReviewArguments
         return new ReviewArguments(ReviewMode.Hook, settingsPath) { RemoteName = remoteName, RemoteUrl = remoteUrl };
     }
 
-    public static ReviewArguments ForPush(string? settingsPath)
+    public static ReviewArguments ForPush(string? settingsPath, string headRevision = "")
     {
-        return new ReviewArguments(ReviewMode.Push, settingsPath);
+        return new ReviewArguments(ReviewMode.Push, settingsPath) { HeadRevision = headRevision };
     }
 
     public static ReviewArguments ForStaged(string? settingsPath)

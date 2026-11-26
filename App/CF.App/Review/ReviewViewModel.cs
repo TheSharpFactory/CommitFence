@@ -1,7 +1,9 @@
 using System.Collections.ObjectModel;
 using System.Globalization;
+using System.Runtime.CompilerServices;
 using CF.Core.Changes;
 using CF.Core.Findings;
+using CF.Core.Fixes;
 using CF.Core.Ports;
 using CF.Core.Prompts;
 using CF.Core.Review;
@@ -34,6 +36,8 @@ internal sealed partial class ReviewViewModel : ObservableObject
     private bool _itemsPaused;
 
     private readonly IReviewService _review;
+    private readonly ReviewFixQueue? _fixes;
+    private readonly ConditionalWeakTable<ReviewResult, ReviewFixSession> _fixSessions = new();
     private readonly IRuleService _rules;
     private readonly IClock _clock;
     private readonly OpenedFolder _folder;
@@ -52,6 +56,28 @@ internal sealed partial class ReviewViewModel : ObservableObject
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(ShowsEmptyBlock), nameof(ShowsRulesLine), nameof(ShowsBarRun), nameof(RunIsMain), nameof(RunIsSecond), nameof(CanCopyAll))]
     public partial VerdictViewModel Verdict { get; set; }
+
+    private int _fixedFindings;
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasAppliedFixes), nameof(AppliedFixesText))]
+    public partial int AppliedFixes { get; private set; }
+
+    public bool HasAppliedFixes
+    {
+        get { return AppliedFixes > 0; }
+    }
+
+    public string AppliedFixesText
+    {
+        get
+        {
+            var findings = _fixedFindings == 1 ? "finding" : "findings";
+            return AppliedFixes == 1
+                ? string.Create(CultureInfo.InvariantCulture, $"1 fix applied to your files, covering {_fixedFindings} {findings}. It is not committed yet: review again to update this verdict.")
+                : string.Create(CultureInfo.InvariantCulture, $"{AppliedFixes} fixes applied to your files, covering {_fixedFindings} {findings}. They are not committed yet: review again to update this verdict.");
+        }
+    }
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(RunText), nameof(CanRun), nameof(RunShowsIcon))]
@@ -163,9 +189,10 @@ internal sealed partial class ReviewViewModel : ObservableObject
     [ObservableProperty]
     public partial IReadOnlyList<FolderPickerEntryViewModel> PickerEntries { get; set; } = new List<FolderPickerEntryViewModel>();
 
-    public ReviewViewModel(IReviewService review, IRuleService rules, IClock clock, OpenedFolder folder, Action<string> showRule)
+    public ReviewViewModel(IReviewService review, IRuleService rules, IClock clock, OpenedFolder folder, Action<string> showRule, IFixService? fixes = null)
     {
         _review = review;
+        _fixes = fixes == null ? null : new ReviewFixQueue(fixes);
         _rules = rules;
         _clock = clock;
         _folder = folder;
@@ -194,6 +221,8 @@ internal sealed partial class ReviewViewModel : ObservableObject
     /// Raised when a file of the panel asks to be brought to the top of the sheet.
     /// </summary>
     public event Action<FileGroupViewModel>? FileRevealRequested;
+
+    public event Action<FindingViewModel>? FindingFocusRequested;
 
     /// <summary>
     /// Raised when the banner asks to open the settings file in the program the system uses for it.
@@ -670,6 +699,8 @@ internal sealed partial class ReviewViewModel : ObservableObject
             return;
 
         _running = true;
+        _fixedFindings = 0;
+        AppliedFixes = 0;
         _generation++;
         IsBusy = true;
         RunCommand.NotifyCanExecuteChanged();
@@ -1055,8 +1086,11 @@ internal sealed partial class ReviewViewModel : ObservableObject
         {
             group.PropertyChanged += (_, e) =>
             {
+                if(e.PropertyName != nameof(FileGroupViewModel.IsOpen))
+                    return;
+
                 UpdateOpenAllText();
-                if(e.PropertyName == nameof(FileGroupViewModel.IsOpen) && !_itemsPaused)
+                if(!_itemsPaused)
                     SyncItems();
             };
         }
@@ -1068,14 +1102,69 @@ internal sealed partial class ReviewViewModel : ObservableObject
     private List<FileGroupViewModel> BuildGroups(ReviewResult result, Dictionary<string, RuleInfo> rules, string? onlyRule, bool isFolder)
     {
         var groups = new List<FileGroupViewModel>();
-        var findings = onlyRule == null ? result.Findings : result.Findings.Where(finding => finding.RuleId == onlyRule).ToList();
-        foreach(var byFile in findings.GroupBy(finding => finding.File ?? "(no file)", StringComparer.Ordinal))
+        foreach(var byFile in result.Findings.GroupBy(finding => finding.File ?? "(no file)", StringComparer.Ordinal))
         {
-            var models = byFile.Select(finding => new FindingViewModel(finding, rules[finding.RuleId], ContentOf(result, finding), _startsOpen && finding.Severity == Severity.Block, _showRule, isFolder, () => Clipboard, OpenConfigLine)).ToList();
-            groups.Add(new FileGroupViewModel(byFile.Key, models, _startsOpen));
+            var models = byFile.Where(finding => onlyRule == null || finding.RuleId == onlyRule)
+                .Select(finding => FindingModel(result, finding, byFile, rules[finding.RuleId], isFolder)).ToList();
+            if(models.Count > 0)
+                groups.Add(new FileGroupViewModel(byFile.Key, models, _startsOpen));
         }
 
         return groups.OrderByDescending(group => group.Total).ThenBy(group => group.Path, StringComparer.Ordinal).ToList();
+    }
+
+    private FindingViewModel FindingModel(ReviewResult result, Finding finding, IEnumerable<Finding> fileFindings, RuleInfo rule, bool isFolder)
+    {
+        var session = _fixSessions.GetOrCreateValue(result);
+        if(session.Models.TryGetValue(finding, out var model))
+            return model;
+
+        Func<Task<FixAnswer>>? prepare = null;
+        var tree = result.TreeOf(finding);
+        if(_fixes != null && result.Repository != null && tree != null && finding.Source == FindingSource.EditorConfig)
+        {
+            var request = new FixRequest(result.Repository, tree, finding);
+            prepare = () => session.PrepareAsync(_fixes, request);
+        }
+
+        model = new FindingViewModel(finding, fileFindings, rule, ContentOf(result, finding), false,
+            _showRule, isFolder, () => Clipboard, OpenConfigLine, _fixes, prepare);
+        session.Models.Add(finding, model);
+        session.UpdateFinding(finding, model);
+        model.FixFinished += (completed, fix) =>
+        {
+            var covered = session.RecordFix(fix, tree, result);
+            if(!ReferenceEquals(_result, result) || _running)
+                return;
+
+            _fixedFindings += covered;
+            AppliedFixes++;
+            foreach(var group in FileGroups)
+                group.RefreshFixedCount();
+
+            FocusNextFinding(completed);
+        };
+        model.IsOpen = _startsOpen && finding.Severity == Severity.Block && !model.IsFixed;
+        return model;
+    }
+
+    private void FocusNextFinding(FindingViewModel completed)
+    {
+        var rows = FileGroups.SelectMany(group => group.Findings.Select(finding => (Group: group, Finding: finding))).ToList();
+        var index = rows.FindIndex(row => ReferenceEquals(row.Finding, completed));
+        var next = rows.Skip(index + 1).FirstOrDefault(row => !row.Finding.IsFixed);
+        if(next.Finding == null)
+            next = rows.Take(index).FirstOrDefault(row => !row.Finding.IsFixed);
+
+        if(next.Finding != null)
+        {
+            next.Group.IsOpen = true;
+            FindingFocusRequested?.Invoke(next.Finding);
+            return;
+        }
+
+        if(index >= 0)
+            FindingFocusRequested?.Invoke(completed);
     }
 
     /// <summary>

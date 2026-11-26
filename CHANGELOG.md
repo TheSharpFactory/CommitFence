@@ -3,6 +3,38 @@
 What changed in each published release of CommitFence, newest first. Each section is also the text of that release on
 GitHub, with its downloads.
 
+## 1.0.0.5 — 2026-11-26
+
+### Apply fix
+
+- **A finding of a rule of `.editorconfig` can be fixed from Review.** When the finding is opened, CommitFence prepares
+  the fix with the SDK's own formatter and shows the whole change: how many places, the lines added and removed, which
+  place is this finding and which another, and that the formatter fixes every occurrence of the rule in the file, also
+  on lines the push did not change. "Apply fix" writes exactly what is shown, only while the file is still the one that
+  was reviewed; otherwise it writes nothing and says why.
+- After a fix, every finding it covers is marked Fixed, the file counts what is still open, and a line under the verdict
+  says that the fix is not committed yet: review again to update the verdict.
+- **`commitfence fix <rule> <file>`** shows the same change on the command line, and `--apply` writes it. It takes the
+  same choice of changes as `review` (`--staged`, `--base` / `--head`, `--all`).
+- A fix keeps the file's line endings and byte order mark; when the formatter changes them on purpose, the change says
+  so in words.
+- Team rules, structure rules and compiler errors have no automatic fix: they keep "Copy as a prompt".
+
+### Review
+
+- A warning's marked line is drawn in the warning's colour, not the colour of a blocking finding.
+
+### Downloads
+
+| Download | What |
+|---|---|
+| `CommitFence-win-x64.zip`, `CommitFence-win-arm64.zip` | The app for Windows, with the command line beside it |
+| `CommitFence-osx-arm64.zip`, `CommitFence-osx-x64.zip` | The app for macOS (Apple silicon, Intel) |
+| `CommitFence-linux-x64.tar.gz` | The app for Linux |
+| `commitfence-cli-*` | The command line, `commitfence`, for the same systems |
+
+---
+
 ## 1.0.0.4 — 2026-11-25
 
 ### Reviews

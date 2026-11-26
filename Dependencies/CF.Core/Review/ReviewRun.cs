@@ -13,6 +13,7 @@ namespace CF.Core.Review;
 internal sealed class ReviewRun
 {
     private readonly List<Finding> _findings = new List<Finding>();
+    private readonly Dictionary<FindingKey, List<string>> _findingTrees = new();
     private readonly List<Finding> _pending = new List<Finding>();
     private readonly List<ExemptedFinding> _exempted = new List<ExemptedFinding>();
     private readonly ExemptionFilter _exemptions = new ExemptionFilter();
@@ -23,6 +24,8 @@ internal sealed class ReviewRun
     private bool _uncommittedWork;
 
     public bool RanBuild { get; set; }
+
+    public string? Tree { get; set; }
 
     private readonly Dictionary<string, string> _sources = new Dictionary<string, string>(StringComparer.Ordinal);
     private readonly HashSet<FindingKey> _pendingKeys = new HashSet<FindingKey>();
@@ -109,6 +112,21 @@ internal sealed class ReviewRun
             _findings.Add(judged);
         else if(judged.Severity == Severity.Block && _findings[_findingPositions[key]].Severity == Severity.Warn)
             _findings[_findingPositions[key]] = judged;
+
+        if(Tree != null && finding.Source == FindingSource.EditorConfig)
+            RememberTree(key, Tree);
+    }
+
+    private void RememberTree(FindingKey key, string tree)
+    {
+        if(!_findingTrees.TryGetValue(key, out var trees))
+        {
+            trees = new List<string>();
+            _findingTrees.Add(key, trees);
+        }
+
+        if(!trees.Contains(tree, StringComparer.Ordinal))
+            trees.Add(tree);
     }
 
     private static Severity? StrictnessEffect(Finding finding, Strictness strictness)
@@ -176,7 +194,7 @@ internal sealed class ReviewRun
         _advice.Add(sentence);
     }
 
-    public ReviewResult ToResult(TimeSpan duration, StructureJudgment? judgment = null)
+    public ReviewResult ToResult(TimeSpan duration, StructureJudgment? judgment = null, RepositoryLocation? repository = null)
     {
         ApplyPolicies(Strictness.Standard);
         var outcome = DecideOutcome();
@@ -185,7 +203,9 @@ internal sealed class ReviewRun
         {
             StructureJudgment = judgment,
             LeavesOutUncommittedWork = _uncommittedWork,
-            ExemptedFindings = _exempted
+            ExemptedFindings = _exempted,
+            Repository = repository,
+            FindingTrees = _findingTrees.ToDictionary(entry => _findings[_findingPositions[entry.Key]], entry => (IReadOnlyList<string>)entry.Value)
         };
     }
 

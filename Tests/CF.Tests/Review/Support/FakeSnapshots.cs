@@ -35,6 +35,21 @@ internal sealed class FakeSnapshots : ISnapshotStore
         }
     }
 
+    public IReadOnlyList<string> ReadChangedFiles(RepositoryLocation repository)
+    {
+        throw new NotSupportedException();
+    }
+
+    public string MakePatch(RepositoryLocation repository, string file, string before, string after)
+    {
+        throw new NotSupportedException();
+    }
+
+    public IReadOnlyList<string> ReadUntrackedFiles(RepositoryLocation repository)
+    {
+        throw new NotSupportedException();
+    }
+
     public string MoveTo(RepositoryLocation repository, string tree)
     {
         var files = _git.FilesOf(tree);

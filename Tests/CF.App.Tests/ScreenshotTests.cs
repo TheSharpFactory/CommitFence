@@ -13,6 +13,7 @@ using CF.Core.Findings;
 using CF.Core.Review;
 using CF.Core.Rules;
 using CF.Core.Updates;
+using CF.Integration.Tests;
 using Xunit;
 
 namespace CF.App.Tests;
@@ -108,6 +109,7 @@ public sealed class ScreenshotTests
             host.Save(folder, $"review-places-{theme}-760.png");
             window.Width = 1440;
             window.Height = 900;
+            await SaveFixStates(folder, theme, host);
             using var cleanShell = new ShellHost(fileRules: fileRules);
             shell = cleanShell;
             window.DataContext = shell.Model;
@@ -372,6 +374,74 @@ public sealed class ScreenshotTests
         await model.ScanAsync();
         host.Pump();
         host.Save(folder, $"exemptions-empty-{theme}-1440.png");
+    }
+
+    private static async Task SaveFixStates(string folder, string theme, ViewHost host)
+    {
+        using var scratch = new TestFolder();
+        using var gate = new ManualResetEventSlim();
+        var fixture = new FixReviewFixture(scratch.Path) { Gate = gate };
+        using var shell = new ShellHost(fileRules: FixReviewFixture.FileRules, fixes: fixture, parentFolder: scratch.Path);
+        File.WriteAllBytes(fixture.PathToSource, FixReviewFixture.Before);
+        shell.Review.Result = _ => fixture.Result();
+        var window = host.Window;
+        window.DataContext = shell.Model;
+        window.Height = 1120;
+        shell.Model.ShowReview();
+        await shell.Model.Review.RunCommand.ExecuteAsync(null);
+        var findings = Assert.Single(shell.Model.Review.FileGroups).Findings;
+        var first = findings[0];
+        try
+        {
+            Assert.True(first.IsPreparing);
+            host.Save(folder, $"review-fix-preparing-{theme}-1440.png");
+        }
+        finally
+        {
+            gate.Set();
+        }
+
+        await first.Preparation!;
+        Assert.True(first.HasFix);
+        host.Save(folder, $"review-fix-ready-{theme}-1440.png");
+        window.Width = 760;
+        host.Save(folder, $"review-fix-ready-{theme}-760.png");
+        window.Width = 1440;
+        host.Pump();
+
+        var difference = host.Find<DiffCode>(code => code.IsEffectivelyVisible);
+        Assert.NotNull(difference);
+        Assert.True(difference.Focus(NavigationMethod.Tab));
+        host.Save(folder, $"review-fix-focus-{theme}-1440.png");
+
+        first.IsOpen = false;
+        findings[3].IsOpen = true;
+        Assert.True(findings[3].ShowsNoFix);
+        host.Save(folder, $"review-fix-unavailable-{theme}-1440.png");
+
+        findings[3].IsOpen = false;
+        first.IsOpen = true;
+        await first.ApplyFixCommand.ExecuteAsync(null);
+        Assert.True(first.IsFixed && findings[1].IsFixed);
+        host.Save(folder, $"review-fix-fixed-{theme}-1440.png");
+
+        findings[2].IsOpen = true;
+        Assert.True(findings[2].FileChanged);
+        host.Save(folder, $"review-fix-changed-{theme}-1440.png");
+
+        File.WriteAllBytes(fixture.PathToSource, FixReviewFixture.Before);
+        await shell.Model.Review.RunCommand.ExecuteAsync(null);
+        var failed = Assert.Single(shell.Model.Review.FileGroups).Findings[0];
+        await failed.Preparation!;
+        File.AppendAllText(fixture.PathToSource, "// Changed outside the review.");
+        await failed.ApplyFixCommand.ExecuteAsync(null);
+        Assert.True(failed.HasFixNotice);
+        Assert.True(failed.IsExcerptStale);
+        Assert.True(failed.HasCode);
+        Assert.Equal("Nothing was written to your file: it changed after the review.", failed.FixNoticeText);
+        Assert.False(failed.OffersFix);
+        host.Save(folder, $"review-fix-failed-{theme}-1440.png");
+        window.Height = 900;
     }
 
     private static ReviewResult ScopedPush()

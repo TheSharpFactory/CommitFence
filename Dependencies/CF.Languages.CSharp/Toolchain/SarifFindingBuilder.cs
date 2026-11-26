@@ -64,6 +64,8 @@ internal sealed class SarifFindingBuilder
 
         return new Finding(ruleId, source, severity, _languageId, unit.Project.DisplayName, unit.Framework, file, place ? region!.StartLine : null, place ? region!.StartColumn : null, result.Message?.Text ?? string.Empty, null, reach)
         {
+            ProjectFile = ToolchainPaths.RelativeTo(_treeFolder, unit.Project.Path),
+            BuildFramework = unit.Framework,
             FileSeverity = configured == null ? null : FileWord(result.Level!)
         };
     }

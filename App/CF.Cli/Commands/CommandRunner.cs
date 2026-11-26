@@ -36,6 +36,7 @@ internal sealed class CommandRunner
     private readonly IClock? _clock;
     private readonly IExemptionService? _exemptions;
     private readonly IStatsService? _stats;
+    private readonly IFixService? _fixes;
     private readonly CommandEnvironment _environment;
     private readonly string _programPath;
     private readonly string _currentFolder;
@@ -43,7 +44,7 @@ internal sealed class CommandRunner
     private readonly TextWriter _error;
     private readonly Dictionary<string, Func<string[], ExitCode>> _commands;
 
-    public CommandRunner(IProductInfoService productInfo, IRuleService ruleService, IReviewService reviewService, ISetupService setupService, IUpdater updater, CommandEnvironment environment, IDoctorService? doctor = null, ISettingsService? settings = null, IStructureService? structure = null, IClock? clock = null, IExemptionService? exemptions = null, IStatsService? stats = null)
+    public CommandRunner(IProductInfoService productInfo, IRuleService ruleService, IReviewService reviewService, ISetupService setupService, IUpdater updater, CommandEnvironment environment, IDoctorService? doctor = null, ISettingsService? settings = null, IStructureService? structure = null, IClock? clock = null, IExemptionService? exemptions = null, IStatsService? stats = null, IFixService? fixes = null)
     {
         _productInfo = productInfo;
         _ruleService = ruleService;
@@ -56,6 +57,7 @@ internal sealed class CommandRunner
         _clock = clock;
         _exemptions = exemptions;
         _stats = stats;
+        _fixes = fixes;
         _environment = environment;
         _currentFolder = environment.CurrentFolder;
         _programPath = environment.ProgramPath;
@@ -93,6 +95,7 @@ internal sealed class CommandRunner
             ["settings"] = args => new SettingsCommand(_settings ?? throw new InvalidOperationException("Settings is not configured."), _environment).Run(args),
             ["structure"] = args => new StructureCommand(_structure ?? throw new InvalidOperationException("Structure is not configured."), _clock!, _environment).Run(args),
             ["exemptions"] = args => new ExemptionsCommand(_exemptions ?? throw new InvalidOperationException("Exemptions is not configured."), _environment).Run(args),
+            ["fix"] = args => new FixCommand(_reviewService, _fixes!, _environment).Run(args),
             [ReviewCommandName] = RunReview
         };
     }

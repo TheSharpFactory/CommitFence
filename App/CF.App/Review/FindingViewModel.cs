@@ -1,5 +1,6 @@
 using CF.Core.Code;
 using CF.Core.Findings;
+using CF.Core.Fixes;
 using CF.Core.Prompts;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
@@ -15,9 +16,123 @@ internal sealed partial class FindingViewModel : ReviewListItemViewModel
     private readonly FileRulePlace? _place;
     private readonly Action<int>? _openLine;
     private readonly Finding _finding;
+    private readonly IEnumerable<Finding> _fileFindings;
     private readonly RuleInfo _rule;
     private readonly string? _content;
     private readonly Action<string> _openRule;
+    private readonly Func<Task<FixAnswer>>? _prepare;
+    private readonly ReviewFixQueue? _fixes;
+
+    public event Action<FindingViewModel, Fix>? FixFinished;
+
+    public Task? Preparation { get; private set; }
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasFix), nameof(HasDiff), nameof(HasByteChanges), nameof(HasCode), nameof(OffersFix), nameof(ShowsFixButton), nameof(ShowsNoFix), nameof(ReachText), nameof(ByteChangesText))]
+    [NotifyCanExecuteChangedFor(nameof(ApplyFixCommand))]
+    public partial Fix? Preview { get; private set; }
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(ShowsNoFix), nameof(ShowsFixButton), nameof(FixButtonText))]
+    public partial bool IsPreparing { get; private set; }
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasDiff))]
+    public partial IReadOnlyList<FixDiffLine> Difference { get; private set; } = [];
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasPreparationProblem), nameof(ShowsNoFix))]
+    public partial string? PreparationProblem { get; private set; }
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasFixNotice), nameof(FixNoticeText), nameof(IsExcerptStale), nameof(HasFix), nameof(HasDiff), nameof(HasByteChanges), nameof(HasCode), nameof(OffersFix), nameof(ShowsFixButton), nameof(ShowsNoFix))]
+    [NotifyCanExecuteChangedFor(nameof(ApplyFixCommand))]
+    public partial FixApplied? ApplyFailure { get; private set; }
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasFix), nameof(HasDiff), nameof(HasByteChanges), nameof(HasCode), nameof(ShowsNoFix), nameof(OffersFix), nameof(ShowsFixButton), nameof(HasPreparationProblem), nameof(HasFixNotice), nameof(FixNoticeText), nameof(IsExcerptStale))]
+    [NotifyCanExecuteChangedFor(nameof(ApplyFixCommand))]
+    public partial bool FileChanged { get; private set; }
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(EffectWord), nameof(ShowsBlock), nameof(ShowsWarn), nameof(SpokenName), nameof(HasFix), nameof(HasDiff), nameof(HasByteChanges), nameof(HasCode), nameof(OffersFix), nameof(ShowsFixButton), nameof(ShowsNoFix))]
+    [NotifyCanExecuteChangedFor(nameof(ApplyFixCommand))]
+    public partial bool IsFixed { get; private set; }
+
+    public bool HasFix
+    {
+        get { return Preview != null && !IsExcerptStale && !IsFixed; }
+    }
+
+    public bool HasDiff
+    {
+        get { return HasFix && Difference.Count > 0; }
+    }
+
+    public bool HasByteChanges
+    {
+        get { return HasFix && ByteChangesText.Length > 0; }
+    }
+
+    public bool OffersFix
+    {
+        get { return HasFix && ApplyFailure == null; }
+    }
+
+    public bool ShowsFixButton
+    {
+        get { return IsPreparing || OffersFix; }
+    }
+
+    public string FixButtonText
+    {
+        get { return IsPreparing ? "Preparing a fix" : "Apply fix"; }
+    }
+
+    public bool ShowsNoFix
+    {
+        get { return !IsPreparing && !HasFix && !HasPreparationProblem && !HasFixNotice && !IsFixed; }
+    }
+
+    public bool HasPreparationProblem
+    {
+        get { return PreparationProblem != null && !FileChanged; }
+    }
+
+    public bool IsExcerptStale
+    {
+        get { return FileChanged || ApplyFailure?.FileChanged == true; }
+    }
+
+    public bool HasFixNotice
+    {
+        get { return FileChanged || ApplyFailure != null; }
+    }
+
+    public string FixNoticeText
+    {
+        get
+        {
+            if(FileChanged)
+                return "A fix changed this file after the review. Review again to prepare a fix for this finding.";
+
+            if(ApplyFailure?.FileChanged == true)
+                return "Nothing was written to your file: it changed after the review.";
+
+            var reason = ApplyFailure?.Reason?.Trim().TrimEnd('.');
+            return reason == null ? string.Empty : $"Nothing was written to your file: {reason}.";
+        }
+    }
+
+    public string ReachText
+    {
+        get { return Preview?.DescribeReach(IsFolderReview) ?? string.Empty; }
+    }
+
+    public string ByteChangesText
+    {
+        get { return Preview?.ByteChanges ?? string.Empty; }
+    }
 
     [ObservableProperty]
     public partial bool IsOpen { get; set; }
@@ -26,17 +141,20 @@ internal sealed partial class FindingViewModel : ReviewListItemViewModel
     [NotifyPropertyChangedFor(nameof(HasCode))]
     public partial IReadOnlyList<CodeLineViewModel> Lines { get; set; } = new List<CodeLineViewModel>();
 
-    public FindingViewModel(Finding finding, RuleInfo rule, string? content, bool startsOpen, Action<string> openRule, bool isFolderReview, Func<ITextClipboard?> clipboard, Action<int>? openLine = null)
+    public FindingViewModel(Finding finding, IEnumerable<Finding> fileFindings, RuleInfo rule, string? content, bool startsOpen, Action<string> openRule, bool isFolderReview, Func<ITextClipboard?> clipboard, Action<int>? openLine = null, ReviewFixQueue? fixes = null, Func<Task<FixAnswer>>? prepare = null)
     {
         Copy = new CopyButtonViewModel("Copy as a prompt", () => AgentPrompt.ForFinding(finding, rule.Prompt, content), clipboard);
         IsFolderReview = isFolderReview;
         _finding = finding;
+        _fileFindings = fileFindings;
         _openLine = openLine;
         if(finding.Source == FindingSource.EditorConfig && finding.File != null)
             _place = rule.FileRule?.ForPath(finding.File);
         _rule = rule;
         _content = content;
         _openRule = openRule;
+        _fixes = fixes;
+        _prepare = prepare;
         IsOpen = startsOpen;
     }
 
@@ -53,23 +171,27 @@ internal sealed partial class FindingViewModel : ReviewListItemViewModel
         }
     }
 
-    public bool IsWarn
+    public bool ShowsBlock
     {
-        get
-        {
-            return !IsBlock;
-        }
+        get { return !IsFixed && IsBlock; }
+    }
+
+    public bool ShowsWarn
+    {
+        get { return !IsFixed && !IsBlock; }
     }
 
     public string EffectWord
     {
-        get
-        {
-            if(IsFolderReview)
-                return IsBlock ? "Would block" : "Would warn";
+        get { return IsFixed ? "Fixed" : ReviewEffectWord(_finding.Severity, IsFolderReview); }
+    }
 
-            return IsBlock ? "Blocks" : "Warns";
-        }
+    public static string ReviewEffectWord(Severity severity, bool isFolderReview)
+    {
+        if(isFolderReview)
+            return severity == Severity.Block ? "Would block" : "Would warn";
+
+        return severity == Severity.Block ? "Blocks" : "Warns";
     }
 
     /// <summary>
@@ -205,7 +327,7 @@ internal sealed partial class FindingViewModel : ReviewListItemViewModel
     {
         get
         {
-            return Lines.Count > 0;
+            return Lines.Count > 0 && !HasFix;
         }
     }
 
@@ -240,6 +362,11 @@ internal sealed partial class FindingViewModel : ReviewListItemViewModel
         }
     }
 
+    public bool HasOpenActions
+    {
+        get { return HasSetting || CanOpenRule; }
+    }
+
     public string SpokenName
     {
         get
@@ -253,13 +380,76 @@ internal sealed partial class FindingViewModel : ReviewListItemViewModel
     {
         OnPropertyChanged(nameof(SpokenName));
         if(value && Lines.Count == 0 && _content != null && _finding.Line != null)
-            Lines = CodeAround.Cut(_content, _finding.Line.Value);
+            Lines = CodeAround.Cut(_content, _finding.Line.Value, IsBlock);
+
+        if(value && _prepare != null && Preparation == null && !FileChanged && !IsFixed)
+            Preparation = PrepareAsync(_prepare);
+    }
+
+    private async Task PrepareAsync(Func<Task<FixAnswer>> prepare)
+    {
+        IsPreparing = true;
+        try
+        {
+            var answer = await prepare();
+            if(FileChanged || IsFixed)
+                return;
+
+            if(answer.Fix == null)
+            {
+                if(answer.Reason != null)
+                    PreparationProblem = answer.NoFixText;
+
+                return;
+            }
+
+            Difference = FixDiff.Read(answer.Fix, _finding, _fileFindings, IsFolderReview);
+            Preview = answer.Fix;
+        }
+        finally
+        {
+            IsPreparing = false;
+        }
+    }
+
+    private bool CanApplyFix()
+    {
+        return OffersFix;
+    }
+
+    [RelayCommand(CanExecute = nameof(CanApplyFix))]
+    private async Task ApplyFixAsync()
+    {
+        var preview = Preview;
+        if(preview == null || _fixes == null || !OffersFix)
+            return;
+
+        var applied = await _fixes.ApplyAsync(preview);
+        if(applied.Succeeded)
+            FixFinished?.Invoke(this, preview);
+        else if(!IsFixed && !FileChanged)
+            ApplyFailure = applied;
+    }
+
+    public void FileWasFixed(bool ruleFixed)
+    {
+        IsPreparing = false;
+        ApplyFailure = null;
+        if(!ruleFixed)
+        {
+            FileChanged = true;
+            return;
+        }
+
+        IsOpen = false;
+        IsFixed = true;
     }
 
     [RelayCommand]
     private void Toggle()
     {
-        IsOpen = !IsOpen;
+        if(!IsFixed)
+            IsOpen = !IsOpen;
     }
 
     [RelayCommand]

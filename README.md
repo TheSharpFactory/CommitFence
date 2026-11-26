@@ -57,7 +57,8 @@ runs the rule on the code you type or paste and marks each place that breaks it,
 ![The Rules screen: four team rules in a list, and the page of the rule "No braces around a single-line if" with its sentence and the code it was tried on](docs/images/rules-screen.png)
 
 **Review.** What the push would send: the verdict, every finding under its file with the code around it, and the files
-of the push.
+of the push. A finding of a rule of `.editorconfig` can be fixed there: the SDK's formatter prepares the change, you see
+all of it, and "Apply fix" writes it.
 
 ![The Review screen after a refused push: two findings block it and one only warns, with the code of the first finding](docs/images/review-screen.png)
 
@@ -93,6 +94,7 @@ with how to fix it.
 | `commitfence rules try <id> [<file>]` | Runs a rule on a file, or on standard input |
 | `commitfence review --push` | Reviews what a push of the current branch would send |
 | `commitfence review --staged` | Reviews what is staged |
+| `commitfence fix <rule> <file> [--apply]` | Previews an .editorconfig fix for the whole file, or applies it if the file still matches the reviewed version. Uses the pushed changes by default. Select a pushed ref with `--head`, or use `--staged`, `--base` / `--head`, or `--all`. |
 | `commitfence review --base <revision> [--head <revision>]` | Reviews a range of commits |
 | `commitfence review --files <path>...` | Reviews the named files |
 | `commitfence review --all [<folder or project file>]` | Reviews the whole of a folder, as of the last commit |

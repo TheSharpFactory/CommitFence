@@ -3,6 +3,7 @@ using CF.Core.Ports;
 using CF.Core.Setup;
 using CF.Languages.CSharp.Catalog;
 using CF.Languages.CSharp.EditorConfig;
+using CF.Languages.CSharp.Fixer;
 using CF.Languages.CSharp.Meaning;
 using CF.Languages.CSharp.Reader;
 using CF.Languages.CSharp.Toolchain;
@@ -24,6 +25,7 @@ public sealed class CSharpLanguage : ILanguage
         Toolchain = toolchain;
         Meaning = new CSharpMeaningSource(toolchain);
         var dotnet = new DotnetTool(processRunner);
+        Fixer = new CSharpFixer(dotnet);
         RepositoryRules = new EditorConfigRules(fileSystem, dotnet);
         DoctorChecks = [new SdkDoctorCheck(Name, dotnet, fileSystem), new MeaningDoctorCheck(Name, fileSystem)];
     }
@@ -48,6 +50,9 @@ public sealed class CSharpLanguage : ILanguage
 
     /// <inheritdoc />
     public IToolchain? Toolchain { get; }
+
+    /// <inheritdoc />
+    public IFixer? Fixer { get; }
 
     /// <inheritdoc />
     public IMeaningSource? Meaning { get; }

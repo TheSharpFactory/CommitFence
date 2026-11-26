@@ -32,7 +32,7 @@ internal sealed partial class MainWindowViewModel : ObservableObject, IDisposabl
         VersionText = services.ProductInfo.Name + " " + services.ProductInfo.Version;
         var catalog = new RuleCatalog(services.Rules.ListCatalogs(null, null));
         Rules = new RulesViewModel(services.Rules, opened, catalog, new SettingsFileWatcher(opened.SettingsPath), new SettingsFileWatcher(Path.Combine(Path.GetDirectoryName(opened.SettingsPath) ?? string.Empty, ".editorconfig")));
-        Review = new ReviewViewModel(services.Review, services.Rules, services.Clock, opened, OpenRule);
+        Review = new ReviewViewModel(services.Review, services.Rules, services.Clock, opened, OpenRule, services.Fixes);
         Updates = new UpdatesViewModel(services.Updater, services.UpdateChecks, services.Clock, opened.FolderPath);
         Dashboard = new DashboardViewModel(services.Stats, opened, OpenDashboardRule, ReviewFromDashboard);
         Exemptions = new ExemptionsViewModel(services.Exemptions, services.Rules, opened, OpenRule, NarrowRule);

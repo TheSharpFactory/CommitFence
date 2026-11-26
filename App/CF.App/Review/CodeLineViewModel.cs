@@ -5,11 +5,13 @@ namespace CF.App.Review;
 /// </summary>
 internal sealed class CodeLineViewModel
 {
-    public CodeLineViewModel(int number, IReadOnlyList<CodeSegment> segments, bool isBreaking)
+    public CodeLineViewModel(int number, IReadOnlyList<CodeSegment> segments, bool isMarked, bool isBlock)
     {
         Number = number;
         Segments = segments;
-        IsBreaking = isBreaking;
+        IsBreaking = isMarked;
+        IsBlocking = isMarked && isBlock;
+        IsWarning = isMarked && !isBlock;
     }
 
     public int Number { get; }
@@ -17,4 +19,8 @@ internal sealed class CodeLineViewModel
     public IReadOnlyList<CodeSegment> Segments { get; }
 
     public bool IsBreaking { get; }
+
+    public bool IsBlocking { get; }
+
+    public bool IsWarning { get; }
 }

@@ -42,6 +42,21 @@ internal sealed class FolderSnapshots : ISnapshotStore
         _folders[tree] = folder;
     }
 
+    public IReadOnlyList<string> ReadChangedFiles(RepositoryLocation repository)
+    {
+        throw new NotSupportedException();
+    }
+
+    public string MakePatch(RepositoryLocation repository, string file, string before, string after)
+    {
+        throw new NotSupportedException();
+    }
+
+    public IReadOnlyList<string> ReadUntrackedFiles(RepositoryLocation repository)
+    {
+        throw new NotSupportedException();
+    }
+
     public string MoveTo(RepositoryLocation repository, string tree)
     {
         Moves.Add(tree);

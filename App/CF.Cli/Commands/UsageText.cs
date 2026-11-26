@@ -38,6 +38,7 @@ internal static class UsageText
         "  commitfence rules remove <id>",
         "  commitfence rules try <id> [<file>]    (standard input without a file)",
         "  commitfence review --files <path>...",
+        "  commitfence fix <rule> <file> [--apply] [[--push] [--head <ref>] | --staged | --base <revision> [--head <revision>] | --all [<target>]] [--settings <path>]",
         "  commitfence review --staged",
         "  commitfence review --hook pre-push <remote name> <remote url>",
         "  commitfence review --push    (what a push of the current branch would send, as the pre-push hook is told)",

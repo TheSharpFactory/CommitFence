@@ -116,6 +116,7 @@ public sealed class TreeReview
         string? wholeFolder = null;
         foreach(var changeSet in _changeResolver.Resolve(repository, scope))
         {
+            run.Tree = changeSet.Tree;
             _changeSetReview.Review(repository, changeSet, settingsPath, run);
             wholeFolder = changeSet.WholeFolder;
         }
@@ -126,7 +127,7 @@ public sealed class TreeReview
         if(judgment != null)
             _structureJudgments?.Save(repository, judgment);
 
-        return run.ToResult(ended - started, judgment);
+        return run.ToResult(ended - started, judgment, repository);
     }
 
     private ReviewResult CreateIncompleteResult(string reason, DateTimeOffset started, DateTimeOffset? ended = null)

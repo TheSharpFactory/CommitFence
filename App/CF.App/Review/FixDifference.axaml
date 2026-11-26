@@ -1,0 +1,57 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:review="using:CF.App.Review"
+             xmlns:parts="using:CF.App.Parts"
+             x:Class="CF.App.Review.FixDifference"
+             x:ClassModifier="internal"
+             ClipToBounds="False"
+             x:DataType="review:FindingViewModel">
+  <Panel>
+  <Border CornerRadius="12" BorderThickness="1" BorderBrush="{DynamicResource line}"
+          Padding="0,8" ClipToBounds="True" Background="{DynamicResource page}">
+    <Grid ColumnDefinitions="98,*">
+      <ItemsControl Grid.ColumnSpan="2" ItemsSource="{Binding Difference}" IsHitTestVisible="False">
+        <ItemsControl.ItemTemplate>
+          <DataTemplate x:DataType="review:FixDiffLine">
+            <Panel Height="20">
+              <Border Background="{DynamicResource diff-del}" IsVisible="{Binding IsRemoved}"/>
+              <Border Background="{DynamicResource diff-add}" IsVisible="{Binding IsAdded}"/>
+              <Grid ColumnDefinitions="38,38,22,*">
+                <TextBlock Theme="{StaticResource code}" Foreground="{DynamicResource ink-3}" TextAlignment="Right" Text="{Binding OldLine}"/>
+                <TextBlock Grid.Column="1" Theme="{StaticResource code}" Foreground="{DynamicResource ink-3}" TextAlignment="Right" Text="{Binding NewLine}"/>
+                <TextBlock Grid.Column="2" Theme="{StaticResource code-strong}" Foreground="{DynamicResource block-ink}"
+                           TextAlignment="Center" IsVisible="{Binding IsRemoved}" Text="−"/>
+                <TextBlock Grid.Column="2" Theme="{StaticResource code-strong}" Foreground="{DynamicResource req-ink}"
+                           TextAlignment="Center" IsVisible="{Binding IsAdded}" Text="+"/>
+              </Grid>
+            </Panel>
+          </DataTemplate>
+        </ItemsControl.ItemTemplate>
+      </ItemsControl>
+      <ScrollViewer Grid.Column="1" IsTabStop="False" HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled">
+        <Grid>
+          <review:DiffMarks IsHitTestVisible="False" Code="{Binding #Code}" Lines="{Binding Difference}"/>
+          <review:DiffCode Name="Code" Theme="{StaticResource code}" TextWrapping="NoWrap" SelectionBrush="{DynamicResource for}"
+                           Focusable="True" IsTabStop="True" AutomationProperties.Name="Difference view" Lines="{Binding Difference}"
+                           PlaceLabelWidth="{Binding #PlaceLabels.Bounds.Width}"/>
+        </Grid>
+      </ScrollViewer>
+      <ItemsControl Name="PlaceLabels" Grid.Column="1" HorizontalAlignment="Right" IsHitTestVisible="False"
+                    ItemsSource="{Binding Difference}">
+        <ItemsControl.ItemTemplate>
+          <DataTemplate x:DataType="review:FixDiffLine">
+            <Panel Height="20">
+              <Border IsVisible="{Binding HasPlaceLabel}" HorizontalAlignment="Right" Background="{DynamicResource diff-del}" Padding="12,0">
+                <TextBlock Theme="{StaticResource type-meta}" Foreground="{DynamicResource ink-2}" VerticalAlignment="Center"
+                           TextTrimming="CharacterEllipsis" Text="{Binding PlaceLabel}"/>
+              </Border>
+            </Panel>
+          </DataTemplate>
+        </ItemsControl.ItemTemplate>
+      </ItemsControl>
+    </Grid>
+  </Border>
+    <parts:FocusRing IsVisible="{Binding #Code.IsFocused}" ControlRadius="12"
+                     GapBrush="{DynamicResource focus-gap}" LineBrush="{DynamicResource focus}"/>
+  </Panel>
+</UserControl>

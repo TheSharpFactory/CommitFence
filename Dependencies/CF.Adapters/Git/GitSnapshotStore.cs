@@ -42,6 +42,59 @@ public sealed class GitSnapshotStore : ISnapshotStore, ISnapshotInspector
     }
 
     /// <inheritdoc />
+    public IReadOnlyList<string> ReadChangedFiles(RepositoryLocation repository)
+    {
+        var files = _git.RunChecked(repository, WithSettings(["diff-files", "--no-ext-diff", "--name-only", "-z"]), SnapshotEnvironment(repository), null);
+        return files.Split('\0', StringSplitOptions.RemoveEmptyEntries);
+    }
+
+    /// <inheritdoc />
+    public string MakePatch(RepositoryLocation repository, string file, string before, string after)
+    {
+        var folder = Path.Combine(RepositoryDataFolder.For(_dataFolder.RootFolder, repository), "diff-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(folder);
+        try
+        {
+            WritePatchInput(folder, "a", file, before);
+            WritePatchInput(folder, "b", file, after);
+            var arguments = new List<string>
+            {
+                "diff", "--no-index", "--no-color", "--no-ext-diff", "--no-textconv", "--no-prefix",
+                "--unified=3", "--text", "--", "a/" + file, "b/" + file
+            };
+            var result = _git.RunOutsideRepository(folder, arguments);
+            if(result.ExitCode != 1 || result.Output.Length == 0)
+                throw new GitException(GitRunner.Describe(arguments, result));
+
+            return result.Output;
+        }
+        finally
+        {
+            Directory.Delete(folder, true);
+        }
+    }
+
+    private static void WritePatchInput(string folder, string side, string file, string text)
+    {
+        var path = Path.Combine(folder, side, file);
+        Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+        File.WriteAllText(path, text);
+    }
+
+    /// <inheritdoc />
+    public IReadOnlyList<string> ReadUntrackedFiles(RepositoryLocation repository)
+    {
+        var listed = _git.RunChecked(repository, WithSettings(["ls-files", "--others", "-z"]), SnapshotEnvironment(repository), null);
+        return listed.Split('\0', StringSplitOptions.RemoveEmptyEntries);
+    }
+
+    private Dictionary<string, string?> SnapshotEnvironment(RepositoryLocation repository)
+    {
+        var folder = RepositoryDataFolder.For(_dataFolder.RootFolder, repository);
+        return CreateEnvironment(Path.Combine(folder, "tree"), Path.Combine(folder, "index"));
+    }
+
+    /// <inheritdoc />
     public PrivateCopyStatus Inspect(RepositoryLocation repository)
     {
         var folder = RepositoryDataFolder.For(_dataFolder.RootFolder, repository);
@@ -155,7 +208,7 @@ public sealed class GitSnapshotStore : ISnapshotStore, ISnapshotInspector
         if(changed.Length == 0)
             return;
 
-        _git.RunChecked(repository, WithSettings(new List<string> { "checkout-index", "--force", "-z", "--stdin" }), environment, changed);
+        _git.RunChecked(repository, WithSettings(new List<string> { "checkout-index", "--force", "--index", "-z", "--stdin" }), environment, changed);
     }
 
     private static Dictionary<string, string?> CreateEnvironment(string treeFolder, string indexPath)

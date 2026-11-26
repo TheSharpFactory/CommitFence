@@ -91,6 +91,13 @@
       <Setter Property="IsVisible" Value="True"/>
     </Style>
 
+    <Style Selector="review|ReviewView TextBlock.fixedfinding">
+      <Setter Property="Foreground" Value="{DynamicResource ink-2}"/>
+    </Style>
+    <Style Selector="review|ReviewView TextBlock.fixedfinding.message">
+      <Setter Property="FontWeight" Value="Normal"/>
+    </Style>
+
     <Style Selector="review|ReviewView parts|Icon.chevron">
       <Setter Property="RenderTransform" Value="rotate(0deg)"/>
     </Style>
@@ -149,6 +156,16 @@
     </Style>
     <Style Selector="review|ReviewView.onepane StackPanel.findingbody">
       <Setter Property="Margin" Value="8,2,12,18"/>
+    </Style>
+
+    <Style Selector="review|ReviewView StackPanel.findingopens">
+      <Setter Property="Grid.Column" Value="1"/>
+    </Style>
+    <Style Selector="review|ReviewView.onepane StackPanel.findingopens">
+      <Setter Property="Grid.Column" Value="0"/>
+      <Setter Property="Grid.Row" Value="1"/>
+      <Setter Property="HorizontalAlignment" Value="Left"/>
+      <Setter Property="Margin" Value="0,8,0,0"/>
     </Style>
 
     <Style Selector="review|ReviewView Button.pickerentry">
@@ -425,6 +442,14 @@
                       </ItemsControl.ItemTemplate>
                     </ItemsControl>
 
+                    <Grid ColumnDefinitions="Auto,*" ColumnSpacing="8" Margin="0,4,0,6"
+                          DataContext="{Binding $parent[review:ReviewView].((review:ReviewViewModel)DataContext)}"
+                          x:DataType="review:ReviewViewModel" IsVisible="{Binding HasAppliedFixes}">
+                      <parts:Icon Data="{StaticResource i-info}" Width="16" Height="16" Stroke="{DynamicResource ink-3}" VerticalAlignment="Center"/>
+                      <TextBlock Grid.Column="1" Theme="{StaticResource type-body}" Foreground="{DynamicResource ink-2}" TextWrapping="Wrap"
+                                 VerticalAlignment="Center" Text="{Binding AppliedFixesText}"/>
+                    </Grid>
+
                     <ItemsControl ItemsSource="{Binding Facts}" IsVisible="{Binding HasFacts}" Margin="0,6,0,0">
                       <ItemsControl.ItemsPanel>
                         <ItemsPanelTemplate>
@@ -558,14 +583,20 @@
                       <parts:Icon Grid.Column="1" Data="{StaticResource i-file}" Width="16" Height="16" Stroke="{DynamicResource ink-3}"/>
                       <TextBlock Grid.Column="2" Theme="{StaticResource code-strong}" TextTrimming="PrefixCharacterEllipsis"
                                  VerticalAlignment="Center" ToolTip.Tip="{Binding Path}" Text="{Binding Path}"/>
-                      <StackPanel Grid.Column="3" Orientation="Horizontal" Spacing="14" VerticalAlignment="Center">
-                        <StackPanel Orientation="Horizontal" Spacing="5" MinWidth="34">
-                          <parts:EffectMark Classes="block" Kind="Block" Width="14" Height="14" IsVisible="{Binding HasBlock}"/>
-                          <TextBlock Theme="{StaticResource type-meta-strong}" FontFeatures="+tnum" IsVisible="{Binding HasBlock}" Text="{Binding BlockText}"/>
+                      <StackPanel Grid.Column="3" Orientation="Horizontal" Spacing="12" VerticalAlignment="Center">
+                        <StackPanel Orientation="Horizontal" Spacing="14">
+                          <StackPanel Orientation="Horizontal" Spacing="5" MinWidth="34">
+                            <parts:EffectMark Classes="block" Kind="Block" Width="14" Height="14" IsVisible="{Binding HasBlock}"/>
+                            <TextBlock Theme="{StaticResource type-meta-strong}" FontFeatures="+tnum" IsVisible="{Binding HasBlock}" Text="{Binding BlockText}"/>
+                          </StackPanel>
+                          <StackPanel Orientation="Horizontal" Spacing="5" MinWidth="34">
+                            <parts:EffectMark Classes="warn" Kind="Warn" Width="14" Height="14" IsVisible="{Binding HasWarn}"/>
+                            <TextBlock Theme="{StaticResource type-meta-strong}" FontFeatures="+tnum" IsVisible="{Binding HasWarn}" Text="{Binding WarnText}"/>
+                          </StackPanel>
                         </StackPanel>
-                        <StackPanel Orientation="Horizontal" Spacing="5" MinWidth="34">
-                          <parts:EffectMark Classes="warn" Kind="Warn" Width="14" Height="14" IsVisible="{Binding HasWarn}"/>
-                          <TextBlock Theme="{StaticResource type-meta-strong}" FontFeatures="+tnum" IsVisible="{Binding HasWarn}" Text="{Binding WarnText}"/>
+                        <StackPanel Orientation="Horizontal" Spacing="12" IsVisible="{Binding HasFixedFindings}">
+                          <parts:Icon Data="{StaticResource i-check}" Width="14" Height="14" Stroke="{DynamicResource ink-3}" VerticalAlignment="Center"/>
+                          <TextBlock Theme="{StaticResource type-meta}" Foreground="{DynamicResource ink-2}" VerticalAlignment="Center" Text="{Binding FixedText}"/>
                         </StackPanel>
                       </StackPanel>
                     </Grid>
@@ -584,12 +615,13 @@
                     <Button Classes="findinghead" Command="{Binding ToggleCommand}" AutomationProperties.Name="{Binding SpokenName}">
                       <Grid ColumnDefinitions="Auto,*,Auto,Auto" ColumnSpacing="12">
                         <StackPanel Orientation="Horizontal" Spacing="6" VerticalAlignment="Top" Margin="0,-2,0,0" Height="24" Width="{Binding EffectWidth}">
-                          <parts:EffectMark Classes="block" Kind="Block" Width="14" Height="14" IsVisible="{Binding IsBlock}" VerticalAlignment="Center"/>
-                          <parts:EffectMark Classes="warn" Kind="Warn" Width="14" Height="14" IsVisible="{Binding IsWarn}" VerticalAlignment="Center"/>
-                          <TextBlock Theme="{StaticResource type-effect}" VerticalAlignment="Center" Text="{Binding EffectWord}"/>
+                          <parts:EffectMark Classes="block" Kind="Block" Width="14" Height="14" IsVisible="{Binding ShowsBlock}" VerticalAlignment="Center"/>
+                          <parts:EffectMark Classes="warn" Kind="Warn" Width="14" Height="14" IsVisible="{Binding ShowsWarn}" VerticalAlignment="Center"/>
+                          <parts:Icon Data="{StaticResource i-check}" Stroke="{DynamicResource req-ink}" Width="14" Height="14" IsVisible="{Binding IsFixed}" VerticalAlignment="Center"/>
+                          <TextBlock Theme="{StaticResource type-effect}" Classes.fixedfinding="{Binding IsFixed}" VerticalAlignment="Center" Text="{Binding EffectWord}"/>
                         </StackPanel>
                         <StackPanel Grid.Column="1" Spacing="2">
-                          <TextBlock Theme="{StaticResource type-body-strong}" TextWrapping="Wrap" Text="{Binding Message}"/>
+                          <TextBlock Theme="{StaticResource type-body-strong}" Classes="message" Classes.fixedfinding="{Binding IsFixed}" TextWrapping="Wrap" Text="{Binding Message}"/>
                           <WrapPanel Orientation="Horizontal">
                             <TextBlock Theme="{StaticResource code}" Foreground="{DynamicResource ink-2}" Margin="0,0,8,0" Text="{Binding RuleId}"/>
                             <TextBlock Theme="{StaticResource type-meta}" Foreground="{DynamicResource ink-2}" TextWrapping="Wrap"
@@ -607,57 +639,80 @@
                         <Run Text="{Binding SourcePrefix}"/><Run Classes="scope" Classes.pattern="{Binding IsScoped}" Text="{Binding SourceScope}"/><Run Text="{Binding SourceSuffix}"/>
                       </TextBlock>
                       <review:SentencePieces Pieces="{Binding Sentence}" IsVisible="{Binding HasSentence}" Margin="0,8,0,0"/>
+                      <TextBlock IsVisible="{Binding HasDiff}" Theme="{StaticResource type-body}" Foreground="{DynamicResource ink-2}"
+                                 TextWrapping="Wrap" Margin="0,8,0,0" Text="{Binding ReachText}"/>
+                      <TextBlock IsVisible="{Binding HasByteChanges}" Theme="{StaticResource type-body}" Foreground="{DynamicResource ink-2}"
+                                 TextWrapping="Wrap" Margin="0,8,0,0" Text="{Binding ByteChangesText}"/>
+                      <review:FixDifference IsVisible="{Binding HasDiff}" Margin="0,12,0,0"/>
                       <Border IsVisible="{Binding HasCode}" Margin="0,12,0,0" CornerRadius="12" BorderThickness="1" BorderBrush="{DynamicResource line}"
                               Padding="0,8" ClipToBounds="True" Background="{DynamicResource page}">
-                        <ItemsControl ItemsSource="{Binding Lines}">
-                          <ItemsControl.ItemTemplate>
-                            <DataTemplate DataType="review:CodeLineViewModel" x:DataType="review:CodeLineViewModel">
-                              <Panel Height="20">
-                                <Border Background="{DynamicResource diff-del}" IsVisible="{Binding IsBreaking}"/>
-                                <Border Background="{DynamicResource block}" Width="3" HorizontalAlignment="Left" IsVisible="{Binding IsBreaking}"/>
-                                <Grid ColumnDefinitions="44,14,*">
-                                  <TextBlock Theme="{StaticResource code}" Foreground="{DynamicResource ink-3}" TextAlignment="Right" Text="{Binding Number}"/>
-                                  <TextBlock Grid.Column="2" Theme="{StaticResource code}" TextWrapping="NoWrap" review:CodeText.Segments="{Binding Segments}"/>
-                              </Grid>
-                            </Panel>
-                          </DataTemplate>
-                        </ItemsControl.ItemTemplate>
-                      </ItemsControl>
-                    </Border>
-                    <Grid ColumnDefinitions="Auto,*" Margin="0,16,0,0" IsVisible="{Binding !HasSetting}">
-                      <review:CopyButton DataContext="{Binding Copy}" HorizontalAlignment="Left"/>
-                        <Button Grid.Column="1" Classes="cf outlined" HorizontalAlignment="Right" IsVisible="{Binding CanOpenRule}"
-                              Command="{Binding OpenRuleCommand}" AutomationProperties.Name="Open the rule">
-                        <StackPanel Orientation="Horizontal" Spacing="8">
-                          <parts:Icon Data="{StaticResource i-rules}" Width="16" Height="16" Stroke="{Binding $parent[Button].Foreground}"/>
-                          <TextBlock Theme="{StaticResource type-body-strong}" Text="Open the rule"/>
+                        <StackPanel>
+                          <TextBlock IsVisible="{Binding IsExcerptStale}" Theme="{StaticResource type-meta}" Foreground="{DynamicResource ink-2}"
+                                     TextWrapping="Wrap" Margin="12,0,12,8" Text="As reviewed. The file has changed since."/>
+                          <ItemsControl ItemsSource="{Binding Lines}">
+                            <ItemsControl.ItemTemplate>
+                              <DataTemplate DataType="review:CodeLineViewModel" x:DataType="review:CodeLineViewModel">
+                                <Panel Height="20">
+                                  <Border Background="{DynamicResource diff-del}" IsVisible="{Binding IsBlocking}"/>
+                                  <Border Background="{DynamicResource block}" Width="3" HorizontalAlignment="Left" IsVisible="{Binding IsBlocking}"/>
+                                  <Border Background="{DynamicResource warn-tint}" IsVisible="{Binding IsWarning}"/>
+                                  <Border Background="{DynamicResource warn}" Width="3" HorizontalAlignment="Left" IsVisible="{Binding IsWarning}"/>
+                                  <Grid ColumnDefinitions="44,14,*">
+                                    <TextBlock Theme="{StaticResource code}" Foreground="{DynamicResource ink-3}" TextAlignment="Right" Text="{Binding Number}"/>
+                                    <TextBlock Grid.Column="2" Theme="{StaticResource code}" TextWrapping="NoWrap" review:CodeText.Segments="{Binding Segments}"/>
+                                  </Grid>
+                                </Panel>
+                              </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                          </ItemsControl>
                         </StackPanel>
-                      </Button>
-                    </Grid>
-                    <WrapPanel IsVisible="{Binding HasSetting}" Margin="0,16,0,0" ItemSpacing="8" LineSpacing="8">
-                      <StackPanel Orientation="Horizontal" Spacing="8">
-                        <TextBlock IsVisible="{Binding HasSetting}" VerticalAlignment="Center" Theme="{StaticResource type-meta}" Foreground="{DynamicResource ink-2}" Text="No automatic fix."/>
-                        <review:CopyButton DataContext="{Binding Copy}"/>
-                      </StackPanel>
-                      <StackPanel Orientation="Horizontal" Spacing="8">
-                        <Button Classes="cf outlined" Command="{Binding OpenLineCommand}" IsVisible="{Binding HasSetting}" AutomationProperties.Name="{Binding OpenLineText}">
-                          <StackPanel Orientation="Horizontal" Spacing="8">
-                            <parts:Icon Data="{StaticResource i-open}" Width="16" Height="16" Stroke="{Binding $parent[Button].Foreground}"/>
-                            <TextBlock Theme="{StaticResource type-body-strong}" Text="{Binding OpenLineText}"/>
-                          </StackPanel>
-                        </Button>
-                        <Button Classes="cf outlined" HorizontalAlignment="Right" IsVisible="{Binding CanOpenRule}"
-                              Command="{Binding OpenRuleCommand}" AutomationProperties.Name="Open the rule">
-                        <StackPanel Orientation="Horizontal" Spacing="8">
-                          <parts:Icon Data="{StaticResource i-rules}" Width="16" Height="16" Stroke="{Binding $parent[Button].Foreground}"/>
-                          <TextBlock Theme="{StaticResource type-body-strong}" Text="Open the rule"/>
+                      </Border>
+                      <Border IsVisible="{Binding HasFixNotice}" Background="{DynamicResource warn-tint}" CornerRadius="12"
+                              Padding="16,12" Margin="0,16,0,0">
+                        <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="10">
+                          <parts:EffectMark Classes="warn" Kind="Warn" Width="16" Height="16" VerticalAlignment="Center"/>
+                          <TextBlock Grid.Column="1" Theme="{StaticResource type-body}" VerticalAlignment="Center" TextWrapping="Wrap" Text="{Binding FixNoticeText}"/>
+                          <Button Grid.Column="2" Classes="cf outlined small" VerticalAlignment="Center" Content="Review again"
+                                  Command="{Binding $parent[review:ReviewView].((review:ReviewViewModel)DataContext).RunCommand}"/>
+                        </Grid>
+                      </Border>
+                      <TextBlock IsVisible="{Binding HasPreparationProblem}" Theme="{StaticResource type-meta}" Foreground="{DynamicResource ink-2}"
+                                 TextWrapping="Wrap" Margin="0,16,0,-8" Text="{Binding PreparationProblem}"/>
+                      <Grid ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto" Margin="0,16,0,0">
+                        <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                          <TextBlock IsVisible="{Binding ShowsNoFix}" VerticalAlignment="Center" Theme="{StaticResource type-meta}"
+                                     Foreground="{DynamicResource ink-2}" Text="No automatic fix."/>
+                          <Button Classes="cf main" IsVisible="{Binding ShowsFixButton}" IsEnabled="{Binding !IsPreparing}"
+                                  Command="{Binding ApplyFixCommand}" AutomationProperties.Name="{Binding FixButtonText}">
+                            <StackPanel Orientation="Horizontal" Spacing="8">
+                              <parts:Icon Data="{StaticResource i-check}" Width="16" Height="16" Stroke="{Binding $parent[Button].Foreground}"
+                                          IsVisible="{Binding !IsPreparing}"/>
+                              <parts:TurningRing Width="14" Height="14" VerticalAlignment="Center" IsVisible="{Binding IsPreparing}"/>
+                              <TextBlock Theme="{StaticResource type-body-strong}" Text="{Binding FixButtonText}"/>
+                            </StackPanel>
+                          </Button>
+                          <review:CopyButton DataContext="{Binding Copy}"/>
                         </StackPanel>
-                      </Button>
-                      </StackPanel>
-                    </WrapPanel>
+                        <StackPanel Classes="findingopens" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center" IsVisible="{Binding HasOpenActions}">
+                          <Button Classes="cf outlined" Command="{Binding OpenLineCommand}" IsVisible="{Binding HasSetting}"
+                                  AutomationProperties.Name="{Binding OpenLineText}">
+                            <StackPanel Orientation="Horizontal" Spacing="8">
+                              <parts:Icon Data="{StaticResource i-open}" Width="16" Height="16" Stroke="{Binding $parent[Button].Foreground}"/>
+                              <TextBlock Theme="{StaticResource type-body-strong}" Text="{Binding OpenLineText}"/>
+                            </StackPanel>
+                          </Button>
+                          <Button Classes="cf outlined" IsVisible="{Binding CanOpenRule}"
+                                  Command="{Binding OpenRuleCommand}" AutomationProperties.Name="Open the rule">
+                            <StackPanel Orientation="Horizontal" Spacing="8">
+                              <parts:Icon Data="{StaticResource i-rules}" Width="16" Height="16" Stroke="{Binding $parent[Button].Foreground}"/>
+                              <TextBlock Theme="{StaticResource type-body-strong}" Text="Open the rule"/>
+                            </StackPanel>
+                          </Button>
+                        </StackPanel>
+                      </Grid>
+                    </StackPanel>
                   </StackPanel>
-                </StackPanel>
-              </Border>
+                </Border>
               </Border>
             </Border>
           </DataTemplate>

@@ -53,6 +53,24 @@ public sealed class ReviewResult
     /// </summary>
     public IReadOnlyList<Finding> Findings { get; }
 
+    /// <summary>The repository of the reviewed trees, when the review used git.</summary>
+    public RepositoryLocation? Repository { get; internal init; }
+
+    internal IReadOnlyDictionary<Finding, IReadOnlyList<string>> FindingTrees { get; init; } = new Dictionary<Finding, IReadOnlyList<string>>();
+
+    /// <summary>All distinct trees where the review reported this finding.</summary>
+    public IReadOnlyList<string> TreesOf(Finding finding)
+    {
+        return FindingTrees.GetValueOrDefault(finding) ?? [];
+    }
+
+    /// <summary>The tree a finding was produced from, when the review reported it in just one tree.</summary>
+    public string? TreeOf(Finding finding)
+    {
+        var trees = TreesOf(finding);
+        return trees.Count == 1 ? trees[0] : null;
+    }
+
     /// <summary>Findings set aside by allow comments, with the comments' lines and reasons.</summary>
     public IReadOnlyList<ExemptedFinding> ExemptedFindings { get; init; } = [];
 

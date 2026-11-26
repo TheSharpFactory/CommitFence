@@ -26,11 +26,13 @@ internal sealed class ReviewArgumentsReader
     private static readonly string[] _optionsWithValue = { _settingsOption, _baseOption, _headOption, _formatOption };
 
     private readonly string[] _args;
+    private readonly bool _allowPushHead;
     private int _position;
 
-    public ReviewArgumentsReader(string[] args)
+    public ReviewArgumentsReader(string[] args, bool allowPushHead)
     {
         _args = args;
+        _allowPushHead = allowPushHead;
     }
 
     public ReviewArgumentsResult Read()
@@ -94,7 +96,7 @@ internal sealed class ReviewArgumentsReader
         return null;
     }
 
-    private static ReviewArgumentsResult Decide(GivenArguments given)
+    private ReviewArgumentsResult Decide(GivenArguments given)
     {
         if(given.Values.TryGetValue(_formatOption, out var format) && format != _textFormat && format != _promptFormat)
             return ReviewArgumentsResult.Wrong($"--format knows two words: {_textFormat}, the default, and {_promptFormat}; '{format}' is not one of them.");
@@ -107,7 +109,7 @@ internal sealed class ReviewArgumentsReader
         if(forms.Count != 1)
             return ReviewArgumentsResult.Wrong("review needs exactly one of --files, --staged, --hook pre-push, --push, --base or --all.");
 
-        if(given.Options.Contains(_headOption) && !given.Options.Contains(_baseOption))
+        if(given.Options.Contains(_headOption) && !given.Options.Contains(_baseOption) && !(_allowPushHead && forms[0] == _pushOption))
             return ReviewArgumentsResult.Wrong("--head needs --base.");
 
         return DecideForm(given, forms[0]);
@@ -142,7 +144,7 @@ internal sealed class ReviewArgumentsReader
         switch(form)
         {
             case _pushOption:
-                return ReviewArguments.ForPush(settingsPath);
+                return ReviewArguments.ForPush(settingsPath, given.Values.GetValueOrDefault(_headOption, string.Empty));
             case _hookOption:
                 return ReviewArguments.ForHook(given.RemoteName, given.RemoteUrl, settingsPath);
             case _baseOption:

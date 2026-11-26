@@ -1,3 +1,4 @@
+using System.Globalization;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 
@@ -12,22 +13,37 @@ internal sealed partial class FileGroupViewModel : ReviewListItemViewModel
     [NotifyPropertyChangedFor(nameof(SpokenName))]
     public partial bool IsOpen { get; set; }
 
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasFixedFindings), nameof(FixedText), nameof(SpokenCounts), nameof(SpokenName))]
+    [NotifyPropertyChangedFor(nameof(BlockCount), nameof(WarnCount), nameof(HasBlock), nameof(HasWarn), nameof(BlockText), nameof(WarnText))]
+    public partial int FixedCount { get; private set; }
+
     public FileGroupViewModel(string path, IReadOnlyList<FindingViewModel> findings, bool startsOpen)
     {
         Path = path;
         Findings = findings;
-        BlockCount = findings.Count(finding => finding.IsBlock);
-        WarnCount = findings.Count - BlockCount;
         IsOpen = startsOpen;
+        RefreshFixedCount();
     }
 
     public string Path { get; }
 
     public IReadOnlyList<FindingViewModel> Findings { get; }
 
-    public int BlockCount { get; }
+    public void RefreshFixedCount()
+    {
+        FixedCount = Findings.Count(finding => finding.IsFixed);
+    }
 
-    public int WarnCount { get; }
+    public int BlockCount
+    {
+        get { return Findings.Count(finding => finding.ShowsBlock); }
+    }
+
+    public int WarnCount
+    {
+        get { return Findings.Count(finding => finding.ShowsWarn); }
+    }
 
     public bool HasBlock
     {
@@ -69,11 +85,30 @@ internal sealed partial class FileGroupViewModel : ReviewListItemViewModel
         }
     }
 
+    public bool HasFixedFindings
+    {
+        get { return FixedCount > 0; }
+    }
+
+    public string FixedText
+    {
+        get { return string.Create(CultureInfo.InvariantCulture, $"{FixedCount} fixed"); }
+    }
+
+    public string SpokenCounts
+    {
+        get
+        {
+            var reviewed = $"{Tally(BlockCount, "blocking")}, {Tally(WarnCount, "warning")}";
+            return HasFixedFindings ? $"{reviewed}, {FixedText}" : reviewed;
+        }
+    }
+
     public string SpokenName
     {
         get
         {
-            return $"{Path}, {Tally(BlockCount, "blocking")}, {Tally(WarnCount, "warning")}, {(IsOpen ? "expanded" : "folded")}";
+            return $"{Path}, {SpokenCounts}, {(IsOpen ? "expanded" : "folded")}";
         }
     }
 

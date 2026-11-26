@@ -32,6 +32,12 @@ public interface ILanguage
     /// </summary>
     IToolchain? Toolchain { get; }
 
+    /// <summary>The tool that can fix a finding of this language, when one is available.</summary>
+    IFixer? Fixer
+    {
+        get { return null; }
+    }
+
     /// <summary>
     /// Where the language's meaning comes from, or nothing when the language has none.
     /// </summary>

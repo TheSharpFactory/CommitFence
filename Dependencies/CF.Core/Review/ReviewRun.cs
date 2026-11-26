@@ -13,7 +13,7 @@ namespace CF.Core.Review;
 internal sealed class ReviewRun
 {
     private readonly List<Finding> _findings = new List<Finding>();
-    private readonly Dictionary<FindingKey, List<string>> _findingTrees = new();
+    private readonly Dictionary<JudgedKey, List<string>> _findingTrees = new();
     private readonly List<Finding> _pending = new List<Finding>();
     private readonly List<ExemptedFinding> _exempted = new List<ExemptedFinding>();
     private readonly ExemptionFilter _exemptions = new ExemptionFilter();
@@ -23,22 +23,39 @@ internal sealed class ReviewRun
     private readonly List<string> _advice = new List<string>();
     private bool _uncommittedWork;
 
+    public ReviewRun(bool quick = false)
+    {
+        Quick = quick;
+        if(quick)
+            _skipped.Add("Quick review left out the build, .editorconfig diagnostics, rules that need the compiler, and structure rules.");
+    }
+
+    public bool Quick { get; }
+
     public bool RanBuild { get; set; }
 
     public string? Tree { get; set; }
 
-    private readonly Dictionary<string, string> _sources = new Dictionary<string, string>(StringComparer.Ordinal);
+    private readonly Dictionary<(string? Tree, string Path), string> _sources = new();
+    private readonly Dictionary<Finding, string?> _reportedTrees = new();
+    private readonly Dictionary<Finding, ReviewedRule> _rules = new();
     private readonly HashSet<FindingKey> _pendingKeys = new HashSet<FindingKey>();
-    private readonly Dictionary<FindingKey, int> _findingPositions = new Dictionary<FindingKey, int>();
+    private readonly Dictionary<JudgedKey, int> _findingPositions = new Dictionary<JudgedKey, int>();
     private readonly HashSet<CoverageKey> _coverageKeys = new HashSet<CoverageKey>();
     private readonly Dictionary<FindingKey, StructureBreach> _structureBreaches = new Dictionary<FindingKey, StructureBreach>();
     private bool _judgedStructure;
     private bool _missedStructure;
 
     /// <summary>
-    /// What makes two findings the same finding.
+    /// What makes two findings of one tree the same finding.
     /// </summary>
     private readonly record struct FindingKey(string RuleId, string? File, int? Line, int? Column, string Message);
+
+    /// <summary>
+    /// What makes two findings the same finding across trees: the same place and message, the same quoted source line
+    /// and the same definition of the rule.
+    /// </summary>
+    private readonly record struct JudgedKey(FindingKey Place, string? QuotedLine, string Definition);
 
     /// <summary>
     /// What makes two coverage entries the same entry.
@@ -84,15 +101,28 @@ internal sealed class ReviewRun
         return new StructureJudgment(endedAt, folder, breaches);
     }
 
-    public void ApplyPolicies(Strictness strictness, Func<Finding, IReadOnlyList<SourceExemption>>? readSource = null)
+    public void ApplyPolicies(Strictness strictness, Func<Finding, IReadOnlyList<SourceExemption>>? readSource = null,
+        IReadOnlyList<RuleDefinition>? activeRules = null, Func<IReadOnlyList<FileRule>>? readFileRules = null)
     {
+        IReadOnlyList<FileRule>? fileRules = null;
         foreach(var finding in _pending)
         {
             var exempted = _exemptions.Match(finding, readSource);
             if(exempted != null)
                 _exempted.Add(exempted);
             else
-                AddUnderStrictness(finding, strictness);
+            {
+                var teamRule = finding.Source == FindingSource.CodeRule
+                    ? activeRules?.FirstOrDefault(rule => rule.Id == finding.RuleId) : null;
+                if(finding.Source == FindingSource.EditorConfig && fileRules == null)
+                    fileRules = readFileRules?.Invoke() ?? [];
+
+                var fileRule = finding.Source == FindingSource.EditorConfig
+                    ? fileRules?.FirstOrDefault(rule => string.Equals(rule.Id, finding.RuleId, StringComparison.OrdinalIgnoreCase)) : null;
+                var reviewedRule = teamRule != null || fileRule != null ? new ReviewedRule(teamRule, fileRule) : null;
+                if(AddUnderStrictness(finding, strictness, reviewedRule) is { } judged && reviewedRule != null)
+                    _rules[judged] = reviewedRule;
+            }
         }
 
         _pending.Clear();
@@ -100,24 +130,35 @@ internal sealed class ReviewRun
         _exemptions.Clear();
     }
 
-    private void AddUnderStrictness(Finding finding, Strictness strictness)
+    private Finding? AddUnderStrictness(Finding finding, Strictness strictness, ReviewedRule? rule)
     {
         var effect = StrictnessEffect(finding, strictness);
         if(effect == null)
-            return;
+            return null;
 
         var judged = effect == finding.Severity ? finding : finding.WithSeverity(effect.Value);
-        var key = KeyOf(finding);
-        if(_findingPositions.TryAdd(key, _findings.Count))
-            _findings.Add(judged);
-        else if(judged.Severity == Severity.Block && _findings[_findingPositions[key]].Severity == Severity.Warn)
-            _findings[_findingPositions[key]] = judged;
-
+        var key = new JudgedKey(KeyOf(finding), QuotedLine(finding), RuleFingerprint.Of(rule));
         if(Tree != null && finding.Source == FindingSource.EditorConfig)
             RememberTree(key, Tree);
+
+        if(_findingPositions.TryAdd(key, _findings.Count))
+            _findings.Add(judged);
+        else
+        {
+            var previous = _findings[_findingPositions[key]];
+            if(judged.Severity != Severity.Block || previous.Severity == Severity.Block)
+                return null;
+
+            _reportedTrees.Remove(previous);
+            _rules.Remove(previous);
+            _findings[_findingPositions[key]] = judged;
+        }
+
+        _reportedTrees[judged] = Tree;
+        return judged;
     }
 
-    private void RememberTree(FindingKey key, string tree)
+    private void RememberTree(JudgedKey key, string tree)
     {
         if(!_findingTrees.TryGetValue(key, out var trees))
         {
@@ -135,6 +176,18 @@ internal sealed class ReviewRun
             return finding.Severity;
 
         return strictness.EffectOf(finding.FileSeverity);
+    }
+
+    /// <summary>
+    /// The text of the line the finding points at, in the tree under review; nothing when that source was not read.
+    /// </summary>
+    private string? QuotedLine(Finding finding)
+    {
+        if(finding.File == null || finding.Line is not { } line || !_sources.TryGetValue((Tree, finding.File), out var text))
+            return null;
+
+        var lines = text.Split('\n');
+        return line >= 1 && line <= lines.Length ? lines[line - 1].TrimEnd('\r') : null;
     }
 
     private static FindingKey KeyOf(Finding finding)
@@ -160,7 +213,7 @@ internal sealed class ReviewRun
 
     public void RememberSource(ILanguage language, CodeFile file, IReadOnlyList<LineRange>? changedLines)
     {
-        _sources[file.Path] = file.Content;
+        _sources[(Tree, file.Path)] = file.Content;
         AddFindings(_exemptions.Remember(language, file, changedLines));
     }
 
@@ -194,17 +247,30 @@ internal sealed class ReviewRun
         _advice.Add(sentence);
     }
 
-    public ReviewResult ToResult(TimeSpan duration, StructureJudgment? judgment = null, RepositoryLocation? repository = null)
+    public ReviewResult ToResult(TimeSpan duration, StructureJudgment? judgment = null, RepositoryLocation? repository = null, ChangeSet? onlyChange = null)
     {
         ApplyPolicies(Strictness.Standard);
         var outcome = DecideOutcome();
-        var sources = _sources.Where(source => _findings.Any(finding => string.Equals(finding.File, source.Key, StringComparison.Ordinal))).ToDictionary(source => source.Key, source => source.Value, StringComparer.Ordinal);
-        return new ReviewResult(outcome, _findings, _coverage, _skipped, Summarize(), duration, sources)
+        var sources = new Dictionary<(string? Tree, string Path), string>();
+        foreach(var finding in _findings)
         {
+            if(finding.File != null && _sources.TryGetValue((_reportedTrees[finding], finding.File), out var text))
+                sources[(_reportedTrees[finding], finding.File)] = text;
+        }
+
+        return new ReviewResult(outcome, _findings, _coverage, _skipped, Summarize(), duration)
+        {
+            ReviewedRules = _rules,
+            IsQuick = Quick,
+            ReportedTrees = _reportedTrees,
+            ReviewedSources = sources,
             StructureJudgment = judgment,
             LeavesOutUncommittedWork = _uncommittedWork,
             ExemptedFindings = _exempted,
             Repository = repository,
+            TreeReviewed = onlyChange?.Tree ?? string.Empty,
+            BaseTreeReviewed = onlyChange?.BeforeTree ?? string.Empty,
+            CommitReviewed = onlyChange?.Commit ?? string.Empty,
             FindingTrees = _findingTrees.ToDictionary(entry => _findings[_findingPositions[entry.Key]], entry => (IReadOnlyList<string>)entry.Value)
         };
     }

@@ -3,6 +3,70 @@
 What changed in each published release of CommitFence, newest first. Each section is also the text of that release on
 GitHub, with its downloads.
 
+## 1.0.0.6 — 2026-11-26
+
+### Rules
+
+- **Comparisons:** a condition can be a limit (`atLeast`, `atMost`), a range (both), a value it must not be (`not`), or
+  a wildcard pattern (`matches`, with `*` and `?`). A method rule can say
+  `"require": { "parameterCount": { "atLeast": 1, "atMost": 5 } }`.
+- **New things to look at:** a method's `nestingDepth`; a class's `isNested` and `isNamedLikeFile`; and file rules, `for:
+  "file"`, with the file's `name` and `typesInFile`. A file rule applies when the file is added or renamed, or when any
+  line in it changes.
+- A rule that uses any of these writes `"requires": "1.0.0.6"` into `commitfence.json`. An older CommitFence then says
+  the review is incomplete and asks to be updated, instead of misreading the rule.
+- **The rule page** sets where a rule applies, what a finding says and why, several requirements, and a comparison that
+  fits each property. A rule that cannot be saved says why, in its head and under the part that is wrong. A range reads
+  "is between 1 and 5" and cannot be reversed.
+- Trying a rule that reads the file's name asks for a file, and shows the command to run with a Copy button.
+
+### Reviews
+
+- **Review the staged changes** in the app, or with `commitfence review --staged`. `--quick` (also with `--files`)
+  reviews without a build and leaves out the rules that need one.
+- **Open at line:** each finding's code opens its file at the line. When the code on disk moved, is not found or is found
+  more than once, the code head says so and the file opens at the top.
+- A change loads only the C# projects it can reach, so a change in one product costs what that product alone costs.
+- A push is reviewed against the remote git would push to, following `push.default`, and says when git would refuse it.
+
+### Setting a repository up
+
+- **`commitfence init` adds the review line to the `pre-push` hook** of husky, lefthook (its `commands` and its `jobs`
+  forms) or a plain git hook, keeping shared and Git LFS hooks intact. `--hook pre-commit` reviews the staged files
+  without a build; `--print` shows both changes first.
+- **In the app,** Rules can start `commitfence.json` and Doctor can preview the hook line, add it, and give the commands
+  that commit only the setup file.
+
+### Fixes
+
+- A review run from a subfolder uses the repository's own settings.
+- The branch in the window follows a checkout made outside the app.
+- A review that finds no push clears the findings of the review before it.
+- A staged or folder review that could not finish says so, even when it also found something.
+- The rule of a finding is read from the tree the finding came from.
+- A rule that sets two conditions on one property is refused instead of losing one.
+- New and Duplicate never propose a rule ID that already exists, also beside a very long one.
+- A finding of a rule ID without a description keeps its effect and says so.
+- A suppression whose ID is a constant, or cannot be resolved, is kept; Exemptions reads an ID written as joined strings.
+- Projects that reference other project types or move their build inputs are reviewed.
+
+### Known limits
+
+- The copied setup commands use `&&`: they run in PowerShell 7 and in git's own shells, not in Windows PowerShell 5.1.
+- lefthook does not escape the hook's arguments: a remote name or URL holding `"`, `$` or a backtick is read by the shell.
+- A copied Windows command whose hook path holds an apostrophe does not run as copied.
+
+### Downloads
+
+| Download | What |
+|---|---|
+| `CommitFence-win-x64.zip`, `CommitFence-win-arm64.zip` | The app for Windows, with the command line beside it |
+| `CommitFence-osx-arm64.zip`, `CommitFence-osx-x64.zip` | The app for macOS (Apple silicon, Intel) |
+| `CommitFence-linux-x64.tar.gz` | The app for Linux |
+| `commitfence-cli-*` | The command line, `commitfence`, for the same systems |
+
+---
+
 ## 1.0.0.5 — 2026-11-26
 
 ### Apply fix

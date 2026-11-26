@@ -1,7 +1,6 @@
 using CF.Cli.Console;
 using CF.Core.Changes;
 using CF.Core.Review;
-using CF.Core.Rules.Settings;
 using CF.Core.Services;
 
 namespace CF.Cli.Commands;
@@ -14,7 +13,6 @@ internal sealed class ChangesReviewCommand
 {
     private readonly IProductInfoService _productInfo;
     private readonly IReviewService _reviewService;
-    private readonly IRuleService _ruleService;
     private readonly TextReader _input;
     private readonly TextWriter _output;
     private readonly TextWriter _error;
@@ -23,11 +21,10 @@ internal sealed class ChangesReviewCommand
     private readonly string? _settingsPath;
     private readonly ReviewArguments _arguments;
 
-    public ChangesReviewCommand(IProductInfoService productInfo, IReviewService reviewService, IRuleService ruleService, CommandEnvironment environment, string? settingsPath, ReviewArguments arguments)
+    public ChangesReviewCommand(IProductInfoService productInfo, IReviewService reviewService, CommandEnvironment environment, string? settingsPath, ReviewArguments arguments)
     {
         _productInfo = productInfo;
         _reviewService = reviewService;
-        _ruleService = ruleService;
         _input = environment.Input;
         _output = environment.Output;
         _error = environment.Error;
@@ -55,7 +52,7 @@ internal sealed class ChangesReviewCommand
     private void Report(ReviewResult result)
     {
         if(_arguments.AsPrompt)
-            new PromptReporter(_output, _ruleService, _settingsPath ?? Path.GetFullPath(SettingsFileName.Default, _currentFolder)).Write(result);
+            new PromptReporter(_output).Write(result);
         else
             new PlainTextReporter(_output, countByRule: _arguments.Mode == ReviewMode.All).Write(result);
     }
@@ -69,7 +66,7 @@ internal sealed class ChangesReviewCommand
             case ReviewMode.Push:
                 return FindPushScope();
             case ReviewMode.Staged:
-                return ReviewScope.ForStaged();
+                return ReviewScope.ForStaged(_arguments.Quick);
             case ReviewMode.All:
                 return ReviewScope.ForWholeFolder(_arguments.Target.Length == 0 ? string.Empty : Path.GetFullPath(_arguments.Target, _currentFolder));
             default:

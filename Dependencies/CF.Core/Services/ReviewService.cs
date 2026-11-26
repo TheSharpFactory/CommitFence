@@ -12,21 +12,23 @@ public sealed class ReviewService : IReviewService
     private readonly NamedFilesReview _namedFiles;
     private readonly TreeReview _tree;
     private readonly PushScopeFinder _pushScope;
+    private readonly StagedScopeFinder? _staged;
 
     /// <summary>
     /// Creates the service.
     /// </summary>
-    public ReviewService(NamedFilesReview namedFiles, TreeReview tree, PushScopeFinder pushScope)
+    public ReviewService(NamedFilesReview namedFiles, TreeReview tree, PushScopeFinder pushScope, StagedScopeFinder? staged = null)
     {
         _namedFiles = namedFiles;
         _tree = tree;
         _pushScope = pushScope;
+        _staged = staged;
     }
 
     /// <inheritdoc />
-    public ReviewResult ReviewFiles(string settingsPath, IReadOnlyList<FileToReview> files)
+    public ReviewResult ReviewFiles(string settingsPath, IReadOnlyList<FileToReview> files, bool quick = false)
     {
-        return _namedFiles.Review(settingsPath, files);
+        return _namedFiles.Review(settingsPath, files, quick);
     }
 
     /// <inheritdoc />
@@ -39,5 +41,17 @@ public sealed class ReviewService : IReviewService
     public PushScopeAnswer FindPushScope(string folder)
     {
         return _pushScope.Find(folder);
+    }
+
+    /// <inheritdoc />
+    public StagedAnswer FindStaged(string folder)
+    {
+        return _staged?.Find(folder) ?? StagedAnswer.Unknown("The staged changes cannot be read here.");
+    }
+
+    /// <inheritdoc />
+    public PushScopeAnswer FindPushScope(string folder, string branch)
+    {
+        return _pushScope.Find(folder, branch);
     }
 }

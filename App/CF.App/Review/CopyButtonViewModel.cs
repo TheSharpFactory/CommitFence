@@ -14,15 +14,21 @@ internal sealed partial class CopyButtonViewModel : ObservableObject
 
     private readonly Func<string> _text;
     private readonly Func<ITextClipboard?> _clipboard;
+    private string IdleSpokenName { get; }
     private DispatcherTimer? _timer;
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(SpokenName))]
     public partial bool IsCopied { get; set; }
 
-    public CopyButtonViewModel(string label, Func<string> text, Func<ITextClipboard?> clipboard, bool isPrimary = false)
+    [ObservableProperty]
+    [NotifyCanExecuteChangedFor(nameof(CopyCommand))]
+    public partial bool IsAvailable { get; set; } = true;
+
+    public CopyButtonViewModel(string label, Func<string> text, Func<ITextClipboard?> clipboard, bool isPrimary = false, string? spokenName = null)
     {
         Label = label;
+        IdleSpokenName = spokenName ?? label;
         IsPrimary = isPrimary;
         _text = text;
         _clipboard = clipboard;
@@ -39,7 +45,7 @@ internal sealed partial class CopyButtonViewModel : ObservableObject
     {
         get
         {
-            return IsCopied ? "Copied" : Label;
+            return IsCopied ? "Copied" : IdleSpokenName;
         }
     }
 
@@ -52,9 +58,12 @@ internal sealed partial class CopyButtonViewModel : ObservableObject
         IsCopied = false;
     }
 
-    [RelayCommand]
+    [RelayCommand(CanExecute = nameof(IsAvailable))]
     private async Task CopyAsync()
     {
+        if(!IsAvailable)
+            return;
+
         var clipboard = _clipboard();
         if(clipboard == null)
             return;

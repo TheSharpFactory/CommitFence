@@ -162,6 +162,37 @@
   </StackPanel>
   </Border>
 
+  <!-- The panel of the states before a review of the staged changes: the files that are staged and not reviewed, or the ones that changed and
+       are not staged, each with its line count or its note. -->
+  <Border IsVisible="{Binding Verdict.HasFileRows}" Background="{DynamicResource side}" CornerRadius="16" Padding="8,12,8,8">
+    <StackPanel>
+      <Grid ColumnDefinitions="Auto,*" Margin="4,0,0,8" MinHeight="28">
+        <TextBlock Theme="{StaticResource type-h3}" VerticalAlignment="Center" Text="Files"/>
+        <TextBlock Grid.Column="1" Theme="{StaticResource type-meta}" Foreground="{DynamicResource ink-2}" Margin="10,2,0,0" VerticalAlignment="Center"
+                   TextTrimming="CharacterEllipsis" Text="{Binding Verdict.FileListHeading}"/>
+      </Grid>
+      <ItemsControl ItemsSource="{Binding Verdict.FileRows}">
+        <ItemsControl.ItemsPanel>
+          <ItemsPanelTemplate>
+            <StackPanel Spacing="2"/>
+          </ItemsPanelTemplate>
+        </ItemsControl.ItemsPanel>
+        <ItemsControl.ItemTemplate>
+          <DataTemplate DataType="review:ListedFile" x:DataType="review:ListedFile">
+            <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="10" Margin="10,9,12,9">
+              <parts:Icon Data="{StaticResource i-file}" Width="15" Height="15" Stroke="{DynamicResource ink}" VerticalAlignment="Top" Margin="0,2,0,0"/>
+              <TextBlock Grid.Column="1" Theme="{StaticResource code-strong}" TextWrapping="Wrap" VerticalAlignment="Center" Text="{Binding Path.Full}"/>
+              <TextBlock Grid.Column="2" Theme="{StaticResource type-meta}" FontFeatures="+tnum" Foreground="{DynamicResource ink-2}" VerticalAlignment="Center"
+                         Text="{Binding Note}"/>
+            </Grid>
+          </DataTemplate>
+        </ItemsControl.ItemTemplate>
+      </ItemsControl>
+      <TextBlock IsVisible="{Binding Verdict.HasMoreFiles}" Theme="{StaticResource type-body}" Foreground="{DynamicResource ink-2}" Margin="38,4,12,6"
+                 Text="{Binding Verdict.MoreFiles}"/>
+    </StackPanel>
+  </Border>
+
   <!-- The panel of a folder review: how many findings each rule has. In one pane it is one line with "Show". -->
   <Border IsVisible="{Binding HasRulePanel}" Background="{DynamicResource side}" CornerRadius="16" Padding="8,12,8,8">
     <StackPanel>

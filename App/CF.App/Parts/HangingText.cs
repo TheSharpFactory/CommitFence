@@ -15,7 +15,6 @@ namespace CF.App.Parts;
 /// </summary>
 internal sealed class HangingText : TextBlock
 {
-    private const int _fewestColumns = 12;
     private const int _fewestAfterIndent = 4;
 
     public static readonly StyledProperty<string> LineProperty = AvaloniaProperty.Register<HangingText, string>(nameof(Line), string.Empty);
@@ -84,7 +83,7 @@ internal sealed class HangingText : TextBlock
     protected override Size MeasureOverride(Size availableSize)
     {
         var width = availableSize.Width - Padding.Left - Padding.Right;
-        var columns = double.IsInfinity(width) ? int.MaxValue : Math.Max(_fewestColumns, (int)Math.Floor(width / CharacterWidth()));
+        var columns = double.IsInfinity(width) ? int.MaxValue : Math.Max(1, (int)Math.Floor(width / CharacterWidth()));
         Fill(columns);
         return base.MeasureOverride(availableSize);
     }
@@ -116,8 +115,9 @@ internal sealed class HangingText : TextBlock
         _builtFor = key;
         Inlines.Clear();
         var indent = text.Length - text.TrimStart(' ').Length;
-        var breaks = WrapPoints(text, columns, indent, ContinuationIndent);
-        var prefix = new string(' ', indent + ContinuationIndent);
+        var continuedIndent = Math.Min(indent + ContinuationIndent, Math.Max(0, columns - _fewestAfterIndent));
+        var breaks = WrapPoints(text, columns, indent, continuedIndent);
+        var prefix = new string(' ', continuedIndent);
         var position = 0;
         foreach(var segment in segments)
         {
@@ -152,25 +152,39 @@ internal sealed class HangingText : TextBlock
 
     /// <summary>
     /// The places in the line before which a row begins (the first row begins at 0 and is not listed): a row ends after a space
-    /// when it has one, and anywhere when it has none.
+    /// or a path separator when possible. A token that cannot fit on one row breaks at the edge.
     /// </summary>
-    public static HashSet<int> WrapPoints(string text, int columns, int indent, int continuation)
+    private static HashSet<int> WrapPoints(string text, int columns, int indent, int continuedIndent)
     {
         var points = new HashSet<int>();
         var start = 0;
         var room = columns;
-        var later = Math.Max(_fewestAfterIndent, columns - indent - continuation);
+        var later = columns - continuedIndent;
         while(text.Length - start > room)
         {
             var end = start + room;
-            var space = text.LastIndexOf(' ', end - 1, end - start);
-            var floor = start + (start == 0 ? indent : 0);
-            var next = space + 1 > floor ? space + 1 : end;
-            points.Add(next);
+            var floor = start == 0 ? Math.Min(indent, end) : start;
+            var next = end;
+            while(next > floor && !CanBreakAfter(text[next - 1]))
+                next--;
+
+            if(next == floor)
+                next = end;
+
+            if(char.IsHighSurrogate(text[next - 1]) && char.IsLowSurrogate(text[next]))
+                next = next > start + 1 ? next - 1 : next + 1;
+
+            if(next < text.Length)
+                points.Add(next);
             start = next;
             room = later;
         }
 
         return points;
+    }
+
+    private static bool CanBreakAfter(char character)
+    {
+        return character is ' ' or '/' or '\\';
     }
 }

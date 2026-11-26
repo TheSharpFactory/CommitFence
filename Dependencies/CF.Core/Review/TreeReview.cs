@@ -68,7 +68,7 @@ public sealed class TreeReview
 
     private ReviewResult FinishLocked(RepositoryLocation repository, ReviewScope scope, string? settingsPath, DateTimeOffset started)
     {
-        var run = new ReviewRun();
+        var run = new ReviewRun(scope.Quick);
         ReviewResult result;
         DateTimeOffset ended;
         try
@@ -114,7 +114,8 @@ public sealed class TreeReview
     private ReviewResult ReviewLocked(RepositoryLocation repository, ReviewScope scope, string? settingsPath, DateTimeOffset started, ReviewRun run, out DateTimeOffset ended)
     {
         string? wholeFolder = null;
-        foreach(var changeSet in _changeResolver.Resolve(repository, scope))
+        var changeSets = _changeResolver.Resolve(repository, scope);
+        foreach(var changeSet in changeSets)
         {
             run.Tree = changeSet.Tree;
             _changeSetReview.Review(repository, changeSet, settingsPath, run);
@@ -127,7 +128,7 @@ public sealed class TreeReview
         if(judgment != null)
             _structureJudgments?.Save(repository, judgment);
 
-        return run.ToResult(ended - started, judgment, repository);
+        return run.ToResult(ended - started, judgment, repository, changeSets.Count == 1 ? changeSets[0] : null);
     }
 
     private ReviewResult CreateIncompleteResult(string reason, DateTimeOffset started, DateTimeOffset? ended = null)

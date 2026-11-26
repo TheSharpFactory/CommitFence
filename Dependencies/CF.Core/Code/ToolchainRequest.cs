@@ -44,4 +44,9 @@ public sealed class ToolchainRequest
     /// review (what they need is built first), and nothing found in a project is "old".
     /// </summary>
     public bool IsWholeReview { get; }
+
+    /// <summary>
+    /// Whether the review needs the complete list of the tree's assemblies to place uses whose source file is unknown.
+    /// </summary>
+    public bool NeedsAllAssemblyNames { get; init; }
 }

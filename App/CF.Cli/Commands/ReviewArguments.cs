@@ -34,6 +34,8 @@ internal sealed class ReviewArguments
     /// </summary>
     public bool AsPrompt { get; internal set; }
 
+    public bool Quick { get; set; }
+
     public static ReviewArgumentsResult Parse(string[] args, bool allowPushHead = false)
     {
         return new ReviewArgumentsReader(args, allowPushHead).Read();

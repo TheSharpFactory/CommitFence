@@ -116,4 +116,10 @@ public interface IGit
     /// The remote branch the local branch follows, or <c>null</c> when it follows none.
     /// </summary>
     BranchUpstream? Upstream(RepositoryLocation repository, string branch);
+
+    /// <summary>The remote configured for pushing this branch, before Git's fallback to a default remote.</summary>
+    string? ConfiguredPushRemote(RepositoryLocation repository, string branch);
+
+    /// <summary>The value of git's <c>push.default</c> setting, or <c>null</c> when it is not set.</summary>
+    string? PushDefault(RepositoryLocation repository);
 }

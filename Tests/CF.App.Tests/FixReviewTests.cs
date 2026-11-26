@@ -75,6 +75,9 @@ public sealed class FixReviewTests
         Assert.NotNull(header);
         Assert.True(header.Focus());
         host.Press(PhysicalKey.Tab);
+        var open = Assert.IsType<Button>(host.Window.FocusManager?.GetFocusedElement());
+        Assert.StartsWith("Open ", AutomationProperties.GetName(open), StringComparison.Ordinal);
+        host.Press(PhysicalKey.Tab);
         var difference = Assert.IsType<DiffCode>(host.Window.FocusManager?.GetFocusedElement());
         host.Press(PhysicalKey.A, RawInputModifiers.Control);
         Assert.Contains("return maximum;", difference.SelectedText, StringComparison.Ordinal);
@@ -123,7 +126,7 @@ public sealed class FixReviewTests
         shell.Review.Result = _ => fixture.Result(multipleTrees: true);
         File.WriteAllBytes(fixture.PathToSource, FixReviewFixture.Before);
         var review = shell.Model.Review;
-        review.SelectedChoice = review.Choices[1];
+        review.SelectedChoice = review.Choices[2];
         await review.RunCommand.ExecuteAsync(null);
         review.RuleRows.Single(rule => rule.RuleId == "IDE0011").ChooseCommand.Execute(null);
         var group = Assert.Single(review.FileGroups);

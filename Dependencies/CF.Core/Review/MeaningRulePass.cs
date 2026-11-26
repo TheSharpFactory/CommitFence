@@ -77,7 +77,7 @@ internal static class MeaningRulePass
                 findings.AddRange(RuleEvaluator.Evaluate(rule, artifacts));
         }
 
-        run.AddFindings(ReachFilter.Keep(ReportOnce(findings), source.ChangedLines));
+        run.AddFindings(ReachFilter.Keep(ReportOnce(findings), source.Change));
     }
 
     /// <summary>

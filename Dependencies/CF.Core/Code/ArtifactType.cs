@@ -46,6 +46,9 @@ public sealed class ArtifactType
     /// </summary>
     public bool KnownOnlyFromMeaning { get; }
 
+    /// <summary>The first CommitFence version that accepts rules for this artifact, when a floor is needed.</summary>
+    public string? RuleVersion { get; init; }
+
     /// <summary>
     /// The descriptor of the property with this name, or nothing.
     /// </summary>

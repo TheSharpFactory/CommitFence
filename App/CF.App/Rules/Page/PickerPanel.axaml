@@ -8,10 +8,10 @@
 
   <!-- The panel a token opens: a find row when there are more than eight entries, then
        the entries, in groups when the picker has groups. At most 392 high; then the entries scroll and the find row stays. -->
-  <Border Name="Surface" Classes="picker" Width="{Binding Width}" AutomationProperties.Name="{Binding SpokenName}">
-    <StackPanel>
+  <Border Name="Surface" Classes="picker" local:PickerRoom.Least="{Binding Width}" AutomationProperties.Name="{Binding SpokenName}">
+    <Grid RowDefinitions="Auto,Auto,*">
 
-      <Border IsVisible="{Binding HasFindRow}" Height="36" Padding="10,0" Margin="0,0,0,4"
+      <Border Grid.Row="0" IsVisible="{Binding HasFindRow}" Height="36" Padding="10,0" Margin="0,0,0,4"
               BorderBrush="{DynamicResource line}" BorderThickness="0,0,0,1">
         <Grid ColumnDefinitions="Auto,*" ColumnSpacing="8">
           <parts:Icon Data="{StaticResource i-search}" Width="16" Height="16" Stroke="{DynamicResource ink-3}"/>
@@ -20,10 +20,10 @@
         </Grid>
       </Border>
 
-      <TextBlock IsVisible="{Binding ShowsNoMatch}" Height="36" Padding="10,8,10,0"
+      <TextBlock Grid.Row="1" IsVisible="{Binding ShowsNoMatch}" Height="36" Padding="10,8,10,0"
                  Theme="{StaticResource type-body}" Foreground="{DynamicResource ink-3}" Text="{Binding NoMatchText}"/>
 
-      <ScrollViewer MaxHeight="340" HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
+      <ScrollViewer Grid.Row="2" MaxHeight="340" HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
         <ItemsControl ItemsSource="{Binding Items}">
           <ItemsControl.DataTemplates>
 
@@ -36,7 +36,7 @@
               <Button Classes="pick" Classes.highlight="{Binding IsHighlighted}" IsEnabled="{Binding IsEnabled}"
                       Command="{Binding $parent[ItemsControl].((local:PickerViewModel)DataContext).ChooseCommand}"
                       CommandParameter="{Binding}" AutomationProperties.Name="{Binding Name}">
-                <Grid ColumnDefinitions="*,Auto,16" ColumnSpacing="10">
+                <Grid ColumnDefinitions="*,Auto,16" ColumnSpacing="24">
                   <TextBlock Classes="entry-name" Classes.current="{Binding IsCurrent}" Text="{Binding Name}" VerticalAlignment="Center"/>
                   <TextBlock Grid.Column="1" Theme="{StaticResource type-meta}" Foreground="{DynamicResource ink-2}"
                              Text="{Binding KindText}" VerticalAlignment="Center"/>
@@ -50,7 +50,7 @@
         </ItemsControl>
       </ScrollViewer>
 
-    </StackPanel>
+    </Grid>
   </Border>
 
 </UserControl>

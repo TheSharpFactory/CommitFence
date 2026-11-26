@@ -46,6 +46,13 @@ public sealed record DoctorExcerpt(string Path, int? Line, IReadOnlyList<FileLin
         return (current, new DoctorExcerpt(path, 2, NumberedLines(reordered, 1, last)));
     }
 
+    internal static HookAddition HookInsert(HookEdit edit)
+    {
+        var updated = ReadLines(edit.Updated!);
+        return new HookAddition(edit.Kind, edit.ShownPath, new DoctorExcerpt(edit.Path, null, NumberedLines(edit.Lines, 1, edit.Lines.Count)),
+            new DoctorExcerpt(edit.Path, edit.InsertionLine, NumberedLines(updated, 1, updated.Count)));
+    }
+
     private static List<FileLine> NumberedLines(IReadOnlyList<string> lines, int first, int last)
     {
         var excerpt = new List<FileLine>();

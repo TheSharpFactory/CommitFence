@@ -42,7 +42,7 @@ internal sealed partial class SettingsViewModel : ObservableObject, IScreenModel
         _languageReports = services.LanguageReports;
         _machine = services.Machine;
         RepositoryName = folder.Name;
-        _folderPath = folder.FolderPath;
+        _folderPath = Path.GetDirectoryName(folder.SettingsPath)!;
         _settingsPath = folder.SettingsPath;
         _followsSystemMotion = followsSystemMotion ?? OperatingSystem.IsWindows();
         VersionTitle = services.ProductInfo.Name + " " + services.ProductInfo.Version;

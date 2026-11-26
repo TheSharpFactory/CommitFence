@@ -29,6 +29,11 @@ internal sealed class ObservedFileSystem : IFileSystem
         return _inner.FileExists(path);
     }
 
+    public bool FolderExists(string path)
+    {
+        return _inner.FolderExists(path);
+    }
+
     public string ReadAllText(string path)
     {
         _beforeRead(path);

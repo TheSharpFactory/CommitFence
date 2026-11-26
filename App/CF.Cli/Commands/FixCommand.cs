@@ -41,16 +41,18 @@ internal sealed class FixCommand(IReviewService review, IFixService fixes, Comma
     {
         var push = arguments.Mode == ReviewMode.Push ? review.FindPushScope(environment.CurrentFolder) : null;
         var scope = ScopeOf(arguments, push);
+        if(arguments.Mode == ReviewMode.Push && arguments.HeadRevision is not ("" or "HEAD"))
+        {
+            scope = scope == null ? null : SelectHead(scope, arguments.HeadRevision);
+            if(scope == null)
+            {
+                push = review.FindPushScope(environment.CurrentFolder, arguments.HeadRevision);
+                scope = push.Scope;
+            }
+        }
+
         if(scope == null)
             return NoFix(push?.Reason);
-
-        if(arguments.Mode == ReviewMode.Push && arguments.HeadRevision.Length > 0)
-        {
-            var head = arguments.HeadRevision == "HEAD" ? push!.Branch : arguments.HeadRevision;
-            scope = SelectHead(scope, head);
-            if(scope == null)
-                return NoFix("Choose one of the pushed refs with --head, or choose a range with --base and --head.");
-        }
 
         var settings = arguments.SettingsPath == null ? null : Path.GetFullPath(arguments.SettingsPath, environment.CurrentFolder);
         var result = review.ReviewChanges(environment.CurrentFolder, scope, settings);

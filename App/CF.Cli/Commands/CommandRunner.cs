@@ -37,6 +37,7 @@ internal sealed class CommandRunner
     private readonly IExemptionService? _exemptions;
     private readonly IStatsService? _stats;
     private readonly IFixService? _fixes;
+    private readonly IFolderService? _folders;
     private readonly CommandEnvironment _environment;
     private readonly string _programPath;
     private readonly string _currentFolder;
@@ -44,7 +45,7 @@ internal sealed class CommandRunner
     private readonly TextWriter _error;
     private readonly Dictionary<string, Func<string[], ExitCode>> _commands;
 
-    public CommandRunner(IProductInfoService productInfo, IRuleService ruleService, IReviewService reviewService, ISetupService setupService, IUpdater updater, CommandEnvironment environment, IDoctorService? doctor = null, ISettingsService? settings = null, IStructureService? structure = null, IClock? clock = null, IExemptionService? exemptions = null, IStatsService? stats = null, IFixService? fixes = null)
+    public CommandRunner(IProductInfoService productInfo, IRuleService ruleService, IReviewService reviewService, ISetupService setupService, IUpdater updater, CommandEnvironment environment, IDoctorService? doctor = null, ISettingsService? settings = null, IStructureService? structure = null, IClock? clock = null, IExemptionService? exemptions = null, IStatsService? stats = null, IFixService? fixes = null, IFolderService? folders = null)
     {
         _productInfo = productInfo;
         _ruleService = ruleService;
@@ -58,6 +59,7 @@ internal sealed class CommandRunner
         _exemptions = exemptions;
         _stats = stats;
         _fixes = fixes;
+        _folders = folders;
         _environment = environment;
         _currentFolder = environment.CurrentFolder;
         _programPath = environment.ProgramPath;
@@ -85,19 +87,29 @@ internal sealed class CommandRunner
             ["--help"] = Alone(ShowUsage),
             ["-h"] = Alone(ShowUsage),
             ["--version"] = Alone(() => new VersionCommand(_productInfo, _output).Run()),
-            ["init"] = Alone(RunInit),
+            ["init"] = args => new InitCommand(_setupService, _environment).Run(args),
             [DoctorCommandName] = Alone(RunDoctor),
             ["stats"] = args => new StatsCommand(_stats ?? throw new InvalidOperationException("Stats is not configured."), _environment).Run(args),
             ["install"] = RunInstall,
             [UpdateCommandName] = RunUpdate,
             ["catalog"] = RunCatalog,
-            ["rules"] = args => new RulesRunner(_ruleService, _environment).Run(args),
-            ["settings"] = args => new SettingsCommand(_settings ?? throw new InvalidOperationException("Settings is not configured."), _environment).Run(args),
-            ["structure"] = args => new StructureCommand(_structure ?? throw new InvalidOperationException("Structure is not configured."), _clock!, _environment).Run(args),
+            ["rules"] = args => new RulesRunner(_ruleService, _environment, DefaultSettingsPath).Run(args),
+            ["settings"] = args => new SettingsCommand(_settings ?? throw new InvalidOperationException("Settings is not configured."), SettingsEnvironment()).Run(args),
+            ["structure"] = args => new StructureCommand(_structure ?? throw new InvalidOperationException("Structure is not configured."), _clock!, SettingsEnvironment()).Run(args),
             ["exemptions"] = args => new ExemptionsCommand(_exemptions ?? throw new InvalidOperationException("Exemptions is not configured."), _environment).Run(args),
             ["fix"] = args => new FixCommand(_reviewService, _fixes!, _environment).Run(args),
             [ReviewCommandName] = RunReview
         };
+    }
+
+    private string DefaultSettingsPath()
+    {
+        return _folders?.Open(_currentFolder).SettingsPath ?? SettingsFileName.PathIn(_currentFolder);
+    }
+
+    private CommandEnvironment SettingsEnvironment()
+    {
+        return _environment with { CurrentFolder = Path.GetDirectoryName(DefaultSettingsPath())! };
     }
 
     /// <summary>
@@ -140,10 +152,10 @@ internal sealed class CommandRunner
     private ExitCode RunReviewCommand(ReviewArguments arguments, string settingsPath)
     {
         if(arguments.Mode == ReviewMode.Files)
-            return new ReviewCommand(_reviewService, _ruleService, _environment, settingsPath, arguments).Run();
+            return new ReviewCommand(_reviewService, _environment, settingsPath, arguments).Run();
 
         var givenPath = arguments.SettingsPath == null ? null : settingsPath;
-        return new ChangesReviewCommand(_productInfo, _reviewService, _ruleService, _environment, givenPath, arguments).Run();
+        return new ChangesReviewCommand(_productInfo, _reviewService, _environment, givenPath, arguments).Run();
     }
 
     private static bool IsSettingsReadFromTree(ReviewArguments arguments)
@@ -176,11 +188,6 @@ internal sealed class CommandRunner
     private ExitCode RunDoctor()
     {
         return new DoctorCommand(_doctor ?? throw new InvalidOperationException("Doctor is not configured."), _output).Run(_currentFolder);
-    }
-
-    private ExitCode RunInit()
-    {
-        return new SetupCommand(_output, _error).Show(_setupService.Init(_currentFolder));
     }
 
     private ExitCode RunCatalog(string[] args)

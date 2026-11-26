@@ -22,6 +22,9 @@ internal static class FileRuleTextFormatter
         foreach(var rule in listing.Rules)
         {
             lines.Add(FormatListLine(rule, idWidth));
+            if(rule.Note != null)
+                lines.Add(new string(' ', idWidth + 2) + rule.Note);
+
             lines.AddRange(rule.ExceptionLines().Select(line => new string(' ', idWidth + 2) + char.ToLowerInvariant(line[0]) + line.Substring(1)));
         }
 
@@ -40,6 +43,8 @@ internal static class FileRuleTextFormatter
             AppendLine(builder, "severity", FormatSeverity(rule.Severity.Value));
 
         AppendLine(builder, "status", FormatStatus(rule));
+        if(rule.Note != null)
+            AppendLine(builder, "note", rule.Note);
         AppendLine(builder, "file", rule.Line == null ? rule.File : $"{rule.File}, line {rule.Line}");
         AppendLine(builder, "source", $"set in {rule.File}; the product does not change that file");
 

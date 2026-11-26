@@ -45,12 +45,12 @@ internal sealed class SettingsSaver
     /// </summary>
     public void CheckWouldSave(RuleSettings settings, string newline)
     {
-        CheckReadsBack(new SettingsWriter(newline).Write(settings), settings);
+        CheckReadsBack(new SettingsWriter(newline).Write(settings, _reader.HigherFeatureVersion(settings)), settings);
     }
 
     public void Save(string settingsPath, string textRead, RuleSettings settings)
     {
-        SaveText(settingsPath, textRead, WriterFor(textRead).Write(settings), settings);
+        SaveText(settingsPath, textRead, WriterFor(textRead).Write(settings, _reader.HigherFeatureVersion(settings)), settings);
     }
 
     public string SaveStructure(string settingsPath, string textRead, RuleSettings settings)

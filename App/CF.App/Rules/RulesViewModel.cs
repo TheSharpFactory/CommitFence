@@ -5,6 +5,7 @@ using Avalonia.Threading;
 using CF.App.Rules.Page;
 using CF.Core.Code;
 using CF.Core.Findings;
+using CF.Core.Ports;
 using CF.Core.Rules;
 using CF.Core.Rules.Settings;
 using CF.Core.Services;
@@ -21,6 +22,7 @@ internal sealed partial class RulesViewModel : ObservableObject, IRuleChanges, I
 {
     private static readonly TimeSpan _undoTime = TimeSpan.FromSeconds(10);
 
+    private const int _longestCountedNumber = 15;
     private const string _customName = "Custom";
     private const string _customNote = "Written here, kept in commitfence.json";
     private const string _fileGroupName = ".editorconfig";
@@ -51,6 +53,7 @@ internal sealed partial class RulesViewModel : ObservableObject, IRuleChanges, I
     private IReadOnlyList<string> _fileNotes = new List<string>();
     private string? _fileName;
     private string? _fileProblem;
+    private Strictness _fileStrictness = Strictness.Standard;
     private int _fileReading;
 
     [ObservableProperty]
@@ -79,6 +82,9 @@ internal sealed partial class RulesViewModel : ObservableObject, IRuleChanges, I
     [NotifyPropertyChangedFor(nameof(HasBanner))]
     public partial string? BannerText { get; set; }
 
+    /// <summary>The banner's words when Duplicate finds a new rule begun and not saved.</summary>
+    public const string UnfinishedDraftText = "Save or discard the new rule you began before duplicating another.";
+
     [ObservableProperty]
     public partial bool CanOpenSettingsFile { get; set; }
 
@@ -92,10 +98,17 @@ internal sealed partial class RulesViewModel : ObservableObject, IRuleChanges, I
     [ObservableProperty]
     public partial string NoMatchText { get; set; } = string.Empty;
 
-    public RulesViewModel(IRuleService rules, OpenedFolder folder, RuleCatalog catalog, ISettingsChangeSource? watcher, ISettingsChangeSource? fileWatcher = null)
+    private readonly IClock? _clock;
+    private readonly Dictionary<string, DateTimeOffset> _savedAt = new Dictionary<string, DateTimeOffset>();
+
+    public RulesViewModel(IRuleService rules, OpenedFolder folder, RuleCatalog catalog, ISettingsChangeSource? watcher, ISettingsChangeSource? fileWatcher = null, ISetupService? setup = null, IClock? clock = null)
     {
         _rules = rules;
         _folder = folder;
+        _setup = setup;
+        _clock = clock;
+        _setupNote = new GroupNoteViewModel($"No commitfence.json in {folder.Name} yet.", false, this);
+        CopyStarter = new CF.App.Review.CopyButtonViewModel("Copy", () => SetupService.StarterSettings, () => Clipboard);
         _catalog = catalog;
         _undoTimer = new DispatcherTimer { Interval = _undoTime };
         _undoTimer.Tick += OnUndoTimeUp;
@@ -281,7 +294,7 @@ internal sealed partial class RulesViewModel : ObservableObject, IRuleChanges, I
     {
         get
         {
-            return !IsOnePane && RuleCountsAreKnown && CurrentPage == null && SelectedFileRule == null;
+            return !IsOnePane && (NeedsSetup || RuleCountsAreKnown) && CurrentPage == null && SelectedFileRule == null;
         }
     }
 
@@ -296,11 +309,16 @@ internal sealed partial class RulesViewModel : ObservableObject, IRuleChanges, I
         }
     }
 
+    public bool ShowsEmptyRules
+    {
+        get { return HasNoRules || (_startedHere && _definitions.Count == 0); }
+    }
+
     public string NoRuleHeading
     {
         get
         {
-            return HasNoRules ? "No rules yet" : "No rule open";
+            return ShowsEmptyRules ? "No rules yet" : "No rule open";
         }
     }
 
@@ -308,7 +326,7 @@ internal sealed partial class RulesViewModel : ObservableObject, IRuleChanges, I
     {
         get
         {
-            return HasNoRules ? $"A rule is a sentence. Write the first one for {_folder.Name}." : "Nothing in the list matches. Clear the search or the filter to choose one.";
+            return ShowsEmptyRules ? $"A rule is a sentence. Write the first one for {_folder.Name}." : "Nothing in the list matches. Clear the search or the filter to choose one.";
         }
     }
 
@@ -331,6 +349,12 @@ internal sealed partial class RulesViewModel : ObservableObject, IRuleChanges, I
     {
         if(IsOnePane || IsDraftOpen || !_hasLoaded)
             return;
+
+        if(open == null && (NeedsSetup || IsStarting || (_startedHere && _definitions.Count == 0)))
+        {
+            NotifyOpenChanged();
+            return;
+        }
 
         var rows = Items.Where(item => item is TeamRuleRowViewModel or FileRuleRowViewModel).ToList();
         if(open != null && StillExists(open))
@@ -378,6 +402,7 @@ internal sealed partial class RulesViewModel : ObservableObject, IRuleChanges, I
         OnPropertyChanged(nameof(ShowsList));
         OnPropertyChanged(nameof(ShowsNoRuleBlock));
         OnPropertyChanged(nameof(HasNoRules));
+        OnPropertyChanged(nameof(ShowsEmptyRules));
         OnPropertyChanged(nameof(NoRuleHeading));
         OnPropertyChanged(nameof(NoRuleLead));
     }
@@ -421,14 +446,14 @@ internal sealed partial class RulesViewModel : ObservableObject, IRuleChanges, I
     /// <inheritdoc />
     public string? ChangeRule(string ruleId, RuleChange change)
     {
-        return Attempt(() => _rules.ChangeRule(_folder.SettingsPath, ruleId, change));
+        return Written(ruleId, () => Attempt(() => _rules.ChangeRule(_folder.SettingsPath, ruleId, change)));
     }
 
     /// <inheritdoc />
     public string? AddRule(RuleDraft draft, string? afterRuleId)
     {
         var code = _draft?.TryIt.Code ?? string.Empty;
-        var message = Attempt(() => AddAt(draft, afterRuleId));
+        var message = Written(draft.Id, () => Attempt(() => AddAt(draft, afterRuleId)));
         if(message == null)
         {
             if(_pages.TryGetValue(draft.Id, out var saved))
@@ -480,6 +505,14 @@ internal sealed partial class RulesViewModel : ObservableObject, IRuleChanges, I
         if(source == null)
             return;
 
+        if(_draft is { IsDirty: true })
+        {
+            // the new rule begun and not saved is kept: it opens again, and the banner says why the copy did not
+            NewRule();
+            BannerText = UnfinishedDraftText;
+            return;
+        }
+
         _draft = new RulePageViewModel(_catalog, this, NextId(), null);
         _draft.FillFrom(source);
         SelectedItem = null;
@@ -487,10 +520,28 @@ internal sealed partial class RulesViewModel : ObservableObject, IRuleChanges, I
         IsPageOpen = true;
     }
 
+    /// <summary>
+    /// What names the files of a pattern in the picker of a path. Left out, a path picker lists no file.
+    /// </summary>
+    public ILanguageService? PathFiles { get; set; }
+
+    /// <inheritdoc />
+    public string RepositoryName
+    {
+        get { return _folder.Name; }
+    }
+
+    /// <inheritdoc />
+    public PathMatches? FindPathFiles(string languageId, string pattern)
+    {
+        return PathFiles?.FindFiles(_folder.FolderPath, languageId, pattern);
+    }
+
     /// <inheritdoc />
     public void DiscardDraft()
     {
         _draft = null;
+        ClearUnfinishedDraftBanner();
         IsDraftOpen = false;
         IsPageOpen = false;
         EnsureRuleOpen();
@@ -502,6 +553,9 @@ internal sealed partial class RulesViewModel : ObservableObject, IRuleChanges, I
     /// </summary>
     public void NewRule()
     {
+        if(IsStarting)
+            return;
+
         _draft ??= new RulePageViewModel(_catalog, this, NextId(), null);
         SelectedItem = null;
         IsDraftOpen = true;
@@ -533,9 +587,13 @@ internal sealed partial class RulesViewModel : ObservableObject, IRuleChanges, I
     /// </summary>
     public void Reload()
     {
+        var missing = MissingSettings();
+        if(!missing)
+            SetupError = null;
+
         try
         {
-            _definitions = _rules.ListRules(_folder.SettingsPath);
+            _definitions = missing ? [] : _rules.ListRules(_folder.SettingsPath);
             _hasLoaded = true;
             BannerText = null;
             CanOpenSettingsFile = false;
@@ -574,7 +632,7 @@ internal sealed partial class RulesViewModel : ObservableObject, IRuleChanges, I
             EndNarrowing();
 
         if(value is FileRuleRowViewModel fileRow)
-            FilePage.Show(fileRow.Rule);
+            FilePage.Show(fileRow.Rule, _fileStrictness);
 
         RefreshBeside();
     }
@@ -600,7 +658,12 @@ internal sealed partial class RulesViewModel : ObservableObject, IRuleChanges, I
         SearchText = string.Empty;
     }
 
-    [RelayCommand]
+    private bool CanNewRuleFromHead()
+    {
+        return !IsStarting;
+    }
+
+    [RelayCommand(CanExecute = nameof(CanNewRuleFromHead))]
     private void NewRuleFromHead()
     {
         NewRule();
@@ -634,7 +697,7 @@ internal sealed partial class RulesViewModel : ObservableObject, IRuleChanges, I
 
     private static List<ConditionDraft> DraftsOf(IReadOnlyList<RuleCondition> conditions)
     {
-        return conditions.Select(condition => new ConditionDraft(condition.PropertyName, condition.ExpectedValues.Select(value => value.ToString()).ToList(), condition.Comparison == Comparison.IsOneOf)).ToList();
+        return conditions.Select(condition => new ConditionDraft(condition.PropertyName, condition.ExpectedValues.Select(value => value.ToString()).ToList(), condition.Comparison, condition.IsList)).ToList();
     }
 
     private void AddAt(RuleDraft draft, string? afterRuleId)
@@ -682,6 +745,40 @@ internal sealed partial class RulesViewModel : ObservableObject, IRuleChanges, I
     /// Makes a change and shows what the file says after it. The message of a refusal is given back, to stand where the
     /// person made the change; nothing is given back when it worked.
     /// </summary>
+    /// <inheritdoc />
+    public string? SavedWhen(string ruleId)
+    {
+        if(_clock == null || !_savedAt.TryGetValue(ruleId, out var at))
+            return null;
+
+        var then = _clock.ToLocalTime(at);
+        var now = _clock.ToLocalTime(_clock.Now);
+        var time = then.ToString("HH:mm", CultureInfo.InvariantCulture);
+        return then.Date == now.Date ? $"today at {time}" : $"on {then.ToString("d MMMM", CultureInfo.InvariantCulture)} at {time}";
+    }
+
+    /// <summary>
+    /// Runs a write of a rule and remembers when it was made. The moment is kept before the write, because the page reads it while
+    /// the write is still reloading it; a refused write forgets it again.
+    /// </summary>
+    private string? Written(string ruleId, Func<string?> write)
+    {
+        var before = _savedAt.TryGetValue(ruleId, out var earlier) ? earlier : (DateTimeOffset?)null;
+        if(_clock != null)
+            _savedAt[ruleId] = _clock.Now;
+
+        var message = write();
+        if(message != null)
+        {
+            if(before == null)
+                _savedAt.Remove(ruleId);
+            else
+                _savedAt[ruleId] = before.Value;
+        }
+
+        return message;
+    }
+
     private string? Attempt(Action change)
     {
         try
@@ -720,7 +817,10 @@ internal sealed partial class RulesViewModel : ObservableObject, IRuleChanges, I
     private void OpenSaved(string ruleId)
     {
         if(_draft != null && _draft.Id == ruleId)
+        {
             _draft = null;
+            ClearUnfinishedDraftBanner();
+        }
 
         IsDraftOpen = false;
         if(_rows.TryGetValue(ruleId, out var row))
@@ -758,11 +858,28 @@ internal sealed partial class RulesViewModel : ObservableObject, IRuleChanges, I
 
     private string NextId()
     {
-        var numbers = _definitions.Select(rule => TeamId().Match(rule.Id)).Where(match => match.Success).ToList();
-        var highest = numbers.Count == 0 ? 0 : numbers.Max(match => int.Parse(match.Groups["number"].Value, CultureInfo.InvariantCulture));
+        // a number with more digits than this is not one the next id could follow, so it is left out
+        var numbers = _definitions.Select(rule => TeamId().Match(rule.Id)).Where(match => match.Success && match.Groups["number"].Length <= _longestCountedNumber).ToList();
+        var highest = numbers.Count == 0 ? 0 : numbers.Max(match => long.Parse(match.Groups["number"].Value, CultureInfo.InvariantCulture));
         var width = Math.Max(3, numbers.Count == 0 ? 3 : numbers.Max(match => match.Groups["number"].Value.Length));
 
-        return "TEAM" + (highest + 1).ToString(CultureInfo.InvariantCulture).PadLeft(width, '0');
+        // an id that is left out of the count above, for its length, can still be the one that follows: no id is proposed twice
+        var taken = new HashSet<string>(_definitions.Select(rule => rule.Id), StringComparer.OrdinalIgnoreCase);
+        string next;
+        do
+        {
+            highest++;
+            next = "TEAM" + highest.ToString(CultureInfo.InvariantCulture).PadLeft(width, '0');
+        }
+        while(taken.Contains(next));
+
+        return next;
+    }
+
+    private void ClearUnfinishedDraftBanner()
+    {
+        if(BannerText == UnfinishedDraftText)
+            BannerText = null;
     }
 
     private void ShowBanner(string text)
@@ -782,6 +899,10 @@ internal sealed partial class RulesViewModel : ObservableObject, IRuleChanges, I
 
     private void Rebuild()
     {
+        NeedsSetup = MissingSettings();
+        if(NeedsSetup || _definitions.Count > 0)
+            SetupWrittenAt = null;
+
         UpdateRows();
         UpdateCounts();
         var desired = new List<RuleListItemViewModel>();
@@ -826,7 +947,7 @@ internal sealed partial class RulesViewModel : ObservableObject, IRuleChanges, I
     private void AddRow(RuleDefinition rule)
     {
         var row = new TeamRuleRowViewModel(rule, _catalog.LanguageName(rule.Language), this);
-        var page = new RulePageViewModel(_catalog, this, rule.Id, rule);
+        var page = new RulePageViewModel(_catalog, this, rule.Id, rule) { IsSetupWriting = IsStarting };
         page.DirtyChanged += () => row.HasUnsavedEdits = page.IsDirty;
         _rows[rule.Id] = row;
         _pages[rule.Id] = page;
@@ -869,7 +990,9 @@ internal sealed partial class RulesViewModel : ObservableObject, IRuleChanges, I
             yield break;
 
         var shown = _definitions.Where(rule => Passes(SelectedFilter.Filter, rule) && MatchesSearch(rule)).ToList();
-        if(shown.Count == 0 && SearchText.Trim().Length == 0)
+        if(NeedsSetup || (_startedHere && _definitions.Count == 0 && SelectedFilter.Filter == RuleFilter.All && SearchText.Trim().Length == 0))
+            yield return _setupNote;
+        else if(shown.Count == 0 && SearchText.Trim().Length == 0)
             yield return new GroupNoteViewModel(EmptyGroupText(), SelectedFilter.Filter != RuleFilter.All);
 
         foreach(var rule in shown)
@@ -922,7 +1045,7 @@ internal sealed partial class RulesViewModel : ObservableObject, IRuleChanges, I
         var searching = SearchText.Trim().Length > 0;
         var anyRow = desired.Any(item => item is TeamRuleRowViewModel);
         var anyFileRow = desired.Any(item => item is FileRuleRowViewModel);
-        HasNoMatch = _hasLoaded && searching && !anyRow && !anyFileRow && _customHeading.IsExpanded && _fileHeading.IsExpanded && FileRulesAreRead;
+        HasNoMatch = _hasLoaded && !NeedsSetup && searching && !anyRow && !anyFileRow && _customHeading.IsExpanded && _fileHeading.IsExpanded && FileRulesAreRead;
         NoMatchText = HasNoMatch ? $"No rule matches “{SearchText.Trim()}”" : string.Empty;
     }
 }

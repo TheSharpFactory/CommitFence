@@ -60,6 +60,39 @@ public sealed class SettingsReader
         }
     }
 
+    internal string? HigherFeatureVersion(RuleSettings settings)
+    {
+        var minimum = settings.Requires == null ? null : ProductVersion.TryParse(settings.Requires);
+        string? raised = null;
+        foreach(var required in settings.Rules.SelectMany(FeatureVersions))
+        {
+            var version = ProductVersion.TryParse(required)!;
+            if(minimum != null && minimum.CompareTo(version) >= 0)
+                continue;
+
+            minimum = version;
+            raised = required;
+        }
+
+        return raised;
+    }
+
+    private IEnumerable<string> FeatureVersions(RuleDefinition rule)
+    {
+        var artifact = _languages.FirstOrDefault(language => language.Id == rule.Language)?.Catalog.FindArtifactType(rule.ArtifactType);
+        if(artifact?.RuleVersion is { } artifactVersion)
+            yield return artifactVersion;
+
+        foreach(var condition in rule.Where.Concat(rule.Require))
+        {
+            if(RuleComparisons.ObjectKey(condition.Comparison) != null)
+                yield return "1.0.0.6";
+
+            if(artifact?.FindProperty(condition.PropertyName)?.RuleVersion is { } propertyVersion)
+                yield return propertyVersion;
+        }
+    }
+
     private static SettingsFileDto Deserialize(byte[] bytes, JsonPositions positions)
     {
         try

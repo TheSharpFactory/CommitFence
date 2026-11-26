@@ -37,6 +37,7 @@ internal sealed partial class MainWindow : Window
         InitializeComponent();
         AddHandler(KeyDownEvent, OnWindowKeyDown, RoutingStrategies.Tunnel);
         Opened += OnOpened;
+        Activated += OnActivated;
         DataContextChanged += OnDataContextChanged;
     }
 
@@ -51,6 +52,11 @@ internal sealed partial class MainWindow : Window
         Model.Updates.StartAndExit = StartAndExit;
         Model.Updates.OpenUri = OpenUri;
         Model.Updates.Start();
+    }
+
+    private void OnActivated(object? sender, EventArgs e)
+    {
+        Model?.RefreshFolder();
     }
 
     private void OnDataContextChanged(object? sender, EventArgs e)

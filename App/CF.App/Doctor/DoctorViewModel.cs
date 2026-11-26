@@ -1,4 +1,5 @@
 using System.Globalization;
+using CF.App.Parts;
 using CF.App.Review;
 using CF.App.Shell;
 using CF.Core.Ports;
@@ -21,6 +22,10 @@ internal sealed partial class DoctorViewModel : ObservableObject, IScreenModel
 
     private readonly IDoctorService _doctor;
     private readonly IClock _clock;
+    private readonly ISetupService? _setup;
+    private string? _addedHookPath;
+    private string? _hookAddedAt;
+    private SetupNextStep? _commitHook;
     private OpenedFolder _folder;
     private DoctorReport? _report;
 
@@ -28,17 +33,20 @@ internal sealed partial class DoctorViewModel : ObservableObject, IScreenModel
     private int _run;
     private bool _started;
 
-    public DoctorViewModel(IDoctorService doctor, IClock clock, OpenedFolder folder)
+    public DoctorViewModel(IDoctorService doctor, IClock clock, OpenedFolder folder, ISetupService? setup = null)
     {
         _doctor = doctor;
         _clock = clock;
         _folder = folder;
+        _setup = setup;
     }
 
     /// <summary>
     /// The window opens a file at a line in the program the system uses for it.
     /// </summary>
     public event Action<string, int?>? OpenFileRequested;
+
+    public event Action<string>? OpenFolderRequested;
 
     /// <summary>
     /// The window opens a web page.
@@ -55,6 +63,10 @@ internal sealed partial class DoctorViewModel : ObservableObject, IScreenModel
     /// </summary>
     public event Action? ChecksFinished;
 
+    public event Action? HookAdded;
+
+    public event Action<string>? HookWriteFinished;
+
     /// <summary>
     /// Where the app puts a text the person asked to copy. The window gives the system's clipboard.
     /// </summary>
@@ -68,8 +80,13 @@ internal sealed partial class DoctorViewModel : ObservableObject, IScreenModel
 
     public bool IsIdle
     {
-        get { return !IsChecking; }
+        get { return !IsChecking && !IsAdding; }
     }
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(IsIdle))]
+    [NotifyCanExecuteChangedFor(nameof(AgainCommand))]
+    public partial bool IsAdding { get; set; }
 
     public string Meta
     {
@@ -98,7 +115,13 @@ internal sealed partial class DoctorViewModel : ObservableObject, IScreenModel
             if(_report.Ready)
                 return DoctorVerdictKind.Ready;
 
-            return _report.Checks.Any(check => check.Outcome == DoctorOutcome.Fails) ? DoctorVerdictKind.Fails : DoctorVerdictKind.Unfinished;
+            var failed = _report.Checks.Where(check => check.Outcome == DoctorOutcome.Fails).ToList();
+            return failed.Count switch
+            {
+                0 => DoctorVerdictKind.Unfinished,
+                1 when failed[0].Fix?.EntryHeading != null => DoctorVerdictKind.LeftToYou,
+                _ => DoctorVerdictKind.Fails
+            };
         }
     }
 
@@ -112,6 +135,8 @@ internal sealed partial class DoctorViewModel : ObservableObject, IScreenModel
         get { return Kind == DoctorVerdictKind.Fails; }
     }
 
+    public bool IsLeftToYou { get { return Kind == DoctorVerdictKind.LeftToYou; } }
+
     public bool IsUnfinished
     {
         get { return Kind == DoctorVerdictKind.Unfinished; }
@@ -124,7 +149,14 @@ internal sealed partial class DoctorViewModel : ObservableObject, IScreenModel
 
     public string Heading
     {
-        get { return Kind == DoctorVerdictKind.Checking ? "Checking" : _report!.Heading; }
+        get
+        {
+            var kind = Kind;
+            if(kind == DoctorVerdictKind.Checking)
+                return "Checking";
+
+            return kind == DoctorVerdictKind.LeftToYou ? "1 check is left to you" : _report!.Heading;
+        }
     }
 
     /// <summary>
@@ -132,7 +164,16 @@ internal sealed partial class DoctorViewModel : ObservableObject, IScreenModel
     /// </summary>
     public IReadOnlyList<DoctorTextPart> Sentence
     {
-        get { return Kind == DoctorVerdictKind.Checking ? new List<DoctorTextPart> { CheckingSentence() } : _report!.Verdict.Parts; }
+        get
+        {
+            var kind = Kind;
+            if(kind == DoctorVerdictKind.Checking)
+                return [CheckingSentence()];
+
+            return kind == DoctorVerdictKind.LeftToYou
+                ? ["Until the entry is in lefthook.yml, pushes from this machine are not reviewed."]
+                : _report!.Verdict.Parts;
+        }
     }
 
     /// <summary>
@@ -172,6 +213,7 @@ internal sealed partial class DoctorViewModel : ObservableObject, IScreenModel
     public async Task ShowFolderAsync(OpenedFolder folder)
     {
         _folder = folder;
+        IsAdding = false;
         _run++;
         IsChecking = false;
         SetReport(null);
@@ -196,6 +238,9 @@ internal sealed partial class DoctorViewModel : ObservableObject, IScreenModel
     /// </summary>
     public async Task CheckAsync()
     {
+        if(!IsIdle)
+            return;
+
         _started = true;
         var run = ++_run;
         var path = _folder.FolderPath;
@@ -241,6 +286,13 @@ internal sealed partial class DoctorViewModel : ObservableObject, IScreenModel
 
     private void SetReport(DoctorReport? report)
     {
+        if(_addedHookPath != null && report?.Checks.Any(check => check.HookPath == _addedHookPath) != true)
+        {
+            _addedHookPath = null;
+            _hookAddedAt = null;
+            _commitHook = null;
+        }
+
         _report = report;
         Groups = report == null ? new List<DoctorGroupViewModel>() : GroupsOf(report);
         Machine = report == null ? new List<MachineRowViewModel>() : MachineOf(report.Machine);
@@ -276,7 +328,8 @@ internal sealed partial class DoctorViewModel : ObservableObject, IScreenModel
         var groups = new List<DoctorGroupViewModel>();
         foreach(var run in RunsOf(report.Checks))
         {
-            var rows = run.Select(check => new DoctorCheckViewModel(check, OpenAction, () => Clipboard)).ToList();
+            var rows = run.Select(check => new DoctorCheckViewModel(check, OpenAction, () => Clipboard,
+                _setup == null ? null : AddHookLineAsync, check.HookPath == _addedHookPath ? _hookAddedAt : null, _commitHook)).ToList();
             groups.Add(new DoctorGroupViewModel(run[0].Group, rows));
         }
 
@@ -312,10 +365,63 @@ internal sealed partial class DoctorViewModel : ObservableObject, IScreenModel
         ];
     }
 
+    private async Task AddHookLineAsync(DoctorCheckViewModel row, HookAddition addition)
+    {
+        if(!IsIdle || !Groups.SelectMany(group => group.Checks).Contains(row))
+            return;
+
+        var run = _run;
+        var path = _folder.FolderPath;
+        IsAdding = true;
+        row.IsAdding = true;
+        try
+        {
+            var report = await Task.Run(() => _setup!.AddHookLine(path, addition));
+            if(run != _run)
+                return;
+
+            if(report.Failed)
+            {
+                var error = string.Join(Environment.NewLine, report.Lines);
+                row.AddErrorDetail = report.Lines.Count > 1 ? string.Join(" ", report.Lines.Skip(1)) : null;
+                row.AddError = report.Lines[0];
+                HookWriteFinished?.Invoke(error);
+                return;
+            }
+
+            _addedHookPath = addition.Before.Path;
+            _hookAddedAt = _clock.Now.ToLocalTime().ToString("HH:mm", CultureInfo.InvariantCulture);
+            var script = addition.ShownPath;
+            _commitHook = report.WorktreeRoot is { } root && IsWorktreePath(script)
+                ? new SetupNextStep(root, script, "so the team's pushes run CommitFence; each teammate needs CommitFence installed on their machine (Doctor checks it).",
+                    "Run CommitFence before each push", () => Clipboard)
+                : null;
+            HookWriteFinished?.Invoke($"CommitFence added the hook line to {addition.ShownPath} at {_hookAddedAt}.");
+            IsAdding = false;
+            await CheckAsync();
+            if(_run == run + 1)
+                HookAdded?.Invoke();
+        }
+        finally
+        {
+            row.IsAdding = false;
+            if(_run == run)
+                IsAdding = false;
+        }
+    }
+
+    private static bool IsWorktreePath(string script)
+    {
+        return !Path.IsPathRooted(script) && !script.StartsWith("../", StringComparison.Ordinal)
+            && !script.StartsWith(".git/", StringComparison.OrdinalIgnoreCase);
+    }
+
     private void OpenAction(DoctorAction action)
     {
         if(action.Kind == DoctorActionKind.OpenFile)
             OpenFileRequested?.Invoke(action.Value, action.Line);
+        else if(action.Kind == DoctorActionKind.OpenFolder)
+            OpenFolderRequested?.Invoke(action.Value);
         else if(action.Kind == DoctorActionKind.OpenWeb)
             OpenWebRequested?.Invoke(action.Value);
     }

@@ -11,7 +11,9 @@ internal static class RuleTextFormatter
 {
     public static string FormatListLine(RuleDefinition rule, int idWidth)
     {
-        return $"{rule.Id.PadRight(idWidth)}  {FormatSeverity(rule.Severity),-5}  {rule.Language}  {rule.ArtifactType}  {rule.Title}{(rule.Enabled ? string.Empty : "  (off)")}";
+        var hasNewComparisons = rule.Where.Concat(rule.Require).Any(condition => condition.Comparison is not (Comparison.Is or Comparison.IsOneOf));
+        var sentence = hasNewComparisons ? "  " + RuleSentence.Of(rule) : string.Empty;
+        return $"{rule.Id.PadRight(idWidth)}  {FormatSeverity(rule.Severity),-5}  {rule.Language}  {rule.ArtifactType}  {rule.Title}{(rule.Enabled ? string.Empty : "  (off)")}{sentence}";
     }
 
     public static string FormatDetail(RuleDefinition rule)

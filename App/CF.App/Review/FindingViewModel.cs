@@ -200,6 +200,25 @@ internal sealed partial class FindingViewModel : ReviewListItemViewModel
     public bool IsFolderReview { get; }
 
     /// <summary>
+    /// A finding of a review of the staged changes counts like a folder review: nothing is pushed yet. It says what it would do to the
+    /// push once the changes are committed.
+    /// </summary>
+    public bool IsStagedReview { get; init; }
+
+    /// <summary>
+    /// Why the team has the rule, for a team rule that gives a reason: the first line of the open finding.
+    /// </summary>
+    public string WhyText
+    {
+        get { return _rule.Why; }
+    }
+
+    public bool HasWhy
+    {
+        get { return _rule.Why.Length > 0; }
+    }
+
+    /// <summary>
     /// The column of the effect: 76 wide in a review of a push, 100 in a review of a folder.
     /// </summary>
     public double EffectWidth
@@ -300,6 +319,9 @@ internal sealed partial class FindingViewModel : ReviewListItemViewModel
         get
         {
             var line = _place == null ? string.Empty : $" on line {_place.Line}";
+            if(IsStagedReview)
+                return line + (IsBlock ? ", where it blocks a push. Once committed, it would stop the push." : ", where it only warns. It would not stop the push.");
+
             if(IsFolderReview)
                 return line + (IsBlock ? ", where it blocks a push." : ", where it only warns.") + " It was already in the code, so it stops no push today.";
 
@@ -379,8 +401,11 @@ internal sealed partial class FindingViewModel : ReviewListItemViewModel
     partial void OnIsOpenChanged(bool value)
     {
         OnPropertyChanged(nameof(SpokenName));
-        if(value && Lines.Count == 0 && _content != null && _finding.Line != null)
-            Lines = CodeAround.Cut(_content, _finding.Line.Value, IsBlock);
+        if(value)
+            ReadCopy();
+
+        if(value && Lines.Count == 0)
+            BuildLines();
 
         if(value && _prepare != null && Preparation == null && !FileChanged && !IsFixed)
             Preparation = PrepareAsync(_prepare);

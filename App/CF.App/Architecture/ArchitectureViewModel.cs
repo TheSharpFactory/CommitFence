@@ -341,7 +341,7 @@ internal sealed partial class ArchitectureViewModel : ObservableObject, IScreenM
     {
         try
         {
-            _service.Undo(_folder.FolderPath, change);
+            _service.Undo(Path.GetDirectoryName(_folder.SettingsPath)!, change);
             Reload(select);
         }
         catch(Exception exception) when(exception is RuleChangeException or SettingsException)
@@ -357,7 +357,7 @@ internal sealed partial class ArchitectureViewModel : ObservableObject, IScreenM
 
         try
         {
-            var change = edit(_folder.FolderPath);
+            var change = edit(Path.GetDirectoryName(_folder.SettingsPath)!);
             ClearUndo();
             Notice = change.Message.Contains("Every other use", StringComparison.Ordinal) ? change.Message : null;
             Reload(select);
@@ -394,7 +394,7 @@ internal sealed partial class ArchitectureViewModel : ObservableObject, IScreenM
         var current = select ?? Selected?.Name;
         try
         {
-            Report = _service.Show(_folder.FolderPath);
+            Report = _service.Show(Path.GetDirectoryName(_folder.SettingsPath)!);
             Layers = new ModuleLayers(Report with { AllowedDirections = Directions });
             ActiveBreaches = Report.ActiveBreaches;
             if(EditingName && FindModule(current) == null)

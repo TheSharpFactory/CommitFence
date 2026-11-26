@@ -15,9 +15,9 @@ namespace CF.Core.Review;
 /// </remarks>
 internal static class ReachFilter
 {
-    public static IReadOnlyList<Finding> Keep(IReadOnlyList<Finding> findings, IReadOnlyList<LineRange> changedLines)
+    public static IReadOnlyList<Finding> Keep(IReadOnlyList<Finding> findings, ChangedFile file)
     {
-        return findings.Where(finding => IsTouched(finding, changedLines)).ToList();
+        return findings.Where(finding => IsTouched(finding, file)).ToList();
     }
 
     public static IReadOnlyList<Finding> Keep(IReadOnlyList<Finding> findings, IReadOnlyList<ChangedFile> changedFiles)
@@ -40,7 +40,7 @@ internal static class ReachFilter
         if(finding.Reach == null)
             return finding.File == null || file != null || finding.IsCompileError;
 
-        return file != null && IsTouched(finding, file.ChangedLines);
+        return file != null && IsTouched(finding, file);
     }
 
     public static ChangedFile? FindFile(string? path, IReadOnlyList<ChangedFile> changedFiles)
@@ -67,17 +67,20 @@ internal static class ReachFilter
         return candidates.Count == 1 ? candidates[0] : null;
     }
 
-    private static bool IsTouched(Finding finding, IReadOnlyList<LineRange> changedLines)
+    private static bool IsTouched(Finding finding, ChangedFile file)
     {
         if(finding.Reach == null)
             return true;
 
-        return changedLines.Any(range => Touches(range, finding.Reach));
+        if(finding.Reach.IsWholeFile && file.Status is ChangeStatus.Added or ChangeStatus.Renamed)
+            return true;
+
+        return file.ChangedLines.Any(range => Touches(range, finding.Reach));
     }
 
     private static bool Touches(LineRange range, ArtifactReach reach)
     {
-        if(range.Touches(reach.Own.StartLine, reach.Own.EndLine))
+        if(reach.IsWholeFile || range.Touches(reach.Own.StartLine, reach.Own.EndLine))
             return true;
 
         if(reach.DependsOn.Any(span => range.Touches(span.StartLine, span.EndLine)))

@@ -54,7 +54,7 @@ public sealed class ToolchainStage
         return tree.ChangeSet.Files.Count(file => file.Language == null && !concerns.Contains(file.Path));
     }
 
-    internal List<ToolchainOutcome> Run(TreeUnderReview tree, IReadOnlyList<ToolchainWork> work)
+    internal List<ToolchainOutcome> Run(TreeUnderReview tree, IReadOnlyList<ToolchainWork> work, bool needsAllAssemblyNames)
     {
         var outcomes = new List<ToolchainOutcome>();
         if(work.Count == 0)
@@ -62,7 +62,13 @@ public sealed class ToolchainStage
 
         var logFolder = _reviewLogs.CreateFolder(tree.Repository);
         foreach(var item in work)
-            outcomes.Add(new ToolchainOutcome(item, RunToolchain(item, new ToolchainRequest(tree.ChangeSet.Tree, tree.Folder, logFolder, item.Files, tree.ChangeSet.IsWholeReview))));
+        {
+            var request = new ToolchainRequest(tree.ChangeSet.Tree, tree.Folder, logFolder, item.Files, tree.ChangeSet.IsWholeReview)
+            {
+                NeedsAllAssemblyNames = needsAllAssemblyNames
+            };
+            outcomes.Add(new ToolchainOutcome(item, RunToolchain(item, request)));
+        }
 
         return outcomes;
     }

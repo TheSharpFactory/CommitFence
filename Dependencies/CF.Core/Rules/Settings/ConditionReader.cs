@@ -25,7 +25,7 @@ internal sealed class ConditionReader
             throw _positions.ErrorAt(path, $"'{LastKey(path)}' holds no conditions; leave it out instead.");
 
         foreach(var entry in entries)
-            conditions.Add(ReadCondition(entry.Key, entry.Value, artifactType, JsonPositions.Join(path, entry.Key)));
+            ReadCondition(conditions, entry.Key, entry.Value, artifactType, JsonPositions.Join(path, entry.Key));
 
         return conditions;
     }
@@ -35,19 +35,77 @@ internal sealed class ConditionReader
         return path.Substring(path.LastIndexOf('.') + 1);
     }
 
-    private RuleCondition ReadCondition(string name, JsonElement element, ArtifactType artifactType, string path)
+    private void ReadCondition(List<RuleCondition> conditions, string name, JsonElement element, ArtifactType artifactType, string path)
     {
         var descriptor = artifactType.FindProperty(name);
         if(descriptor == null)
             throw _positions.ErrorAt(path, UnknownPropertyMessage(name, artifactType));
 
-        if(element.ValueKind != JsonValueKind.Array)
-            return new RuleCondition(name, Comparison.Is, new[] { ReadValue(element, descriptor, artifactType, path) });
-
-        return ReadOneOf(element, descriptor, artifactType, path);
+        switch(element.ValueKind)
+        {
+            case JsonValueKind.Object:
+                conditions.AddRange(ReadObject(element, descriptor, artifactType, path));
+                break;
+            case JsonValueKind.Array:
+                conditions.Add(ReadList(element, descriptor, artifactType, path, Comparison.IsOneOf));
+                break;
+            default:
+                conditions.Add(new RuleCondition(name, Comparison.Is, [ReadValue(element, descriptor, artifactType, path)]));
+                break;
+        }
     }
 
-    private RuleCondition ReadOneOf(JsonElement array, PropertyDescriptor descriptor, ArtifactType artifactType, string path)
+    private List<RuleCondition> ReadObject(JsonElement element, PropertyDescriptor descriptor, ArtifactType artifactType, string path)
+    {
+        var conditions = new List<RuleCondition>();
+        foreach(var entry in element.EnumerateObject())
+        {
+            var entryPath = JsonPositions.Join(path, entry.Name);
+            var comparison = RuleComparisons.FromObjectKey(entry.Name);
+            if(comparison == null)
+                throw _positions.ErrorAt(entryPath, $"The comparison '{entry.Name}' is not known.");
+
+            if(!RuleComparisons.For(descriptor.ValueType).Contains(comparison.Value))
+                throw _positions.ErrorAt(entryPath, $"The property '{descriptor.Name}' of {artifactType.Name} cannot use '{entry.Name}'.");
+
+            conditions.Add(ReadOperand(entry.Value, descriptor, artifactType, entryPath, comparison.Value));
+        }
+
+        CheckObject(conditions, path, descriptor.Name);
+        return conditions;
+    }
+
+    private RuleCondition ReadOperand(JsonElement operand, PropertyDescriptor descriptor, ArtifactType artifactType, string path, Comparison comparison)
+    {
+        if(comparison == Comparison.IsNot && operand.ValueKind == JsonValueKind.Array)
+            return ReadList(operand, descriptor, artifactType, path, comparison);
+
+        var value = ReadValue(operand, descriptor, artifactType, path, checkAllowedValues: comparison != Comparison.Matches);
+        return new RuleCondition(descriptor.Name, comparison, [value]);
+    }
+
+    private void CheckObject(List<RuleCondition> conditions, string path, string name)
+    {
+        if(conditions.Count == 1)
+            return;
+
+        if(conditions.Count == 2)
+        {
+            var lower = conditions.Find(condition => condition.Comparison == Comparison.AtLeast);
+            var upper = conditions.Find(condition => condition.Comparison == Comparison.AtMost);
+            if(lower != null && upper != null)
+            {
+                if(lower.ExpectedValues[0].Number > upper.ExpectedValues[0].Number)
+                    throw _positions.ErrorAt(JsonPositions.Join(path, "atLeast"), $"The range for '{name}' has 'atLeast' above 'atMost'.");
+
+                return;
+            }
+        }
+
+        throw _positions.ErrorAt(path, $"Give one comparison for '{name}', or use 'atLeast' and 'atMost' together.");
+    }
+
+    private RuleCondition ReadList(JsonElement array, PropertyDescriptor descriptor, ArtifactType artifactType, string path, Comparison comparison)
     {
         var values = new List<PropertyValue>();
         var index = 0;
@@ -60,16 +118,16 @@ internal sealed class ConditionReader
         if(values.Count == 0)
             throw _positions.ErrorAt(path, $"The list for '{descriptor.Name}' is empty; give at least one value.");
 
-        return new RuleCondition(descriptor.Name, Comparison.IsOneOf, values);
+        return new RuleCondition(descriptor.Name, comparison, values, isList: true);
     }
 
-    private PropertyValue ReadValue(JsonElement element, PropertyDescriptor descriptor, ArtifactType artifactType, string path)
+    private PropertyValue ReadValue(JsonElement element, PropertyDescriptor descriptor, ArtifactType artifactType, string path, bool checkAllowedValues = true)
     {
         var value = ToValue(element);
         if(value == null || value.Type != descriptor.ValueType)
             throw _positions.ErrorAt(path, $"The property '{descriptor.Name}' of {artifactType.Name} takes {Describe(descriptor.ValueType)}.");
 
-        if(value.Type == PropertyValueType.Text && descriptor.AllowedValues.Count > 0 && !descriptor.AllowedValues.Contains(value.Text))
+        if(checkAllowedValues && value.Type == PropertyValueType.Text && descriptor.AllowedValues.Count > 0 && !descriptor.AllowedValues.Contains(value.Text))
             throw _positions.ErrorAt(path, $"'{value.Text}' is not a value of '{descriptor.Name}'. Use one of: {string.Join(", ", descriptor.AllowedValues)}.");
 
         return value;

@@ -88,7 +88,7 @@ internal sealed class MarkedText : TextBlock
         if(text.Length == 0 || Inlines == null)
             return;
 
-        var run = new Run(isCode ? CF.App.Doctor.PathBreaks.After(text) : text);
+        var run = new Run(isCode ? CF.App.Parts.PathBreaks.After(text) : text);
         if(bold || isCode)
         {
             run.FontWeight = FontWeight.SemiBold;

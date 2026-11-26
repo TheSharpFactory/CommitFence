@@ -36,8 +36,8 @@ public static class CompositionRoot
         var settingsFile = new SettingsFile(fileSystem, new SettingsReader(languages));
         var judgments = new FileStructureJudgments(dataFolder, fileSystem);
         var history = new FileReviewHistory(dataFolder);
-        var review = CreateReviewService(parts, languages, settingsFile, judgments, history);
-        var setup = new SetupService(new UserGitSettings(processRunner), new UserPath(), git, fileSystem);
+        var review = CreateReviewService(parts, languages, settingsFile, judgments, history, git);
+        var setup = new SetupService(new UserGitSettings(processRunner), new UserPath(), git, fileSystem, git);
 
         var doctor = new DoctorService(parts.Clock, productInfo, git, new DoctorMachine(fileSystem, productInfo.Version), dataFolder, fileSystem, new GitSnapshotStore(processRunner, dataFolder), settingsFile, languages);
         return new CommitFenceServices(parts.ProductInfo, parts.Clock, languages, rules, review, setup, new FolderService(fileSystem, git), new ReleaseUpdater(productInfo.Version), new FileUpdateCheckRecord(dataFolder, UpdateProgramName()), doctor, new SettingsService(fileSystem, new FileSettingsLock(dataFolder), languages), new StructureService(fileSystem, new FileSettingsLock(dataFolder), languages, git, judgments), new LanguageService(git, languages), new FileMachineSettings(dataFolder), new ExemptionService(git, languages), new StatsService(git, parts.Clock, history, rules), new FixService(languages, new GitSnapshotStore(processRunner, dataFolder), new FileReviewLock(dataFolder), fileSystem));
@@ -53,7 +53,7 @@ public static class CompositionRoot
         return string.IsNullOrEmpty(name) ? "commitfence" : name;
     }
 
-    private static ReviewService CreateReviewService(CompositionParts parts, IReadOnlyList<ILanguage> languages, SettingsFile settingsFile, IStructureJudgments judgments, IReviewHistory history)
+    private static ReviewService CreateReviewService(CompositionParts parts, IReadOnlyList<ILanguage> languages, SettingsFile settingsFile, IStructureJudgments judgments, IReviewHistory history, IWorkingStatus status)
     {
         var settings = new SettingsInTree(parts.FileSystem, settingsFile, parts.ProductInfo.Version);
         var fileReviewer = new FileReviewer(parts.FileSystem, languages);
@@ -61,7 +61,7 @@ public static class CompositionRoot
         var changeSetReview = CreateChangeSetReview(parts, languages, settingsFile, settings, fileReviewer);
         var tree = new TreeReview(parts.Clock, parts.Git, new FileReviewLock(parts.DataFolder), new FileProgramLock(), new ChangeResolver(parts.Git, languages), changeSetReview, judgments, history);
 
-        return new ReviewService(namedFiles, tree, new PushScopeFinder(parts.Git));
+        return new ReviewService(namedFiles, tree, new PushScopeFinder(parts.Git), new StagedScopeFinder(parts.Git, status));
     }
 
     private static ChangeSetReview CreateChangeSetReview(CompositionParts parts, IReadOnlyList<ILanguage> languages, SettingsFile settingsFile, SettingsInTree settings, FileReviewer fileReviewer)

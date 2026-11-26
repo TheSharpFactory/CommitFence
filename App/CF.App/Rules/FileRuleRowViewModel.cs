@@ -110,7 +110,7 @@ internal sealed partial class FileRuleRowViewModel : RuleListItemViewModel
     {
         get
         {
-            return Rule.Main != null && (Rule.State == FileRuleState.OwnDefault || Rule.State == FileRuleState.NotUnderstood);
+            return !IsUnset && Rule.State is FileRuleState.OwnDefault or FileRuleState.NotUnderstood;
         }
     }
 
@@ -153,7 +153,7 @@ internal sealed partial class FileRuleRowViewModel : RuleListItemViewModel
     {
         get
         {
-            return Rule.State == FileRuleState.OwnDefault ? "default" : "not understood";
+            return Rule.ListedPlace?.Effect ?? string.Empty;
         }
     }
 
@@ -268,6 +268,14 @@ internal sealed partial class FileRuleRowViewModel : RuleListItemViewModel
     }
 
     public string SpokenName
+    {
+        get
+        {
+            return Rule.Note == null ? SpokenNameOfSettings : $"{SpokenNameOfSettings} {Rule.Note}";
+        }
+    }
+
+    private string SpokenNameOfSettings
     {
         get
         {

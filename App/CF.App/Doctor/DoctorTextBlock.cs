@@ -3,6 +3,7 @@ using Avalonia.Controls;
 using Avalonia.Controls.Documents;
 using Avalonia.Media;
 using Avalonia.Styling;
+using CF.App.Parts;
 using CF.App.Rules.Page.Code;
 using CF.Core.Setup;
 
@@ -16,9 +17,12 @@ internal sealed class DoctorTextBlock : TextBlock
 {
     public static readonly StyledProperty<IReadOnlyList<DoctorTextPart>?> PartsProperty = AvaloniaProperty.Register<DoctorTextBlock, IReadOnlyList<DoctorTextPart>?>(nameof(Parts));
 
+    public static readonly StyledProperty<string?> FailureDetailProperty = AvaloniaProperty.Register<DoctorTextBlock, string?>(nameof(FailureDetail));
+
     static DoctorTextBlock()
     {
         PartsProperty.Changed.AddClassHandler<DoctorTextBlock>((text, _) => text.Rebuild());
+        FailureDetailProperty.Changed.AddClassHandler<DoctorTextBlock>((text, _) => text.Rebuild());
     }
 
     public DoctorTextBlock()
@@ -37,6 +41,12 @@ internal sealed class DoctorTextBlock : TextBlock
         {
             SetValue(PartsProperty, value);
         }
+    }
+
+    public string? FailureDetail
+    {
+        get { return GetValue(FailureDetailProperty); }
+        set { SetValue(FailureDetailProperty, value); }
     }
 
     protected override void OnAttachedToVisualTree(VisualTreeAttachmentEventArgs e)
@@ -60,7 +70,10 @@ internal sealed class DoctorTextBlock : TextBlock
                 continue;
             }
 
-            var run = new Run(PathBreaks.After(part.Text)) { Foreground = ThemeBrushes.Find(this, "ink") };
+            var run = new Run(PathBreaks.After(part.Text));
+            if(!Classes.Contains("error"))
+                run.Foreground = ThemeBrushes.Find(this, "ink");
+
             if(code.Family != null)
                 run.FontFamily = code.Family;
 
@@ -69,6 +82,9 @@ internal sealed class DoctorTextBlock : TextBlock
 
             Inlines.Add(run);
         }
+
+        if(!string.IsNullOrEmpty(FailureDetail))
+            Inlines.Add(new Run(" " + FailureDetail) { Foreground = ThemeBrushes.Find(this, "ink-2") });
     }
 
     /// <summary>

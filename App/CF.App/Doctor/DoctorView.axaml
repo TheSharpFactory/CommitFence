@@ -12,6 +12,9 @@
        checks in groups, each a row with its mark, and, beside them from 1304 wide (after them in one pane), the panel "This machine".
        A check that fails is open after checking: its fix, the lines of the file it is about, and its buttons. -->
   <UserControl.Styles>
+    <Style Selector="Button.cf.quiet:disabled">
+      <Setter Property="Background" Value="{DynamicResource hover}"/>
+    </Style>
     <Style Selector="Border.checkrow.failed">
       <Setter Property="Background" Value="{DynamicResource well}"/>
       <Setter Property="CornerRadius" Value="12"/>
@@ -30,6 +33,10 @@
     <Style Selector="Border.checkrow.failed StackPanel.checkfix">
       <Setter Property="Margin" Value="36,0,0,0"/>
     </Style>
+    <Style Selector="Border.checkrow.failed.hooksetup">
+      <Setter Property="Background" Value="Transparent"/>
+      <Setter Property="Padding" Value="8,12,12,16"/>
+    </Style>
     <Style Selector="Border.verdictbadge">
       <Setter Property="Width" Value="44"/>
       <Setter Property="Height" Value="44"/>
@@ -40,6 +47,10 @@
     </Style>
     <Style Selector="Border.verdictbadge.fails">
       <Setter Property="Background" Value="{DynamicResource block}"/>
+    </Style>
+    <Style Selector="Border.verdictbadge.left-to-you">
+      <Setter Property="BorderThickness" Value="2"/>
+      <Setter Property="BorderBrush" Value="{DynamicResource ink-2}"/>
     </Style>
     <Style Selector="Border.verdictbadge.unfinished">
       <Setter Property="Background" Value="{DynamicResource solid}"/>
@@ -56,7 +67,7 @@
         <!-- The verdict: the badge, the heading, and "Check again" at the right end of the line, centred on the badge. -->
         <Grid ColumnDefinitions="Auto,*,Auto" MinHeight="44">
           <Border Classes="verdictbadge" Classes.ready="{Binding IsReady}" Classes.fails="{Binding HasFailures}"
-                  Classes.unfinished="{Binding IsUnfinished}" Classes.running="{Binding IsRunning}" Margin="0,0,14,0">
+                  Classes.left-to-you="{Binding IsLeftToYou}" Classes.unfinished="{Binding IsUnfinished}" Classes.running="{Binding IsRunning}" Margin="0,0,14,0">
             <Panel>
               <parts:Icon Data="{StaticResource i-check}" Width="24" Height="24" StrokeThickness="2.4" Stroke="{DynamicResource page}"
                           IsVisible="{Binding IsReady}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
@@ -64,13 +75,18 @@
                           IsVisible="{Binding HasFailures}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
               <parts:Icon Data="{StaticResource i-off}" Width="24" Height="24" StrokeThickness="1.8" Stroke="{DynamicResource on-solid}"
                           IsVisible="{Binding IsUnfinished}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+              <parts:Icon Data="{StaticResource i-pen}" Width="24" Height="24" Stroke="{DynamicResource ink}"
+                          IsVisible="{Binding IsLeftToYou}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
               <parts:TurningRing Width="24" Height="24" IsVisible="{Binding IsRunning}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
             </Panel>
           </Border>
           <TextBlock Grid.Column="1" Theme="{StaticResource type-verdict}" VerticalAlignment="Center" Text="{Binding Heading}"/>
           <Button Grid.Column="2" Name="CheckAgainButton" Classes="cf outlined" Margin="14,0,0,0" VerticalAlignment="Center"
                   Command="{Binding AgainCommand}" AutomationProperties.Name="Check again">
-            <TextBlock Theme="{StaticResource type-body-strong}" Text="Check again"/>
+            <StackPanel Orientation="Horizontal" Spacing="8">
+              <parts:Icon Data="{StaticResource i-review}" Width="16" Height="16" Stroke="{Binding $parent[Button].Foreground}"/>
+              <TextBlock Theme="{StaticResource type-body-strong}" Text="Check again"/>
+            </StackPanel>
           </Button>
         </Grid>
 
@@ -89,17 +105,19 @@
         </StackPanel>
 
         <!-- The groups, 28 apart, in the order the checks come. -->
-        <ItemsControl Name="GroupList" ItemsSource="{Binding Groups}" Focusable="False">
+        <ItemsControl Name="GroupList" ItemsSource="{Binding Groups}" Focusable="False" AutomationProperties.LiveSetting="Polite">
           <ItemsControl.ItemTemplate>
             <DataTemplate DataType="screen:DoctorGroupViewModel" x:DataType="screen:DoctorGroupViewModel">
               <StackPanel Margin="0,28,0,0">
-                <TextBlock Theme="{StaticResource type-meta-strong}" Foreground="{DynamicResource ink-2}" Margin="8,0,0,8" Text="{Binding Name}"/>
+                <Border Height="36" Padding="8,0,0,4">
+                  <TextBlock Theme="{StaticResource type-body-strong}" Foreground="{DynamicResource ink-2}" VerticalAlignment="Center" Text="{Binding Name}"/>
+                </Border>
                 <Border BorderBrush="{DynamicResource line}" BorderThickness="0,1,0,0">
                   <ItemsControl ItemsSource="{Binding Checks}" Focusable="False">
                     <ItemsControl.ItemTemplate>
                       <DataTemplate DataType="screen:DoctorCheckViewModel" x:DataType="screen:DoctorCheckViewModel">
                         <Border BorderBrush="{DynamicResource line}" BorderThickness="0,0,0,1" AutomationProperties.Name="{Binding SpokenName}">
-                          <Border Classes="checkrow" Classes.failed="{Binding ShowsFailure}">
+                          <Border Classes="checkrow" Classes.failed="{Binding ShowsFailure}" Classes.hooksetup="{Binding IsHookSetup}">
                             <StackPanel>
 
                               <!-- The check: its mark, its title, and what was found. -->
@@ -110,9 +128,14 @@
                                     <parts:Icon Data="{StaticResource i-check}" Width="12" Height="12" StrokeThickness="2.8" Stroke="{DynamicResource page}"
                                                 HorizontalAlignment="Center" VerticalAlignment="Center"/>
                                   </Border>
-                                  <Border IsVisible="{Binding ShowsFailure}" Width="24" Height="24" CornerRadius="7" Background="{DynamicResource block}"
+                                  <Border IsVisible="{Binding ShowsFailureMark}" Width="24" Height="24" CornerRadius="7" Background="{DynamicResource block}"
                                           Margin="0,-2,0,0" VerticalAlignment="Top">
                                     <parts:Icon Data="{StaticResource i-x}" Width="14" Height="14" StrokeThickness="2.4" Stroke="{DynamicResource on-block}"
+                                                HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                  </Border>
+                                  <Border IsVisible="{Binding ShowsManualMark}" Width="24" Height="24" CornerRadius="7"
+                                          BorderThickness="1.5" BorderBrush="{DynamicResource ink-2}" Margin="0,-2,0,0" VerticalAlignment="Top">
+                                    <parts:Icon Data="{StaticResource i-pen}" Width="14" Height="14" Stroke="{DynamicResource ink}"
                                                 HorizontalAlignment="Center" VerticalAlignment="Center"/>
                                   </Border>
                                   <parts:Icon IsVisible="{Binding ShowsNotChecked}" Data="{StaticResource i-off}" Width="16" Height="16" Stroke="{DynamicResource off}"
@@ -124,7 +147,11 @@
                                            HorizontalAlignment="Center" VerticalAlignment="Top" Margin="0,7,0,0"/>
                                 </Panel>
                                 <StackPanel Grid.Column="1" Spacing="2">
-                                  <TextBlock Theme="{StaticResource type-body-strong}" TextWrapping="Wrap" Text="{Binding Title}"/>
+                                  <parts:WrapRow ItemSpacing="8" LineSpacing="2">
+                                    <TextBlock Theme="{StaticResource type-body-strong}" TextWrapping="Wrap" Text="{Binding Title}"/>
+                                    <TextBlock IsVisible="{Binding ShowsManualMark}" Theme="{StaticResource type-meta}" FontWeight="Medium"
+                                               Foreground="{DynamicResource ink-2}" TextWrapping="Wrap" Text="Left to you: lefthook writes this hook"/>
+                                  </parts:WrapRow>
                                   <screen:DoctorTextBlock Classes="finding" Theme="{StaticResource type-body}" Foreground="{DynamicResource ink-2}"
                                                           IsVisible="{Binding ShowsResult}" Parts="{Binding Found}"/>
                                   <TextBlock Theme="{StaticResource type-meta}" Foreground="{DynamicResource ink-2}"
@@ -132,27 +159,65 @@
                                 </StackPanel>
                               </Grid>
 
+                              <Grid IsVisible="{Binding ShowsCommitHook}" Margin="44,-4,12,18">
+                                <Grid.ColumnDefinitions>
+                                  <ColumnDefinition Width="*" MaxWidth="664"/>
+                                  <ColumnDefinition Width="Auto"/>
+                                </Grid.ColumnDefinitions>
+                                <parts:SetupNextStepView DataContext="{Binding CommitHook}"/>
+                              </Grid>
                               <!-- The fix of a failing check, in the line of the title. -->
                               <StackPanel Classes="checkfix" IsVisible="{Binding HasFix}">
-                                <screen:DoctorTextBlock Theme="{StaticResource type-body}" Foreground="{DynamicResource ink-2}" MaxWidth="680"
+                                <screen:DoctorTextBlock Theme="{StaticResource type-body}" Foreground="{DynamicResource ink-2}" MaxWidth="640"
                                                         HorizontalAlignment="Left" Parts="{Binding FixText}"/>
                                 <StackPanel IsVisible="{Binding HasLines}" Margin="0,12,0,0">
-                                  <TextBlock IsVisible="{Binding HasAfterMove}" Theme="{StaticResource type-meta}" Foreground="{DynamicResource ink-2}"
+                                  <TextBlock IsVisible="{Binding ShowsNow}" Theme="{StaticResource type-meta}" Foreground="{DynamicResource ink-2}"
                                              Margin="0,0,0,6" Text="{x:Static setup:DoctorFix.NowHeading}"/>
                                   <Border Background="{DynamicResource page}" BorderBrush="{DynamicResource line}"
                                           BorderThickness="1" CornerRadius="12" Padding="0,8" ClipToBounds="True">
-                                    <parts:FileLines ItemsSource="{Binding Lines}" NumberWidth="30" NumberGap="14"/>
+                                    <parts:FileLines ItemsSource="{Binding Lines}" NumberWidth="{Binding NumberWidth}" NumberGap="{Binding SignGap}"
+                                                     SignWidth="{Binding SignWidth}" AutomationProperties.Name="{Binding NowName}"/>
                                   </Border>
                                 </StackPanel>
                                 <StackPanel IsVisible="{Binding HasAfterMove}" Margin="0,12,0,0" Spacing="6">
-                                  <TextBlock Theme="{StaticResource type-meta}" Foreground="{DynamicResource ink-2}" Text="{x:Static setup:DoctorFix.AfterMoveHeading}"/>
+                                  <TextBlock Theme="{StaticResource type-meta}" Foreground="{DynamicResource ink-2}" Text="{Binding PreviewHeading}"/>
                                   <Border Background="{DynamicResource page}" BorderBrush="{DynamicResource line}"
                                           BorderThickness="1" CornerRadius="12" Padding="0,8" ClipToBounds="True">
-                                    <parts:FileLines ItemsSource="{Binding AfterMoveLines}" NumberWidth="30" NumberGap="14"/>
+                                    <parts:FileLines ItemsSource="{Binding AfterMoveLines}" NumberWidth="{Binding NumberWidth}" NumberGap="{Binding SignGap}"
+                                                     SignWidth="{Binding SignWidth}" AutomationProperties.Name="{Binding PreviewName}"/>
                                   </Border>
+                                  <screen:DoctorTextBlock Theme="{StaticResource type-meta}" Foreground="{DynamicResource ink-2}" Parts="{Binding HookLineNote}"
+                                                          IsVisible="{Binding HookLineNote, Converter={x:Static ObjectConverters.IsNotNull}}"/>
                                 </StackPanel>
-                                <!-- Leave room for the buttons' outer focus rings within the items area. -->
-                                <ItemsControl IsVisible="{Binding HasActions}" ItemsSource="{Binding Actions}" Margin="-4,12,-4,-4" Focusable="False">
+                                <StackPanel IsVisible="{Binding HasEntry}" Margin="0,12,0,0" Spacing="6">
+                                  <screen:DoctorTextBlock Theme="{StaticResource type-meta}" Foreground="{DynamicResource ink-2}" Parts="{Binding EntryHeading}"/>
+                                  <Border Background="{DynamicResource page}" BorderBrush="{DynamicResource line}"
+                                          BorderThickness="1" CornerRadius="12" Padding="0,8" ClipToBounds="True">
+                                    <parts:FileLines ItemsSource="{Binding EntryLines}" NumberWidth="0" NumberGap="0" SignWidth="26"/>
+                                  </Border>
+                                  <screen:DoctorTextBlock Theme="{StaticResource type-meta}" Foreground="{DynamicResource ink-2}" Parts="{Binding EntryLineNote}"/>
+                                  <screen:DoctorTextBlock Theme="{StaticResource type-meta}" Foreground="{DynamicResource ink-2}" Parts="{Binding EntryHint}"/>
+                                </StackPanel>
+                                <Grid IsVisible="{Binding AddError, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"
+                                      ColumnDefinitions="Auto,*" ColumnSpacing="8" Margin="0,12,0,0">
+                                  <parts:EffectMark Kind="Block" Width="14" Height="14" VerticalAlignment="Top" Margin="0,3,0,0"
+                                                    Shape="{DynamicResource block}" Sign="{DynamicResource on-block}"/>
+                                  <screen:DoctorTextBlock Grid.Column="1" Classes="error" Theme="{StaticResource type-body}" Foreground="{DynamicResource block-ink}" Parts="{Binding AddErrorParts}" FailureDetail="{Binding AddErrorDetail}"/>
+                                </Grid>
+                                <WrapPanel Margin="-4,12,-4,-4">
+                                  <Border IsVisible="{Binding CanAdd}" Padding="4">
+                                    <parts:BusyButton Classes="cf main" Width="140" IsBusy="{Binding IsAdding}" Command="{Binding AddCommand}" AutomationProperties.Name="{Binding AddName}">
+                                      <StackPanel Orientation="Horizontal" Spacing="8">
+                                        <parts:Icon IsVisible="{Binding ShowsAddIcon}" Data="{StaticResource i-plus}" Width="16" Height="16"
+                                                    Stroke="{Binding $parent[Button].Foreground}"/>
+                                        <parts:Icon IsVisible="{Binding ShowsRetryIcon}" Data="{StaticResource i-refresh}" Width="16" Height="16"
+                                                    Stroke="{Binding $parent[Button].Foreground}"/>
+                                        <parts:TurningRing Classes="button-ring on-solid" VerticalAlignment="Center" IsVisible="{Binding IsAdding}"/>
+                                        <TextBlock Theme="{StaticResource type-body-strong}" Text="{Binding AddLabel}"/>
+                                      </StackPanel>
+                                    </parts:BusyButton>
+                                  </Border>
+                                  <ItemsControl IsVisible="{Binding HasActions}" ItemsSource="{Binding Actions}" Focusable="False">
                                   <ItemsControl.ItemsPanel>
                                     <ItemsPanelTemplate>
                                       <WrapPanel Orientation="Horizontal"/>
@@ -165,7 +230,8 @@
                                           <Panel IsVisible="{Binding IsCopy}">
                                             <review:CopyButton DataContext="{Binding Copy}"/>
                                           </Panel>
-                                          <Button IsVisible="{Binding IsOpen}" Classes="cf" Classes.main="{Binding IsPrimary}" Classes.outlined="{Binding !IsPrimary}"
+                                          <Button IsVisible="{Binding IsOpen}" Classes="cf" Classes.main="{Binding IsPrimary}"
+                                                  Classes.outlined="{Binding IsSecondary}" Classes.quiet="{Binding IsQuiet}"
                                                   Command="{Binding OpenCommand}" AutomationProperties.Name="{Binding Label}">
                                             <StackPanel Orientation="Horizontal" Spacing="8">
                                               <parts:Icon Data="{StaticResource i-open}" Width="16" Height="16" Stroke="{Binding $parent[Button].Foreground}"/>
@@ -176,7 +242,8 @@
                                       </Border>
                                     </DataTemplate>
                                   </ItemsControl.ItemTemplate>
-                                </ItemsControl>
+                                  </ItemsControl>
+                                </WrapPanel>
                               </StackPanel>
 
                             </StackPanel>

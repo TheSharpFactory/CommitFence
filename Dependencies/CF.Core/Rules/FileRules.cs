@@ -1,7 +1,6 @@
 using CF.Core.Code;
-using CF.Core.Rules;
 
-namespace CF.Core.Services;
+namespace CF.Core.Rules;
 
 /// <summary>
 /// Asks the languages for the rules that the repository's own files set, for the repository that holds a settings file.
@@ -66,7 +65,7 @@ internal sealed class FileRules
     {
         var main = rule.Main == null ? null : WithEffect(rule.Main, strictness);
         var exceptions = rule.Exceptions.Select(place => WithEffect(place, strictness)).ToList();
-        return new FileRule(rule.Id, rule.Title, rule.File, rule.Language, main, exceptions);
+        return new FileRule(rule.Id, rule.Title, rule.File, rule.Language, main, exceptions) { IsUndescribed = rule.IsUndescribed };
     }
 
     private static FileRulePlace WithEffect(FileRulePlace place, Strictness strictness)

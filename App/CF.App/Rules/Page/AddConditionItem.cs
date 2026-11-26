@@ -4,10 +4,10 @@ using CommunityToolkit.Mvvm.Input;
 namespace CF.App.Rules.Page;
 
 /// <summary>
-/// The add button that ends the where clause. It is one more piece of the clause's flow, so it wraps with the conditions;
+/// The add button that ends the where clause. It stays on the last condition's line (see TokenFlow);
 /// it says "and" after a condition and "add a condition" when there is none.
 /// </summary>
-internal sealed partial class AddConditionItem : ObservableObject
+internal sealed partial class AddConditionItem : ObservableObject, ITokenAdd
 {
     private readonly RulePageViewModel _page;
 

@@ -12,6 +12,7 @@ using CF.Core.Code;
 using CF.Core.Findings;
 using CF.Core.Review;
 using CF.Core.Rules;
+using CF.Core.Setup;
 using CF.Core.Updates;
 using CF.Integration.Tests;
 using Xunit;
@@ -24,6 +25,143 @@ namespace CF.App.Tests;
 /// </summary>
 public sealed class ScreenshotTests
 {
+    private static async Task SaveSetupScreens(string folder, string theme, IReadOnlyList<FileRule> fileRules, ViewHost host, MainWindow window)
+    {
+        var setup = new FakeSetupService { WorktreeRoot = OperatingSystem.IsWindows() ? "C:/Projects/invoicing" : "/home/dev/projects/invoicing" };
+        var setupFileRules = fileRules.ToList();
+        setupFileRules[0] = RulesHost.FileRule("IDE0055", "Fix formatting", FileRuleState.On, Severity.Block, 14);
+        using var shell = new ShellHost(settings: null, fileRules: setupFileRules, setup: setup);
+        shell.Clock.Now = new DateTimeOffset(new DateTime(2026, 11, 24, 10, 42, 0, DateTimeKind.Local));
+        window.DataContext = shell.Model;
+        host.Window.FocusManager?.Focus(null);
+        await Signals.FileRulesArrived(shell.Model.Rules);
+        host.Pump();
+        Assert.Single(host.FindAll<Button>(button => button.IsEffectivelyVisible && button.Classes.Contains("main")
+            && Avalonia.Automation.AutomationProperties.GetName(button) == "Start CommitFence here"));
+        host.Save(folder, $"rules-start-{theme}-1440.png");
+        var rules = shell.Model.Rules;
+        var failedStart = new SetupReport(["Could not write commitfence.json: the folder is read-only.",
+            "Nothing was written. Make the folder writable and try again, or copy the three lines and create the file yourself."], true);
+        setup.Start = _ => failedStart;
+        await rules.StartSettingsCommand.ExecuteAsync(null);
+        host.Save(folder, $"rules-startfail-{theme}-1440.png");
+
+        setup.Start = _ => new SetupReport(["Could not write commitfence.json: a folder named commitfence.json already exists there.",
+            "Nothing was written. Move or rename the commitfence.json folder, then try again."], true);
+        await rules.StartSettingsCommand.ExecuteAsync(null);
+        host.Save(folder, $"rules-startfail-folder-{theme}-1440.png");
+
+        setup.Start = _ => new SetupReport(["Could not write commitfence.json: the folder is not in a Git repository.",
+            "Nothing was written. Open a Git repository, then try again."], true);
+        await rules.StartSettingsCommand.ExecuteAsync(null);
+        host.Save(folder, $"rules-startfail-no-repository-{theme}-1440.png");
+
+        using var startHeld = new ManualResetEventSlim();
+        var startEntered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        setup.Start = _ =>
+        {
+            startEntered.SetResult();
+            startHeld.Wait();
+            return failedStart;
+        };
+        var starting = rules.StartSettingsCommand.ExecuteAsync(null);
+        try
+        {
+            await startEntered.Task;
+            host.Save(folder, $"rules-starting-{theme}-1440.png");
+        }
+        finally
+        {
+            startHeld.Set();
+            await starting;
+        }
+
+        setup.Start = null;
+        await rules.StartSettingsCommand.ExecuteAsync(null);
+        host.Pump();
+        host.Window.FocusManager?.Focus(null);
+        host.Save(folder, $"rules-started-{theme}-1440.png");
+        var added = false;
+        var managed = false;
+        var checkedAt = new DateTimeOffset(new DateTime(2026, 11, 24, 17, 12, 0, DateTimeKind.Local));
+        shell.Clock.Now = checkedAt;
+        shell.Doctor.Answer = path => FakeDoctorService.HookSetupReport(path, added, managed, hasLefthookConfig: true) with
+        {
+            CheckedAt = added ? checkedAt.AddMinutes(2) : checkedAt,
+            Duration = TimeSpan.FromSeconds(added ? 1.2 : 1.3)
+        };
+        shell.Model.CurrentScreen = Screen.Doctor;
+        await Signals.Until(shell.Model.Doctor, () => !shell.Model.Doctor.IsRunning);
+        host.Pump();
+        host.Save(folder, $"doctor-add-{theme}-1440.png");
+
+        var checkAgain = host.Find<Button>(button => button.Name == "CheckAgainButton" && button.IsEffectivelyVisible)!;
+        Assert.True(checkAgain.Focus(NavigationMethod.Tab));
+        host.Press(PhysicalKey.Tab);
+        var add = host.Find<Button>(button => button.IsEffectivelyVisible
+            && Avalonia.Automation.AutomationProperties.GetName(button) == "Add the line to .husky/pre-push, as line 2")!;
+        Assert.True(host.HasFocusWithin(add));
+        host.Save(folder, $"doctor-addfocus-{theme}-1440.png");
+
+        var row = shell.Model.Doctor.Groups[0].Checks[0];
+        using var addHeld = new ManualResetEventSlim();
+        var addEntered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        setup.Add = (_, _) =>
+        {
+            addEntered.SetResult();
+            addHeld.Wait();
+            return new SetupReport(["Could not write .husky/pre-push: the file is read-only.",
+                "Nothing was changed. Make it writable and try again, or copy the line and add it by hand as line 2."], true);
+        };
+        host.Window.FocusManager?.Focus(null);
+        var openScript = host.Find<Button>(button => button.IsEffectivelyVisible
+            && Avalonia.Automation.AutomationProperties.GetName(button) == "Open the hook script")!;
+        var adding = row.AddCommand.ExecuteAsync(null);
+        try
+        {
+            await addEntered.Task;
+            host.Pump();
+            Assert.False(checkAgain.IsEffectivelyEnabled);
+            Assert.False(host.Find<Button>(button => button.IsEffectivelyVisible
+                && Avalonia.Automation.AutomationProperties.GetName(button) == "Copy the hook line")!.IsEffectivelyEnabled);
+            Assert.False(openScript.IsEffectivelyEnabled);
+            var status = host.Find<ItemsControl>(control => control.Name == "GroupList" && control.IsEffectivelyVisible)!;
+            Assert.Equal("Adding", Avalonia.Automation.AutomationProperties.GetName(status));
+            Assert.Equal(Avalonia.Automation.AutomationLiveSetting.Polite, Avalonia.Automation.AutomationProperties.GetLiveSetting(status));
+            host.Save(folder, $"doctor-adding-{theme}-1440.png");
+        }
+        finally
+        {
+            addHeld.Set();
+            await adding;
+        }
+
+        host.Pump();
+        Assert.True(openScript.IsEffectivelyEnabled);
+        host.Save(folder, $"doctor-failed-{theme}-1440.png");
+        setup.Add = (_, _) =>
+        {
+            added = true;
+            return new SetupReport([], false) { WorktreeRoot = setup.WorktreeRoot };
+        };
+        shell.Clock.Now = checkedAt.AddMinutes(2);
+        await row.AddCommand.ExecuteAsync(null);
+        host.Pump();
+        host.Save(folder, $"doctor-added-{theme}-1440.png");
+
+        added = false;
+        managed = true;
+        shell.Clock.Now = checkedAt;
+        await shell.Model.Doctor.CheckAsync();
+        host.Window.FocusManager?.Focus(null);
+        host.Pump();
+        var entry = shell.Model.Doctor.Groups[0].Checks[0].EntryLines;
+        Assert.NotEmpty(entry);
+        Assert.All(entry, line => Assert.False(line.HasNumber));
+        Assert.Equal(5, entry.Count(line => line.ShowsPlus));
+        host.Save(folder, $"doctor-other-{theme}-1440.png");
+    }
+
     private const string _variable = "CF_SCREENSHOTS";
 
     // the app has one theme, dark
@@ -62,6 +200,31 @@ public sealed class ScreenshotTests
             // Rules, with a rule open beside the list
             Assert.NotNull(shell.Model.Rules.SelectedRule);
             host.Save(folder, $"rules-{theme}-1440x900.png");
+
+            // Try it on a rule that has paths: the note under the box
+            using var pathsShell = new ShellHost(SettingsText.Four.Replace("\"id\": \"TEAM001\",", "\"id\": \"TEAM001\",\n            \"paths\": [\"src/**/*.cs\", \"lib/**/*.cs\"],", StringComparison.Ordinal));
+            window.DataContext = pathsShell.Model;
+            pathsShell.Model.Rules.SelectedItem = pathsShell.Model.Rules.Items.OfType<TeamRuleRowViewModel>().Single(row => row.Id == "TEAM001");
+            var pathsTryIt = pathsShell.Model.Rules.CurrentPage!.TryIt;
+            pathsTryIt.LoadExampleCommand.Execute(null);
+            await Signals.Idle(pathsTryIt);
+            host.Pump();
+            host.Save(folder, $"rules-try-paths-{theme}-1440x900.png");
+
+            using var fileNameShell = new ShellHost("""{"rules":[{"id":"NAME","language":"csharp","for":"class","severity":"block","title":"Match the file name","require":{"isNamedLikeFile":true}}]}""");
+            window.DataContext = fileNameShell.Model;
+            var fileNameTryIt = fileNameShell.Model.Rules.CurrentPage!.TryIt;
+            await Signals.Idle(fileNameTryIt);
+            Assert.True(fileNameTryIt.ReadsFileName);
+            Assert.Equal("commitfence rules try NAME <file>", fileNameTryIt.Command);
+            host.Save(folder, $"rules-try-file-name-{theme}-1440x900.png");
+            window.Width = 760;
+            host.Pump();
+            fileNameShell.Model.Rules.OpenSelectedRule();
+            host.Save(folder, $"rules-try-file-name-{theme}-760x900.png");
+            window.Width = 1440;
+            window.DataContext = shell.Model;
+            host.Pump();
 
             shell.Model.Rules.SelectedItem = shell.Model.Rules.Items.OfType<FileRuleRowViewModel>().Single(row => row.Id == "IDE0055");
             host.Pump();
@@ -110,6 +273,7 @@ public sealed class ScreenshotTests
             window.Width = 1440;
             window.Height = 900;
             await SaveFixStates(folder, theme, host);
+            await RuleFieldsPictures.SaveAsync(folder, theme);
             using var cleanShell = new ShellHost(fileRules: fileRules);
             shell = cleanShell;
             window.DataContext = shell.Model;
@@ -233,6 +397,10 @@ public sealed class ScreenshotTests
                 held.Set();
                 await checking;
             }
+
+            await SaveSetupScreens(folder, theme, fileRules, host, window);
+            window.DataContext = shell.Model;
+            host.Pump();
 
             // Settings: up to date (1440 and 760), the notes of the version installed shown, a custom mapping in the file, then an update
             // that is available, downloading and failed (1440, and the whole page at 760)

@@ -211,6 +211,9 @@ public sealed class RuleService : IRuleService
     private RuleTryResult Try(RuleDefinition rule, string sourceText, string? fileName)
     {
         var language = _languages.First(candidate => candidate.Id == rule.Language);
+        if(string.IsNullOrEmpty(fileName) && ReadsFileName(rule, language))
+            return new RuleTryResult(TryStatus.NeedsFileName, [], $"This rule reads the file's name, so it cannot be tried on pasted code. Try it on a file with commitfence rules try {rule.Id} <file>.", null, null);
+
         if(MeaningNeeds.Has(rule, language))
             return new RuleTryResult(TryStatus.NeedsBuild, new List<ArtifactVerdict>(), "the rule needs what the compiler knows about the code, so it cannot be tried without a build", null, null);
 
@@ -223,6 +226,12 @@ public sealed class RuleService : IRuleService
         {
             return new RuleTryResult(TryStatus.DoesNotParse, new List<ArtifactVerdict>(), exception.Message, exception.Line, exception.Column);
         }
+    }
+
+    private static bool ReadsFileName(RuleDefinition rule, ILanguage language)
+    {
+        var artifactType = language.Catalog.FindArtifactType(rule.ArtifactType);
+        return artifactType != null && rule.Where.Concat(rule.Require).Any(condition => artifactType.FindProperty(condition.PropertyName)?.ReadsFileName == true);
     }
 
     private static LanguageCatalog CreateCatalog(ILanguage language, string? artifactTypeName)

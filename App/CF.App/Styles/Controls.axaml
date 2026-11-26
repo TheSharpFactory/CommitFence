@@ -122,8 +122,25 @@
     <Setter Property="Background" Value="{DynamicResource line}"/>
   </Style>
   <Style Selector="Button.cf.outlined:disabled">
-    <Setter Property="BorderBrush" Value="{DynamicResource line}"/>
+    <Setter Property="Background" Value="{DynamicResource hover}"/>
+    <Setter Property="BorderBrush" Value="{DynamicResource hover}"/>
     <Setter Property="Foreground" Value="{DynamicResource ink-disabled}"/>
+  </Style>
+  <Style Selector="Button.cf.busy">
+    <Setter Property="Cursor" Value="Wait"/>
+  </Style>
+  <Style Selector="Button.cf.main.busy">
+    <Setter Property="Background" Value="{DynamicResource solid-hover}"/>
+    <Setter Property="BorderBrush" Value="{DynamicResource solid-hover}"/>
+  </Style>
+  <Style Selector="Button.cf.main.busy /template/ Border#Surface">
+    <Setter Property="Transitions" Value="{x:Null}"/>
+  </Style>
+  <Style Selector="Button.cf.outlined.busy">
+    <Setter Property="Background" Value="{DynamicResource page}"/>
+  </Style>
+  <Style Selector="Button.cf.busy /template/ Panel#Root">
+    <Setter Property="RenderTransform" Value="scale(1)"/>
   </Style>
 
   <Style Selector="Button.cf.small /template/ parts|FocusRing#Ring">

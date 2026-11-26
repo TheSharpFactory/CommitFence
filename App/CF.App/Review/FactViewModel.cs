@@ -5,10 +5,11 @@ namespace CF.App.Review;
 /// </summary>
 internal sealed class FactViewModel
 {
-    public FactViewModel(string iconKey, string text)
+    public FactViewModel(string iconKey, string text, string code = "")
     {
         IconKey = iconKey;
         Text = text;
+        Code = code;
     }
 
     public string IconKey { get; }
@@ -18,6 +19,22 @@ internal sealed class FactViewModel
         get
         {
             return IconKey == "file";
+        }
+    }
+
+    public bool IsStaged
+    {
+        get
+        {
+            return IconKey == "staged";
+        }
+    }
+
+    public bool IsCommit
+    {
+        get
+        {
+            return IconKey == "commit";
         }
     }
 
@@ -37,5 +54,18 @@ internal sealed class FactViewModel
         }
     }
 
+    /// <summary>
+    /// The words that stand in the fact in the code face, after its text: the short id of a commit.
+    /// </summary>
+    public string Code { get; }
+
     public string Text { get; }
+
+    /// <summary>
+    /// The fact as one sentence, for the spoken name.
+    /// </summary>
+    public string Spoken
+    {
+        get { return Text + Code; }
+    }
 }

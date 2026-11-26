@@ -14,8 +14,8 @@
       <SolidColorBrush x:Key="data" Color="#7E7E7E"/>
       <SolidColorBrush x:Key="ink" Color="#EDEDED"/>
       <SolidColorBrush x:Key="ink-2" Color="#C8C8C8"/>
-      <SolidColorBrush x:Key="ink-3" Color="#B0B0B0"/>
-      <SolidColorBrush x:Key="ink-disabled" Color="#7A7A7A"/>
+      <SolidColorBrush x:Key="ink-3" Color="#BDBDBD"/>
+      <SolidColorBrush x:Key="ink-disabled" Color="#9E9E9E"/>
       <SolidColorBrush x:Key="solid" Color="#EDEDED"/>
       <SolidColorBrush x:Key="solid-hover" Color="#D6D6D6"/>
       <SolidColorBrush x:Key="on-solid" Color="#1F1F1F"/>

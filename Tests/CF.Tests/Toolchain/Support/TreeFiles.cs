@@ -1,4 +1,5 @@
 using System.Text;
+using System.Xml.Linq;
 
 namespace CF.Tests.Toolchain.Support;
 
@@ -36,14 +37,14 @@ internal static class TreeFiles
     }
 
     /// <summary>
-    /// Writes an empty project file for each project of the fake build, a plain source file for each source it compiles
+    /// Writes a project file with the inputs the fake build reports, a plain source file for each source it compiles
     /// unless the tree holds one already, and the settings file.
     /// </summary>
     public static void WriteTree(string folder, IEnumerable<FakeProject> projects, string settings)
     {
         foreach(var project in projects)
         {
-            Write(folder, project.Path, "<Project Sdk=\"Microsoft.NET.Sdk\" />\n");
+            WriteProject(folder, project);
             foreach(var source in project.Units.SelectMany(unit => unit.Compiles).Distinct())
             {
                 if(!File.Exists(Path.Combine(folder, source)))
@@ -52,5 +53,19 @@ internal static class TreeFiles
         }
 
         Write(folder, "commitfence.json", settings);
+    }
+
+    private static void WriteProject(string folder, FakeProject project)
+    {
+        var projectFolder = Path.GetDirectoryName(Path.Combine(folder, project.Path))!;
+        var items = new XElement("ItemGroup");
+        foreach(var reference in project.Units.SelectMany(unit => unit.References).Distinct())
+            items.Add(new XElement("ProjectReference", new XAttribute("Include", Path.GetRelativePath(projectFolder, Path.Combine(folder, reference)))));
+
+        foreach(var source in project.Units.SelectMany(unit => unit.Compiles).Distinct())
+            items.Add(new XElement("Compile", new XAttribute("Include", Path.GetRelativePath(projectFolder, Path.Combine(folder, source)))));
+
+        var document = new XElement("Project", new XAttribute("Sdk", "Microsoft.NET.Sdk"), items);
+        Write(folder, project.Path, document.ToString());
     }
 }

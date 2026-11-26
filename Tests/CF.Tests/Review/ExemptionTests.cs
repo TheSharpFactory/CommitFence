@@ -84,6 +84,42 @@ public sealed class ExemptionTests
     }
 
     [Fact]
+    public void SuppressMessageRowsKeepConstantAndUnresolvedIds()
+    {
+        using var folder = new TestFolder();
+        var git = new FakeGit(folder.Path);
+        git.AddCommit("one", new Dictionary<string, string>
+        {
+            ["src/Orders.cs"] = """
+                class Orders
+                {
+                    const string DiagnosticId = "CA" + "1822:Static members";
+                    [SuppressMessage("Performance", DiagnosticId, Justification = "unqualified")]
+                    [SuppressMessage("Performance", Orders.DiagnosticId, Justification = "qualified")]
+                    [SuppressMessage("Performance", Outside.Id, Justification = "external")]
+                    [SuppressMessage("Performance", "", Justification = "empty")]
+                    [SuppressMessage]
+                    [SuppressMessage("Performance", "CA" + "1822", Justification = "joined")]
+                    void Order() { }
+                }
+                """,
+            ["src/Outside.cs"] = """class Outside { public const string Id = "CA1000"; }"""
+        });
+        git.Name("HEAD", "one");
+        var service = new ExemptionService(git, [new TestLanguage()]);
+
+        var result = Run(service, folder.Path, "exemptions", "list");
+
+        Assert.Equal(ExitCode.Passed, result.ExitCode);
+        Assert.Contains("line 4  CA1822  [SuppressMessage]  unqualified", result.Output, StringComparison.Ordinal);
+        Assert.Contains("line 5  CA1822  [SuppressMessage]  qualified", result.Output, StringComparison.Ordinal);
+        Assert.Contains("line 6  (not a literal)  [SuppressMessage]  external", result.Output, StringComparison.Ordinal);
+        Assert.Contains("line 7  (not a literal)  [SuppressMessage]  empty", result.Output, StringComparison.Ordinal);
+        Assert.Contains("line 8  (not a literal)  [SuppressMessage]  No reason given", result.Output, StringComparison.Ordinal);
+        Assert.Contains("line 9  CA1822  [SuppressMessage]  joined", result.Output, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void CountingGroupsByFileAndRuleAndNamesTheFolderThatHoldsMostOfARule()
     {
         var entries = new List<ExemptionEntry>

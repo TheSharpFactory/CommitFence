@@ -111,7 +111,7 @@ public sealed class FileRulesTests
     public void CommandsDescribeEachPlaceInTheFile()
     {
         using var sdk = new FakeSdk();
-        using var fixture = new RulesFixture(_settings, sdk.Runner(false));
+        using var fixture = new RulesFixture(_settings, sdk.Runner(true));
         ScopedRule(fixture, "*.cs:error,tests/*.cs:warning,*.g.cs:none");
         var list = fixture.Commands.Run("rules", "list");
         var detail = fixture.Commands.Run("rules", "show", "ZZ1000");
@@ -119,12 +119,12 @@ public sealed class FileRulesTests
         Assert.Equal(ExitCode.Passed, detail.ExitCode);
         Assert.Equal(new List<string>
         {
-            ".editorconfig: 1 rules", "ZZ1000  on              blocks  line 2",
+            ".editorconfig: 1 rules", "ZZ1000  on              blocks  Test analyzer  line 2",
             "        warns for tests/*.cs, line 4", "        off for *.g.cs, line 6"
         }, list.Output.Split(Environment.NewLine, StringSplitOptions.RemoveEmptyEntries).TakeLast(4));
         Assert.Equal(new List<string>
         {
-            "ZZ1000", "  setting:  'error'", "  severity: block",
+            "ZZ1000  Test analyzer", "  setting:  'error'", "  severity: block",
             "  status:   blocks for all C# files, 2 exceptions, applied by the build",
             "  file:     .editorconfig, line 2",
             "  source:   set in .editorconfig; the product does not change that file",
@@ -138,7 +138,8 @@ public sealed class FileRulesTests
     [Fact]
     public void ListMapsTheMainSettingAndEachException()
     {
-        using var fixture = new RulesFixture("""{"strictness":"strict","rules":[]}""");
+        using var sdk = new FakeSdk();
+        using var fixture = new RulesFixture("""{"strictness":"strict","rules":[]}""", sdk.Runner(true));
         ScopedRule(fixture, "*.cs:error,tests/*.cs:warning,*.g.cs:none");
 
         var result = fixture.Commands.Run("rules", "list");
@@ -179,12 +180,18 @@ public sealed class FileRulesTests
             // a section that matches no file, or no file of the repository, lists nothing; the later of two sections and of two lines wins, with its own line
             Assert.DoesNotContain("VB0001", result.Output, StringComparison.Ordinal);
             Assert.DoesNotContain("ZZ1006", result.Output, StringComparison.Ordinal);
-            AssertLine(result.Output, "CA1000", "on", "blocks", $"line {LineOf("CA1000", 2)}");
-            AssertLine(result.Output, "ZZ1007", "on", "blocks", $"line {LineOf("ZZ1007", 2)}");
+            AssertLine(result.Output, "CA1000", "blocks", $"line {LineOf("CA1000", 2)}");
+            AssertLine(result.Output, "ZZ1007", "blocks", $"line {LineOf("ZZ1007", 2)}");
             AssertLine(result.Output, "ZZ1005", "not set");
             AssertLine(result.Output, "ca1050", "blocks");
             AssertLine(result.Output, "CA1052", "off");
             AssertLine(result.Output, "IDE0005", "warns");
+
+            // an ID with no SDK title keeps its effect and says that CommitFence has no description of it
+            Assert.Contains(FileRule.UndescribedIdNote, result.Output, StringComparison.Ordinal);
+            var undescribed = fixture.Commands.Run("rules", "show", "ZZ1004");
+            Assert.Contains("on, applied by the build", undescribed.Output, StringComparison.Ordinal);
+            Assert.Contains("note:     " + FileRule.UndescribedIdNote, undescribed.Output, StringComparison.Ordinal);
 
             // the title: the SDK's when there is one, else the comment after the setting, else the comment above it
             AssertLine(result.Output, "ZZ1002", "trailing title");
@@ -197,6 +204,24 @@ public sealed class FileRulesTests
             // a file of the same name in a sub-folder is not read, and the listing says so
             Assert.Contains("1 .editorconfig file in sub-folders is not read.", lines);
         }
+    }
+
+    [Theory]
+    [InlineData("CS0168", false)]
+    [InlineData("ZZ9999", true)]
+    [InlineData("CA1000", false)]
+    public void OnlyAnIdWithNoTitleThatTheBuildMayNotReportIsUndescribed(string id, bool undescribed)
+    {
+        using var sdk = new FakeSdk();
+        using var fixture = new RulesFixture(_settings, sdk.Runner(true));
+        fixture.Write(".editorconfig", $"[*.cs]\ndotnet_diagnostic.{id}.severity = error\n");
+        fixture.Write("src/x.cs", "class X { }\n");
+
+        var shown = fixture.Commands.Run("rules", "show", id);
+
+        Assert.Equal(ExitCode.Passed, shown.ExitCode);
+        Assert.Contains("on, applied by the build", shown.Output, StringComparison.Ordinal);
+        Assert.Equal(undescribed, shown.Output.Contains(FileRule.UndescribedIdNote, StringComparison.Ordinal));
     }
 
     [Fact]

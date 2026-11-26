@@ -35,10 +35,10 @@ public sealed class NamedFilesReview
     /// Reviews the files. A file that cannot be read, or does not parse, makes the result incomplete.
     /// </summary>
     /// <exception cref="Rules.Settings.SettingsException">The settings file is missing or wrong.</exception>
-    public ReviewResult Review(string settingsPath, IReadOnlyList<FileToReview> files)
+    public ReviewResult Review(string settingsPath, IReadOnlyList<FileToReview> files, bool quick = false)
     {
         var started = _clock.Now;
-        var run = new ReviewRun();
+        var run = new ReviewRun(quick);
         if(_settings.RefusesOlderProgram(settingsPath, run))
             return run.ToResult(_clock.Now - started);
 
@@ -46,8 +46,10 @@ public sealed class NamedFilesReview
         foreach(var file in files)
             ReviewOne(file, settings.ActiveRules, run);
 
-        ReportNotRun(settings, run);
-        run.ApplyPolicies(settings.Strictness);
+        if(!quick)
+            ReportNotRun(settings, run);
+
+        run.ApplyPolicies(settings.Strictness, activeRules: settings.ActiveRules);
 
         return run.ToResult(_clock.Now - started);
     }

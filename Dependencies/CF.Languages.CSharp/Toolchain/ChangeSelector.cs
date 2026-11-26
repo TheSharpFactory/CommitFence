@@ -23,7 +23,7 @@ internal static class ChangeSelector
     /// </remarks>
     public static bool IsConcern(string fullPath, IReadOnlyList<string> projectFolders)
     {
-        if(IsSourceFile(fullPath) || IsProjectFile(fullPath) || IsBuildWideFile(fullPath) || IsImportableFile(fullPath))
+        if(IsSourceFile(fullPath) || IsProjectFile(fullPath) || IsBuildInput(fullPath))
             return true;
 
         return projectFolders.Any(folder => ToolchainPaths.IsUnder(folder, fullPath));
@@ -44,7 +44,8 @@ internal static class ChangeSelector
     /// </summary>
     private static bool IsBuildWideFile(string path)
     {
-        return _buildWideFiles.Contains(Path.GetFileName(path), StringComparer.OrdinalIgnoreCase);
+        return _buildWideFiles.Contains(Path.GetFileName(path), StringComparer.OrdinalIgnoreCase)
+            || Path.GetFileName(path).StartsWith("Directory.Build.", StringComparison.OrdinalIgnoreCase);
     }
 
     /// <summary>
@@ -54,6 +55,33 @@ internal static class ChangeSelector
     private static bool IsImportableFile(string path)
     {
         return path.EndsWith(".props", StringComparison.OrdinalIgnoreCase) || path.EndsWith(".targets", StringComparison.OrdinalIgnoreCase);
+    }
+
+    public static bool IsBuildInput(string path)
+    {
+        return IsBuildWideFile(path) || IsImportableFile(path);
+    }
+
+    // These changes seed every unit, even when nothing in its project file refers to the changed path.
+    public static bool RequiresAllProjects(IReadOnlyList<ChangedFile> files)
+    {
+        return files.Any(file => IsImportableFile(file.Path)
+            || (IsProjectFile(file.Path) && file.Status is ChangeStatus.Deleted or ChangeStatus.Renamed)
+            || (file.PreviousPath != null && (IsImportableFile(file.PreviousPath) || IsProjectFile(file.PreviousPath))));
+    }
+
+    // A removed source outside all readable projects may have been linked from anywhere.
+    public static bool RequiresDeletedSourceFallback(IReadOnlyList<ProjectEvaluation> evaluations, string treeFolder, IReadOnlyList<ChangedFile> files)
+    {
+        var projectFolders = evaluations.Where(evaluation => evaluation.Units.Count > 0)
+            .Select(evaluation => ToolchainPaths.FolderOf(evaluation.Project.Path)).ToList();
+        return files.Any(file => (file.Status == ChangeStatus.Deleted && IsOutsideSource(file.Path, treeFolder, projectFolders))
+            || (file.PreviousPath != null && IsOutsideSource(file.PreviousPath, treeFolder, projectFolders)));
+    }
+
+    private static bool IsOutsideSource(string path, string treeFolder, IReadOnlyList<string> projectFolders)
+    {
+        return IsSourceFile(path) && !projectFolders.Any(folder => ToolchainPaths.IsUnder(folder, ToolchainPaths.Combine(treeFolder, path)));
     }
 
     /// <summary>

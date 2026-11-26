@@ -12,4 +12,16 @@ public sealed record DoctorFix(DoctorText Text, IReadOnlyList<DoctorAction> Acti
 
     /// <summary>The label for the preview of the moved hook line.</summary>
     public const string AfterMoveHeading = "After the move";
+
+    /// <summary>The label for the preview of an inserted hook line.</summary>
+    public const string AfterAddingHeading = "After adding";
+
+    /// <summary>The insertion offered by Doctor, when the script can be edited safely.</summary>
+    public HookAddition? Addition { get; init; }
+
+    /// <summary>The caption for configuration to copy, when offered.</summary>
+    public DoctorText? EntryHeading { get; init; }
+
+    /// <summary>How to merge the entry into an existing configuration.</summary>
+    public DoctorText? EntryHint { get; init; }
 }

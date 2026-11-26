@@ -1,11 +1,15 @@
 using Avalonia;
+using Avalonia.Automation;
+using Avalonia.Automation.Peers;
 using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Interactivity;
 using Avalonia.Platform.Storage;
 using Avalonia.Threading;
 using Avalonia.VisualTree;
+using CF.App.Doctor;
 using CF.App.Parts;
+using CF.App.Review;
 using CF.App.Rules.Page;
 
 namespace CF.App.Rules;
@@ -267,11 +271,13 @@ internal sealed partial class RulesView : UserControl
         _model = DataContext as RulesViewModel;
         if(_model != null)
         {
+            _model.Clipboard = new TopLevelClipboard(this);
             _model.OpenFileRequested += OnOpenFileRequested;
             _model.OpenLineRequested += OnOpenLineRequested;
             _model.PropertyChanged += OnModelPropertyChanged;
             _model.Items.CollectionChanged += OnItemsChanged;
             _model.FileRulesArrived += WarmUp;
+            _model.SettingsAppeared += OnSettingsAppeared;
             _windowWidth = Bounds.Width + _railWidth;
             ApplyLayout();
         }
@@ -281,6 +287,44 @@ internal sealed partial class RulesView : UserControl
     {
         if(e.PropertyName == nameof(RulesViewModel.ShowsPage) || e.PropertyName == nameof(RulesViewModel.ShowsFilePage) || e.PropertyName == nameof(RulesViewModel.CurrentPage) || e.PropertyName == nameof(RulesViewModel.IsOnePane))
             ApplyLayout();
+
+        if(e.PropertyName == nameof(RulesViewModel.SetupConfirmation) && _model?.SetupConfirmation != null)
+            Dispatcher.UIThread.Post(ShowSetupConfirmation, DispatcherPriority.Loaded);
+
+        if(e.PropertyName == nameof(RulesViewModel.SetupError) && _model?.SetupError != null)
+            Dispatcher.UIThread.Post(AnnounceSetupError, DispatcherPriority.Loaded);
+    }
+
+    private void ShowSetupConfirmation()
+    {
+        if(_model?.SetupConfirmation is not { } message)
+            return;
+
+        NewRuleButton.Focus(NavigationMethod.Tab);
+        var confirmation = FindSetupMessage<TextBlock>(message);
+        if(confirmation != null)
+            ControlAutomationPeer.CreatePeerForElement(confirmation).RaisePropertyChangedEvent(AutomationElementIdentifiers.NameProperty, null, message);
+    }
+
+    private void OnSettingsAppeared()
+    {
+        Dispatcher.UIThread.Post(() => NewRuleButton.Focus(NavigationMethod.Tab), DispatcherPriority.Loaded);
+    }
+
+    private void AnnounceSetupError()
+    {
+        if(_model?.SetupError is not { } message)
+            return;
+
+        var error = FindSetupMessage<DoctorTextBlock>(message);
+        if(error != null)
+            ControlAutomationPeer.CreatePeerForElement(error).RaisePropertyChangedEvent(AutomationElementIdentifiers.NameProperty, null, message);
+    }
+
+    private T? FindSetupMessage<T>(string message) where T : Control
+    {
+        return this.GetVisualDescendants().OfType<T>()
+            .FirstOrDefault(text => text.IsEffectivelyVisible && AutomationProperties.GetName(text) == message);
     }
 
     private async void OnOpenLineRequested(string path, int line)
@@ -343,9 +387,14 @@ internal sealed partial class RulesView : UserControl
         if(e.NavigationMethod != NavigationMethod.Tab || e.OldFocusedElement is not Visual from || Rows.IsVisualAncestorOf(from) || !ListColumn.IsVisualAncestorOf(from) || from is not (SegmentedList or Control { Parent: SegmentedList } or ListBoxItem))
             return;
 
-        var open = OpenFileButton();
+        var open = SetupLineButton() ?? OpenFileButton();
         if(open != null)
             Dispatcher.UIThread.Post(() => open.Focus(NavigationMethod.Tab), DispatcherPriority.Input);
+    }
+
+    private BusyButton? SetupLineButton()
+    {
+        return Rows.GetVisualDescendants().OfType<BusyButton>().FirstOrDefault(button => button.IsEffectivelyVisible && IsInView(button));
     }
 
     private Button? OpenFileButton()
@@ -376,14 +425,33 @@ internal sealed partial class RulesView : UserControl
 
         var shift = e.KeyModifiers.HasFlag(KeyModifiers.Shift);
         var onOpenFile = source is Button button && Avalonia.Automation.AutomationProperties.GetName(button) == "Open file";
-        if(!onOpenFile && !(shift && source is ListBoxItem))
+        var setup = SetupLineButton();
+        var onSetup = ReferenceEquals(source, setup);
+        var onCopy = source is Button { DataContext: CopyButtonViewModel };
+        if(!onOpenFile && !onSetup && !onCopy && !(shift && source is ListBoxItem))
             return;
 
         e.Handled = true;
         if(shift)
-            FocusFilter();
-        else
+        {
+            if(onSetup || setup?.Focus(NavigationMethod.Tab) != true)
+                FocusFilter();
+
+            return;
+        }
+
+        if(onSetup && (FocusCopyStarter() || OpenFileButton()?.Focus(NavigationMethod.Tab) == true))
+            return;
+
+        if(!onCopy || OpenFileButton()?.Focus(NavigationMethod.Tab) != true)
             Rows.FocusEntry(NavigationMethod.Tab);
+    }
+
+    private bool FocusCopyStarter()
+    {
+        var copy = Rows.GetVisualDescendants().OfType<Button>()
+            .FirstOrDefault(button => button.IsEffectivelyVisible && button.DataContext is CopyButtonViewModel);
+        return copy?.Focus(NavigationMethod.Tab) == true;
     }
 
     /// <summary>

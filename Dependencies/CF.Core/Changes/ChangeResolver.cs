@@ -60,9 +60,10 @@ public sealed class ChangeResolver
     private ChangeSet ResolveStaged(RepositoryLocation repository, ChangeSetBuilder builder)
     {
         var staged = _git.WriteStagedTree(repository);
-        var before = _git.ResolveTree(repository, "HEAD") ?? _git.EmptyTree(repository);
+        var commit = _git.ResolveCommit(repository, "HEAD");
 
-        return builder.Build("staged changes", before, staged);
+        // the commit is read once: the tree it is compared with and the commit the result names are the same one
+        return builder.Build("staged changes", commit ?? _git.EmptyTree(repository), staged).WithCommit(commit ?? string.Empty);
     }
 
     private ChangeSet ResolveRange(RepositoryLocation repository, ChangeSetBuilder builder, ReviewScope scope)

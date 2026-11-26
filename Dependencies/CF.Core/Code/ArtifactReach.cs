@@ -25,6 +25,9 @@ public sealed class ArtifactReach
     /// </summary>
     public SourceSpan Own { get; }
 
+    /// <summary>Whether changes anywhere in the file, including removals at its edges, touch the artifact.</summary>
+    public bool IsWholeFile { get; init; }
+
     /// <summary>
     /// Spans outside the artifact that some of its properties were read from, such as the header of the type it is
     /// declared in.

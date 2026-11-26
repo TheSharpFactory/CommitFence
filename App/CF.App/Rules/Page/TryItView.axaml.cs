@@ -60,7 +60,8 @@ internal sealed partial class TryItView : UserControl
     {
         var rows = Math.Clamp(Editor.Document.LineCount, _fewestRows, _mostRows);
         var least = Editor.Document.TextLength == 0 ? _emptyBoxLeast : _boxChrome + (rows * _rowHeight);
-        var height = Math.Max(least, room - Box.Bounds.Top);
+        var noteHeight = PathsNote.IsVisible ? PathsNote.Bounds.Height + PathsNote.Margin.Top : 0;
+        var height = Math.Max(least, room - Box.Bounds.Top - noteHeight);
         if(double.IsNaN(Box.Height) || Math.Abs(Box.Height - height) > 0.5)
             Box.Height = height;
     }
@@ -124,6 +125,7 @@ internal sealed partial class TryItView : UserControl
         _try.Shown += OnShown;
         _try.ExampleLoaded += OnExampleLoaded;
         _try.PropertyChanged += OnTryPropertyChanged;
+        _try.Clipboard = new CF.App.Review.TopLevelClipboard(this);
         TakeCodeFromModel();
         OnShown();
     }

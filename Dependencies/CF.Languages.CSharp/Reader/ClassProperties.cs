@@ -11,13 +11,15 @@ namespace CF.Languages.CSharp.Reader;
 /// </summary>
 internal static class ClassProperties
 {
-    public static IReadOnlyList<Property> Create(ClassDeclarationSyntax node, SourceLines lines)
+    public static IReadOnlyList<Property> Create(ClassDeclarationSyntax node, SourceLines lines, string fileStem)
     {
         return new PropertyList()
             .Syntax(CSharpNames.Name, node.Identifier.ValueText)
             .Syntax(CSharpNames.WrittenAccess, AccessRules.WrittenAccess(node.Modifiers))
             .Syntax(CSharpNames.Modifiers, DeclarationFacts.ModifierText(node.Modifiers))
             .Syntax(CSharpNames.ContainingType, DeclarationFacts.KindOfType(node.Parent as TypeDeclarationSyntax))
+            .Syntax(CSharpNames.IsNested, node.Parent is TypeDeclarationSyntax)
+            .Syntax(CSharpNames.IsNamedLikeFile, string.Equals(node.Identifier.ValueText, fileStem, StringComparison.Ordinal))
             .Syntax(CSharpNames.IsPartial, node.Modifiers.Any(SyntaxKind.PartialKeyword))
             .Syntax(CSharpNames.Lines, lines.LineCount(node))
             .Syntax(CSharpNames.FitsOnOneLine, lines.FitsOnOneLine(node))

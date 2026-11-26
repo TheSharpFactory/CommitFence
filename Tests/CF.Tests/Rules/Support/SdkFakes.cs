@@ -56,6 +56,11 @@ internal sealed class DeniedFileSystem : IFileSystem
         return _inner.FileExists(path);
     }
 
+    public bool FolderExists(string path)
+    {
+        return _inner.FolderExists(path);
+    }
+
     public string ReadAllText(string path)
     {
         if(Path.GetFileName(path) == _deniedName)
@@ -111,7 +116,7 @@ internal sealed class FakeSdk : IDisposable
     {
         var sdk = Path.Combine(Root, SdkFolderRunner.Version, "Sdks", "Microsoft.NET.Sdk");
         TreeFiles.Write(sdk, Path.Combine("analyzers", "build", "config", "analysislevel_9_all.globalconfig"), "# CA1000: An older title of the analyzer\n");
-        TreeFiles.Write(sdk, Path.Combine("analyzers", "build", "config", "analysislevel_11_all.globalconfig"), "# CA1000: Do not declare static members on generic types\n");
+        TreeFiles.Write(sdk, Path.Combine("analyzers", "build", "config", "analysislevel_11_all.globalconfig"), "# CA1000: Do not declare static members on generic types\n# CA1001: Disposable fields\n# CA1002: Do not expose generic lists\n# CA1050: Declare types in namespaces\n# CA1052: Static holder types\n# ZZ1000: Test analyzer\n");
         TreeFiles.Write(sdk, Path.Combine("codestyle", "cs", "build", "config", "analysislevelstyle_all.globalconfig"), "# IDE0005: Remove unnecessary using directives\n");
     }
 

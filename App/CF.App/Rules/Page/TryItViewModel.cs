@@ -1,4 +1,5 @@
 using System.Text.RegularExpressions;
+using CF.App.Review;
 using CF.Core.Rules;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
@@ -37,6 +38,13 @@ internal sealed partial class TryItViewModel : ObservableObject
     [ObservableProperty]
     public partial string ParseText { get; set; } = string.Empty;
 
+    /// <summary>
+    /// What Try it says under its box when the rule applies only to some paths; empty when it applies to every file.
+    /// </summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasPathsNote))]
+    public partial string PathsNote { get; set; } = string.Empty;
+
     [ObservableProperty]
     public partial int Breaks { get; set; }
 
@@ -51,10 +59,106 @@ internal sealed partial class TryItViewModel : ObservableObject
     /// </summary>
     public IReadOnlyList<ArtifactVerdict> Verdicts { get; private set; } = new List<ArtifactVerdict>();
 
+    private string _ruleId = string.Empty;
+    private string _repositoryName = string.Empty;
+
+    public TryItViewModel()
+    {
+        Copy = new CopyButtonViewModel("Copy", () => Command, () => Clipboard);
+        Copy.PropertyChanged += (_, _) => OnPropertyChanged(nameof(CopySpokenName));
+    }
+
     /// <summary>
     /// Raised on the window's thread each time what Try it shows has changed.
     /// </summary>
     public event Action? Shown;
+
+    /// <summary>
+    /// Whether the rule reads what pasted code does not have, the name of the file: it is tried on a file, from a terminal, and the
+    /// page shows the command in place of the code box.
+    /// </summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(ShowsCodeBox), nameof(ShowsCommand), nameof(CommandSentence))]
+    public partial bool ReadsFileName { get; set; }
+
+    /// <summary>
+    /// Whether the rule is saved as the page shows it. The command runs the saved rule, so a new rule or one with unsaved changes
+    /// cannot be tried on a file yet.
+    /// </summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(ShowsCommand), nameof(CommandSentence))]
+    public partial bool IsSaved { get; set; }
+
+    /// <summary>
+    /// Whether the command line with its Copy button is shown: the rule is tried on a file and is saved.
+    /// </summary>
+    public bool ShowsCommand
+    {
+        get { return ReadsFileName && IsSaved; }
+    }
+
+    public bool ShowsCodeBox
+    {
+        get { return !ReadsFileName; }
+    }
+
+    public string Command
+    {
+        get { return $"commitfence rules try {_ruleId} <file>"; }
+    }
+
+    public string CopySpokenName
+    {
+        get { return Copy.IsCopied ? "Copied" : $"Copy the command {Command}"; }
+    }
+
+    public CopyButtonViewModel Copy { get; }
+
+    /// <summary>
+    /// Where the Copy button puts the command; the window gives it.
+    /// </summary>
+    public ITextClipboard? Clipboard { get; set; }
+
+    /// <summary>
+    /// The id of the rule, which the command names.
+    /// </summary>
+    public void RuleChanged(string ruleId, string repositoryName)
+    {
+        if(ruleId == _ruleId && repositoryName == _repositoryName)
+            return;
+
+        _ruleId = ruleId;
+        _repositoryName = repositoryName;
+        OnPropertyChanged(nameof(Command));
+        OnPropertyChanged(nameof(CommandSentence));
+        OnPropertyChanged(nameof(CopySpokenName));
+    }
+
+    public string CommandSentence
+    {
+        get
+        {
+            return IsSaved
+                ? $"This rule reads the name of the file, which pasted code does not have, so it is tried on a file instead. Run this in a terminal in `{_repositoryName}`, with the path of a file:"
+                : "Save the rule to try it on a file.";
+        }
+    }
+
+    public bool HasPathsNote
+    {
+        get
+        {
+            return PathsNote.Length > 0;
+        }
+    }
+
+    /// <summary>
+    /// The paths the rule applies to, as the rule writes them: the sample is judged as if it were a file of those paths.
+    /// </summary>
+    public void PathsChanged(IReadOnlyList<string> paths)
+    {
+        PathsNote = paths.Count == 0 ? string.Empty : $"This rule applies only to {string.Join(", ", paths)}. The sample is judged as if it were one of those files.";
+    }
 
     public bool HasCode
     {
@@ -252,7 +356,7 @@ internal sealed partial class TryItViewModel : ObservableObject
             OnPropertyChanged(nameof(HasExample));
         }
 
-        if(plan?.Key == _plan?.Key && (plan == null) == (_plan == null))
+        if(Equals(plan?.Key, _plan?.Key) && (plan == null) == (_plan == null))
             return;
 
         _plan = plan;
@@ -373,6 +477,12 @@ internal sealed partial class TryItViewModel : ObservableObject
 
     private void Describe(TryPlan? plan, string code, TryAnswer? answer)
     {
+        if(ReadsFileName)
+        {
+            Phase = TryPhase.Empty;
+            return;
+        }
+
         if(plan == null)
         {
             Message = _unfinished;

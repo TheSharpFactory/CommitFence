@@ -3,6 +3,8 @@
              xmlns:local="using:CF.App.Rules.Page"
              xmlns:parts="using:CF.App.Parts"
              xmlns:ae="using:AvaloniaEdit"
+             xmlns:review="using:CF.App.Review"
+             xmlns:settings="using:CF.App.Settings"
              x:Class="CF.App.Rules.Page.TryItView"
              x:ClassModifier="internal"
              x:DataType="local:TryItViewModel">
@@ -23,12 +25,12 @@
     </Style>
   </UserControl.Styles>
 
-  <Grid RowDefinitions="Auto,Auto">
+  <Grid RowDefinitions="Auto,Auto,Auto">
 
     <Grid Name="Head" ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto" Margin="0,20,0,10" MinHeight="24">
       <TextBlock Name="Heading" Theme="{StaticResource type-h2}" VerticalAlignment="Center" Text="Try it"/>
       <StackPanel Name="HeadRight" Grid.Column="1" Orientation="Horizontal" Spacing="6" VerticalAlignment="Center"
-                  HorizontalAlignment="Right">
+                  HorizontalAlignment="Right" IsVisible="{Binding ShowsCodeBox}">
         <StackPanel Orientation="Horizontal" Spacing="6" IsVisible="{Binding ShowsCounts}"
                     AutomationProperties.Name="{Binding CountsSpokenName}">
           <local:TryLabel Kind="Breaks" Word="{Binding BreaksWord}" IsZero="{Binding NoBreaks}"/>
@@ -37,13 +39,44 @@
         </StackPanel>
         <local:TryLabel Kind="Warn" Word="{Binding ParseText}" IsVisible="{Binding ShowsParse}"
                         AutomationProperties.Name="{Binding ParseText}"/>
-        <TextBlock Name="MessageText" Theme="{StaticResource type-meta}" Foreground="{DynamicResource ink-2}" TextWrapping="Wrap"
+        <TextBlock Name="MessageText" Theme="{StaticResource type-body}" Foreground="{DynamicResource ink-2}" TextWrapping="Wrap"
                    VerticalAlignment="Center" IsVisible="{Binding ShowsMessage}" Text="{Binding Message}"
                    AutomationProperties.Name="{Binding Message}"/>
       </StackPanel>
     </Grid>
 
-    <Border Name="Box" Grid.Row="1" CornerRadius="16" ClipToBounds="True" Background="{DynamicResource page}">
+    <!-- A rule that reads the name of the file cannot be tried on pasted code: nothing invites typing, and the one box says why and gives
+         the command that tries the rule on a file. -->
+    <Border Name="CommandBox" Grid.Row="1" IsVisible="{Binding ReadsFileName}" CornerRadius="16" BorderThickness="1"
+            BorderBrush="{DynamicResource line}" Background="{DynamicResource page}" Padding="16">
+      <StackPanel Spacing="12">
+        <Grid ColumnDefinitions="Auto,*" ColumnSpacing="8">
+          <parts:Icon Data="{StaticResource i-info}" Width="16" Height="16" Stroke="{DynamicResource ink-2}" VerticalAlignment="Top" Margin="0,2,0,0"/>
+          <settings:MarkedText Grid.Column="1" Theme="{StaticResource type-body}" Foreground="{DynamicResource ink-2}" Marked="{Binding CommandSentence}"/>
+        </Grid>
+        <Border CornerRadius="10" Background="{DynamicResource well}" MinHeight="44" Padding="14,4,4,4" IsVisible="{Binding ShowsCommand}">
+          <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
+            <TextBlock Theme="{StaticResource code}" Foreground="{DynamicResource ink}" VerticalAlignment="Center" TextWrapping="Wrap"
+                       Text="{Binding Command}"/>
+            <Button Grid.Column="1" Classes="cf outlined small" VerticalAlignment="Center" Command="{Binding Copy.CopyCommand}"
+                    AutomationProperties.Name="{Binding CopySpokenName}">
+              <StackPanel Orientation="Horizontal" Spacing="6">
+                <Panel>
+                  <parts:Icon Data="{StaticResource i-copy}" Width="14" Height="14" Stroke="{Binding $parent[Button].Foreground}" IsVisible="{Binding !Copy.IsCopied}"/>
+                  <parts:Icon Data="{StaticResource i-check}" Width="14" Height="14" Stroke="{Binding $parent[Button].Foreground}" IsVisible="{Binding Copy.IsCopied}"/>
+                </Panel>
+                <Panel>
+                  <TextBlock Theme="{StaticResource type-meta-strong}" Opacity="{Binding Copy.IsCopied, Converter={x:Static review:CopyButton.Hidden}}" Text="Copy"/>
+                  <TextBlock Theme="{StaticResource type-meta-strong}" HorizontalAlignment="Left" IsVisible="{Binding Copy.IsCopied}" Text="Copied"/>
+                </Panel>
+              </StackPanel>
+            </Button>
+          </Grid>
+        </Border>
+      </StackPanel>
+    </Border>
+
+    <Border Name="Box" Grid.Row="1" IsVisible="{Binding ShowsCodeBox}" CornerRadius="16" ClipToBounds="True" Background="{DynamicResource page}">
       <Panel Name="BoxPanel" Classes="codebox">
         <Grid Margin="1" RowDefinitions="36,*">
 
@@ -51,7 +84,7 @@
             <Grid ColumnDefinitions="Auto,*,Auto,Auto" ColumnSpacing="4">
               <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
                 <parts:Icon Data="{StaticResource i-type}" Width="14" Height="14" Stroke="{DynamicResource ink-3}"/>
-                <TextBlock Theme="{StaticResource type-meta}" Foreground="{DynamicResource ink-2}" VerticalAlignment="Center"
+                <TextBlock Theme="{StaticResource type-body}" Foreground="{DynamicResource ink-2}" VerticalAlignment="Center"
                            Text="Type or paste C# here. The rule runs as you type."/>
               </StackPanel>
               <Button Name="PasteButton" Grid.Column="2" Classes="cf quiet small" AutomationProperties.Name="Paste"
@@ -77,7 +110,7 @@
             <StackPanel Name="EmptyBlock" ZIndex="1" IsVisible="{Binding ShowsEmptyBlock}" MaxWidth="520" HorizontalAlignment="Center"
                         VerticalAlignment="Center">
               <TextBlock Theme="{StaticResource type-body}" TextAlignment="Center" TextWrapping="Wrap" IsHitTestVisible="False" Text="{Binding BlockSentence}"/>
-              <TextBlock Theme="{StaticResource type-meta}" Foreground="{DynamicResource ink-2}" TextAlignment="Center" TextWrapping="Wrap" Margin="0,4,0,0"
+              <TextBlock Theme="{StaticResource type-body}" Foreground="{DynamicResource ink-2}" TextAlignment="Center" TextWrapping="Wrap" Margin="0,4,0,0"
                          IsHitTestVisible="False" Text="{Binding BlockLegendLine}"/>
               <StackPanel Orientation="Horizontal" Spacing="6" HorizontalAlignment="Center" Margin="0,12,0,0" IsHitTestVisible="False"
                           AutomationProperties.Name="Breaks it, Follows it, Not covered">
@@ -94,7 +127,7 @@
                            HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto" WordWrap="False"
                            FontFamily="Cascadia Mono, Consolas, Menlo, DejaVu Sans Mono, monospace" FontSize="13"
                            Foreground="{DynamicResource ink}" AutomationProperties.Name="Code to try the rule on"/>
-            <TextBlock Name="PlaceholderText" Theme="{StaticResource type-meta}" Foreground="{DynamicResource ink-3}"
+            <TextBlock Name="PlaceholderText" Theme="{StaticResource type-body}" Foreground="{DynamicResource ink-3}"
                        IsHitTestVisible="False" IsVisible="{Binding ShowsHint}" Margin="49,0,0,0" VerticalAlignment="Top"
                        Text="{Binding Placeholder}"/>
           </Panel>
@@ -103,6 +136,10 @@
         <Border Name="Edge" Classes="edge" CornerRadius="16" IsHitTestVisible="False"/>
       </Panel>
     </Border>
+
+    <!-- A rule with paths: the sample is not a file, so it is judged as if it were one the rule applies to. -->
+    <TextBlock Name="PathsNote" Grid.Row="2" Margin="0,8,0,0" Theme="{StaticResource type-body}" Foreground="{DynamicResource ink-2}"
+               TextWrapping="Wrap" IsVisible="{Binding HasPathsNote}" Text="{Binding PathsNote}"/>
 
   </Grid>
 

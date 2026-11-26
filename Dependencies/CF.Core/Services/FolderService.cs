@@ -24,9 +24,9 @@ public sealed class FolderService : IFolderService
     public OpenedFolder Open(string folder)
     {
         var folderPath = Path.GetFullPath(folder);
-        var settingsPath = SettingsFileName.PathIn(folderPath);
-        var settingsExist = _fileSystem.FileExists(settingsPath);
         var repository = FindRepository(folderPath);
+        var settingsPath = SettingsFileName.PathIn(repository?.WorkFolder ?? folderPath);
+        var settingsExist = _fileSystem.FileExists(settingsPath);
         if(repository == null)
             return new OpenedFolder(folderPath, settingsPath, settingsExist, NameOf(folderPath), null, false);
 

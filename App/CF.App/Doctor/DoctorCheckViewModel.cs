@@ -2,6 +2,7 @@ using CF.App.Parts;
 using CF.App.Review;
 using CF.Core.Setup;
 using CommunityToolkit.Mvvm.ComponentModel;
+using CommunityToolkit.Mvvm.Input;
 
 namespace CF.App.Doctor;
 
@@ -20,12 +21,136 @@ internal sealed partial class DoctorCheckViewModel : ObservableObject
 {
     private readonly DoctorCheckResult _result;
 
-    public DoctorCheckViewModel(DoctorCheckResult result, Action<DoctorAction> open, Func<ITextClipboard?> clipboard)
+    private readonly Func<DoctorCheckViewModel, HookAddition, Task>? _addHookLine;
+
+    public DoctorCheckViewModel(DoctorCheckResult result, Action<DoctorAction> open, Func<ITextClipboard?> clipboard,
+        Func<DoctorCheckViewModel, HookAddition, Task>? addHookLine = null, string? hookAddedAt = null, SetupNextStep? commitHook = null)
     {
         _result = result;
-        Lines = LinesOf(result.Fix?.Excerpt, false);
-        AfterMoveLines = LinesOf(result.Fix?.AfterMove, true);
-        Actions = (result.Fix?.Actions ?? new List<DoctorAction>()).Select((action, index) => new DoctorActionViewModel(action, index == 0, open, clipboard)).ToList();
+        _addHookLine = addHookLine;
+        var fix = result.Fix;
+        Addition = fix?.Addition;
+        Lines = LinesOf(fix?.Excerpt, false);
+        AfterMoveLines = LinesOf(Addition?.After ?? fix?.AfterMove, true, Addition != null);
+        EntryHeading = fix?.EntryHeading?.Parts;
+        EntryHint = fix?.EntryHint?.Parts;
+        EntryLines = EntryHeading == null ? [] : LinesOfEntry(fix!.Actions[0].Value);
+        var actions = fix?.Actions ?? [];
+        if(Addition != null)
+            actions = actions.OrderBy(action => action.Kind != DoctorActionKind.CopyText).ToList();
+
+        Actions = actions.Select((action, index) =>
+        {
+            var copiesEntry = HasEntry && action.Kind == DoctorActionKind.CopyText;
+            var isPrimary = copiesEntry || (index == 0 && Addition == null && action.Kind != DoctorActionKind.CopyText
+                && result.Title != "The pre-push hook runs CommitFence first");
+            return new DoctorActionViewModel(action, isPrimary, open, clipboard,
+                copyName: copiesEntry ? $"{action.Label}, {EntryLines.Count(line => line.ShowsPlus)} lines for lefthook.yml" : null,
+                isQuiet: HasEntry && !copiesEntry || Addition != null && action.Kind == DoctorActionKind.OpenFile);
+        }).ToList();
+        var justAdded = hookAddedAt != null && result.Outcome == DoctorOutcome.Passes;
+        Found = justAdded ? [.. result.Found.Parts, $" CommitFence added it at {hookAddedAt}."] : result.Found.Parts;
+        CommitHook = justAdded ? commitHook : null;
+    }
+
+    private HookAddition? Addition { get; }
+
+    public bool CanAdd { get { return Addition != null && _addHookLine != null; } }
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(AddLabel), nameof(AddName), nameof(ShowsAddIcon), nameof(ShowsRetryIcon))]
+    public partial bool IsAdding { get; set; }
+
+    partial void OnIsAddingChanged(bool value)
+    {
+        foreach(var action in Actions)
+        {
+            if(action.Copy is { } copy)
+                copy.IsAvailable = !value;
+            else if(action.Kind == DoctorActionKind.OpenFile)
+                action.IsAvailable = !value;
+        }
+    }
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(AddLabel), nameof(AddName), nameof(ShowsAddIcon), nameof(ShowsRetryIcon), nameof(AddErrorParts))]
+    public partial string? AddError { get; set; }
+
+    [ObservableProperty]
+    public partial string? AddErrorDetail { get; set; }
+
+    public IReadOnlyList<DoctorTextPart>? AddErrorParts
+    {
+        get { return AddError == null || Addition == null ? null : SetupMessage.WithFileName(AddError, Addition.ShownPath); }
+    }
+
+    public string AddLabel { get { return IsAdding ? "Adding" : AddError != null ? "Try again" : "Add the line"; } }
+
+    public bool ShowsAddIcon { get { return !IsAdding && AddError == null; } }
+
+    public bool ShowsRetryIcon { get { return !IsAdding && AddError != null; } }
+
+    public string? AddName
+    {
+        get
+        {
+            if(IsAdding)
+                return "Adding, busy";
+
+            return Addition == null ? null : $"{AddLabel} to {Addition.ShownPath}, as line {Addition.After.Line}";
+        }
+    }
+
+    public double SignWidth { get { return Addition != null ? 22 : 0; } }
+
+    public double SignGap { get { return Addition != null ? 0 : 14; } }
+
+    public double NumberWidth { get { return Addition != null ? 44 : 30; } }
+
+    public string NowName { get { return $"Now, {Lines.Count} lines"; } }
+
+    public string PreviewName { get { return Addition == null ? PreviewHeading : $"After adding, {Addition.After.Lines.Count} lines, line {Addition.After.Line} added"; } }
+
+    public string PreviewHeading { get { return Addition == null ? DoctorFix.AfterMoveHeading : DoctorFix.AfterAddingHeading; } }
+
+    public IReadOnlyList<DoctorTextPart>? EntryHeading { get; }
+
+    public IReadOnlyList<DoctorTextPart>? EntryHint { get; }
+
+    public IReadOnlyList<DoctorTextPart> EntryLineNote { get; } = ["The ", DoctorTextPart.CodeText("run:"),
+        " line is one line in the file, shown broken at ", DoctorTextPart.CodeText(";"), " and ", DoctorTextPart.CodeText("||"),
+        " to read. Copy the lefthook entry gives it as one line."];
+
+    public IReadOnlyList<FileLineViewModel> EntryLines { get; }
+
+    public bool HasEntry { get { return EntryHeading != null; } }
+
+    public IReadOnlyList<DoctorTextPart>? HookLineNote
+    {
+        get
+        {
+            return Addition == null ? null : [$"Line {Addition.After.Line} is one line in the file, shown broken at ",
+                DoctorTextPart.CodeText(";"), " and ", DoctorTextPart.CodeText("||"), " to read. Copy the hook line gives it as one line."];
+        }
+    }
+
+    public SetupNextStep? CommitHook { get; }
+
+    public bool ShowsCommitHook { get { return ShowsPass && CommitHook != null; } }
+
+    public bool ShowsManualMark { get { return ShowsFailure && HasEntry; } }
+
+    public bool ShowsFailureMark { get { return ShowsFailure && !HasEntry; } }
+
+    public bool IsHookSetup { get { return _result.Title == "The pre-push hook runs CommitFence first" && _result.Fix is { Excerpt.Line: null } or { Excerpt: null }; } }
+
+    public bool ShowsNow { get { return HasAfterMove || IsHookSetup && HasLines; } }
+
+    [RelayCommand(AllowConcurrentExecutions = true)]
+    private async Task AddAsync()
+    {
+        if(CanAdd && !IsBusy && !IsAdding)
+            await _addHookLine!(this, Addition!);
     }
 
     /// <summary>
@@ -34,6 +159,7 @@ internal sealed partial class DoctorCheckViewModel : ObservableObject
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(ShowsPass), nameof(ShowsFailure), nameof(ShowsNotChecked), nameof(ShowsRing), nameof(ShowsQuietProgress), nameof(ShowsFinishedMark), nameof(ShowsResult))]
     [NotifyPropertyChangedFor(nameof(HasFix), nameof(HasLines), nameof(HasActions), nameof(SpokenName))]
+    [NotifyPropertyChangedFor(nameof(ShowsManualMark), nameof(ShowsFailureMark), nameof(ShowsCommitHook))]
     public partial bool IsBusy { get; set; }
 
     [ObservableProperty]
@@ -65,10 +191,7 @@ internal sealed partial class DoctorCheckViewModel : ObservableObject
         get { return _result.Outcome; }
     }
 
-    public IReadOnlyList<DoctorTextPart> Found
-    {
-        get { return _result.Found.Parts; }
-    }
+    public IReadOnlyList<DoctorTextPart> Found { get; }
 
     public bool HasFix
     {
@@ -155,7 +278,7 @@ internal sealed partial class DoctorCheckViewModel : ObservableObject
         }
     }
 
-    private static List<FileLineViewModel> LinesOf(DoctorExcerpt? excerpt, bool afterMove)
+    private static List<FileLineViewModel> LinesOf(DoctorExcerpt? excerpt, bool preview, bool adding = false)
     {
         var lines = new List<FileLineViewModel>();
         if(excerpt == null)
@@ -164,14 +287,74 @@ internal sealed partial class DoctorCheckViewModel : ObservableObject
         foreach(var line in excerpt.Lines)
         {
             var marked = excerpt.Marks(line.Number);
-            var model = new FileLineViewModel { IsFinding = marked && !afterMove, IsMoved = marked && afterMove };
+            if(marked && adding)
+            {
+                lines.AddRange(HookDisplayRows.For(line).Select(row => AddedLine(row)));
+                continue;
+            }
+
+            var model = new FileLineViewModel { IsFinding = marked && !preview, IsMoved = marked && preview };
             model.Take(line, false);
 
-            // a plain run, so that the line is set in ink and not in the faint colour of a line that is not code
-            model.Segments = [new CodeSegment(line.Text, null)];
+            if(!model.IsComment || line.Text.StartsWith("#!", StringComparison.Ordinal))
+                model.Segments = [new CodeSegment(line.Text, null)];
             lines.Add(model);
         }
 
         return lines;
+    }
+
+    private static List<FileLineViewModel> LinesOfEntry(string entry)
+    {
+        var lines = new List<FileLineViewModel>();
+        const string run = "run: '";
+        foreach(var text in DoctorExcerpt.ReadLines(entry))
+        {
+            var line = new CF.Core.Code.FileLine(1, text);
+            var trimmed = text.AsSpan().TrimStart(' ');
+            if(trimmed.StartsWith(run, StringComparison.Ordinal))
+            {
+                var prefixLength = text.Length - trimmed.Length + run.Length;
+                lines.AddRange(HookDisplayRows.For(line, text[..prefixLength]).Select(row => AddedLine(row, fragment: true)));
+            }
+            else
+            {
+                lines.Add(AddedLine(line, fragment: true));
+            }
+        }
+
+        return lines;
+    }
+
+    private static FileLineViewModel AddedLine(CF.Core.Code.FileLine line, bool fragment = false)
+    {
+        var model = new FileLineViewModel { IsAdded = true, IsContinuation = line.Number == 0 };
+        model.Take(fragment ? new CF.Core.Code.FileLine(0, line.Text) : line, false);
+        model.Segments = HookSegments(line.Text);
+        return model;
+    }
+
+    private static List<CodeSegment> HookSegments(string text)
+    {
+        var segments = new List<CodeSegment>();
+        var start = 0;
+        while(start < text.Length)
+        {
+            var quoted = text.IndexOf('"', start);
+            var end = quoted < 0 ? -1 : text.IndexOf('"', quoted + 1);
+            if(end < 0)
+            {
+                segments.Add(new CodeSegment(text[start..], null));
+                break;
+            }
+
+            if(quoted > start)
+                segments.Add(new CodeSegment(text[start..quoted], null));
+
+            segments.Add(new CodeSegment(text[quoted..(end + 1)], "code-string"));
+            start = end + 1;
+        }
+
+        return segments;
     }
 }

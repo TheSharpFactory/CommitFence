@@ -9,6 +9,7 @@ internal sealed class ReviewArgumentsReader
     private const string _settingsOption = "--settings";
     private const string _filesOption = "--files";
     private const string _stagedOption = "--staged";
+    private const string _quickOption = "--quick";
     private const string _hookOption = "--hook";
     private const string _pushOption = "--push";
     private const string _baseOption = "--base";
@@ -47,7 +48,10 @@ internal sealed class ReviewArgumentsReader
 
         var decided = Decide(given);
         if(decided.Arguments != null)
+        {
             decided.Arguments.AsPrompt = given.Values.TryGetValue(_formatOption, out var format) && format == _promptFormat;
+            decided.Arguments.Quick = given.PreCommit || given.Options.Contains(_quickOption);
+        }
 
         return decided;
     }
@@ -61,7 +65,7 @@ internal sealed class ReviewArgumentsReader
             return null;
         }
 
-        if(!_forms.Contains(argument) && !_optionsWithValue.Contains(argument))
+        if(!_forms.Contains(argument) && !_optionsWithValue.Contains(argument) && (argument != _quickOption || _allowPushHead))
             return $"'{argument}' is not understood here.";
 
         if(!given.Options.Add(argument))
@@ -87,6 +91,13 @@ internal sealed class ReviewArgumentsReader
 
     private string? ReadHook(GivenArguments given)
     {
+        if(!_allowPushHead && _position + 1 < _args.Length && _args[_position + 1] == "pre-commit")
+        {
+            given.PreCommit = true;
+            _position++;
+            return null;
+        }
+
         if(_position + _hookValueCount >= _args.Length || _args[_position + 1] != _prePushHook)
             return "--hook needs pre-push, the remote's name and the remote's address, as git gives them to the hook.";
 
@@ -107,10 +118,13 @@ internal sealed class ReviewArgumentsReader
 
         var forms = _forms.Where(given.Options.Contains).ToList();
         if(forms.Count != 1)
-            return ReviewArgumentsResult.Wrong("review needs exactly one of --files, --staged, --hook pre-push, --push, --base or --all.");
+            return ReviewArgumentsResult.Wrong("review needs exactly one of --files, --staged, --hook, --push, --base or --all.");
 
         if(given.Options.Contains(_headOption) && !given.Options.Contains(_baseOption) && !(_allowPushHead && forms[0] == _pushOption))
             return ReviewArgumentsResult.Wrong("--head needs --base.");
+
+        if(given.Options.Contains(_quickOption) && forms[0] is not (_stagedOption or _filesOption) && !given.PreCommit)
+            return ReviewArgumentsResult.Wrong("--quick needs --staged, --files or --hook pre-commit.");
 
         return DecideForm(given, forms[0]);
     }
@@ -146,7 +160,7 @@ internal sealed class ReviewArgumentsReader
             case _pushOption:
                 return ReviewArguments.ForPush(settingsPath, given.Values.GetValueOrDefault(_headOption, string.Empty));
             case _hookOption:
-                return ReviewArguments.ForHook(given.RemoteName, given.RemoteUrl, settingsPath);
+                return given.PreCommit ? ReviewArguments.ForStaged(settingsPath) : ReviewArguments.ForHook(given.RemoteName, given.RemoteUrl, settingsPath);
             case _baseOption:
                 given.Values.TryGetValue(_headOption, out var head);
                 return ReviewArguments.ForRange(given.Values[_baseOption], head ?? _defaultHead, settingsPath);
@@ -188,6 +202,8 @@ internal sealed class ReviewArgumentsReader
         public Dictionary<string, string> Values { get; } = new Dictionary<string, string>(StringComparer.Ordinal);
 
         public List<string> Plain { get; } = new List<string>();
+
+        public bool PreCommit { get; set; }
 
         public string RemoteName { get; set; } = string.Empty;
 

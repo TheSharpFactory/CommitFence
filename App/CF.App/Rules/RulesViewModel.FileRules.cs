@@ -51,12 +51,28 @@ internal sealed partial class RulesViewModel
         }
     }
 
+    /// <summary>
+    /// The strictness in force, which the settings file chooses; standard when there is no file or it cannot be read.
+    /// </summary>
+    private Strictness ReadStrictness()
+    {
+        try
+        {
+            return _rules.ReadSettings(_folder.SettingsPath).Strictness;
+        }
+        catch(SettingsException)
+        {
+            return Strictness.Standard;
+        }
+    }
+
     private void ShowFileRules(int generation, FileAnswer answer)
     {
         if(generation != _fileReading)
             return;
 
         _fileProblem = answer.Problem;
+        _fileStrictness = ReadStrictness();
         _fileName = answer.Listings?.Select(listing => listing.File).FirstOrDefault(file => file != null);
         _fileRules = answer.Listings == null ? new List<FileRule>() : answer.Listings.SelectMany(listing => listing.Rules).ToList();
         _fileNotes = answer.Listings == null ? new List<string>() : answer.Listings.SelectMany(listing => listing.Notes).ToList();
@@ -81,7 +97,7 @@ internal sealed partial class RulesViewModel
         }
 
         if(SelectedItem is FileRuleRowViewModel selected && _fileRows.TryGetValue(selected.Id, out var current))
-            FilePage.Show(current.Rule);
+            FilePage.Show(current.Rule, _fileStrictness);
     }
 
     private void OpenEditorConfigLine(int line)

@@ -11,22 +11,25 @@ namespace CF.Core.Services;
 public sealed class SetupService : ISetupService
 {
     private const string _settingsFile = "commitfence.json";
-    private static readonly string _starterSettings = string.Join("\n", "{", "    \"rules\": []", "}") + "\n";
+    /// <summary>The exact settings content written by setup.</summary>
+    public const string StarterSettings = "{\n    \"rules\": []\n}\n";
 
     private readonly IUserGitSettings _gitSettings;
     private readonly IUserPath _userPath;
     private readonly IGit _git;
     private readonly IFileSystem _fileSystem;
+    private readonly HookScript _hooks;
 
     /// <summary>
     /// Creates the service.
     /// </summary>
-    public SetupService(IUserGitSettings gitSettings, IUserPath userPath, IGit git, IFileSystem fileSystem)
+    public SetupService(IUserGitSettings gitSettings, IUserPath userPath, IGit git, IFileSystem fileSystem, IDoctorGit hookGit)
     {
         _gitSettings = gitSettings;
         _userPath = userPath;
         _git = git;
         _fileSystem = fileSystem;
+        _hooks = new HookScript(hookGit, fileSystem);
     }
 
     /// <inheritdoc />
@@ -48,50 +51,205 @@ public sealed class SetupService : ISetupService
     }
 
     /// <inheritdoc />
-    public SetupReport Init(string folder)
+    public SetupReport Init(string folder, HookKind hook = HookKind.PrePush, bool print = false)
     {
+        var lines = new List<string>();
         try
         {
-            return InitIn(folder);
+            var repository = _git.FindRepository(folder);
+            if(repository == null)
+                return new SetupReport([$"init must be run inside a git repository: {folder} is not in one."], true);
+
+            var edit = _hooks.Inspect(repository, hook);
+            lines.Add(WriteStarterSettings(repository.WorkFolder, print).Message);
+            DescribeHook(edit, print, lines);
+            return new SetupReport(lines, false);
         }
         catch(Exception exception) when(IsSetupFailure(exception))
         {
-            return new SetupReport(new List<string> { "Failed: " + exception.Message }, true);
+            lines.Add("Failed: " + DoctorCheck.Message(exception));
+            return new SetupReport(lines, true);
         }
     }
 
-    private SetupReport InitIn(string folder)
+    private void DescribeHook(HookEdit edit, bool print, List<string> lines)
     {
-        var repository = _git.FindRepository(folder);
-        if(repository == null)
-            return new SetupReport(new List<string> { "init must be run inside a git repository: " + folder + " is not in one." }, true);
-
-        var lines = new List<string>
+        var path = edit.Path;
+        if(edit.HasReviewLine)
         {
-            WriteStarterSettings(repository.WorkFolder),
-            "Add this line as the first command of the pre-push hook (with husky, the file .husky/pre-push):",
-            HookLine.PrePush
-        };
+            lines.Add($"{path} already contains the CommitFence line and was left as it is.");
+            if(edit.ManualReason != null)
+                lines.Add(edit.ManualReason);
 
-        return new SetupReport(lines, false);
-    }
+            DescribeInactiveHook(edit.GitPath, lines);
+            return;
+        }
 
-    private string WriteStarterSettings(string repositoryFolder)
-    {
-        var settingsPath = Path.Combine(repositoryFolder, _settingsFile);
-        if(_fileSystem.FileExists(settingsPath))
-            return $"{settingsPath} already exists and was left as it is.";
+        if(edit.Updated == null)
+        {
+            lines.AddRange(ManualHookInstructions(edit));
+            DescribeInactiveHook(edit.GitPath, lines);
+            return;
+        }
+
+        if(print)
+        {
+            if(edit.Original == null && !edit.IsHusky)
+                lines.Add($"Would create {path} with #!/bin/sh and add this line at line {edit.InsertionLine}:");
+            else
+                lines.Add($"Would add this line to {path} at line {edit.InsertionLine}:");
+
+            lines.Add(HookLine.For(edit.Kind));
+            return;
+        }
 
         try
         {
-            _fileSystem.WriteNewFile(settingsPath, _starterSettings);
+            _hooks.Write(edit);
+        }
+        catch(Exception exception) when(IsSetupFailure(exception))
+        {
+            throw new IOException(Failure(edit.Path, exception), exception);
+        }
+
+        lines.Add($"Added the CommitFence line to {path} at line {edit.InsertionLine}.");
+        if(!OperatingSystem.IsWindows())
+            lines.Add($"Made {path} executable.");
+
+        if(edit.GitPath != edit.Path)
+            DescribeInactiveHook(edit.GitPath, lines);
+    }
+
+    private void DescribeInactiveHook(string path, List<string> lines)
+    {
+        if(_fileSystem.FileExists(path) && !_fileSystem.IsExecutable(path))
+            lines.Add($"{path} is inactive because it is not executable.");
+    }
+
+    private static List<string> ManualHookInstructions(HookEdit edit)
+    {
+        if(edit.ManualReason == null && edit.Manager == "lefthook")
+        {
+            var advice = new List<string> { $"lefthook generated {edit.Path}.", LefthookAdvice.For(edit.ShownPath).ToString(), LefthookAdvice.Entry(edit.Kind) };
+            if(edit.Kind == HookKind.PrePush)
+                advice.Add(LefthookAdvice.MergeHint.ToString());
+
+            return advice;
+        }
+
+        var lines = new List<string>();
+        if(edit.ManualReason != null)
+            lines.Add(edit.ManualReason);
+
+        lines.Add(edit.RunsGitLfs
+            ? $"To use this line in {edit.Path}, arrange for both commands to get the hook input:"
+            : $"Add this line as the first command of {edit.Path}:");
+        lines.Add(HookLine.For(edit.Kind));
+        return lines;
+    }
+
+    /// <inheritdoc />
+    public bool HasSettings(string path)
+    {
+        return _fileSystem.FileExists(path);
+    }
+
+    /// <inheritdoc />
+    public SetupReport StartSettings(string folder)
+    {
+        string? repositoryFolder = null;
+        try
+        {
+            var repository = _git.FindRepository(folder);
+            if(repository == null)
+                return SettingsWriteFailure("the folder is not in a Git repository", "Open a Git repository, then try again.");
+
+            repositoryFolder = repository.WorkFolder;
+            var (message, created) = WriteStarterSettings(repositoryFolder);
+            return new SetupReport([message], false) { SettingsCreated = created, WorktreeRoot = created ? repository.WorkFolder : null };
+        }
+        catch(Exception exception) when(IsSetupFailure(exception))
+        {
+            if(repositoryFolder != null && _fileSystem.FolderExists(Path.Combine(repositoryFolder, _settingsFile)))
+                return SettingsWriteFailure($"a folder named {_settingsFile} already exists there", $"Move or rename the {_settingsFile} folder, then try again.");
+
+            var reason = DoctorCheck.Message(exception).TrimEnd('.');
+            var remedy = repositoryFolder != null && IsFolderAccessFailure(exception) ? "Make the folder writable and try again" : "Try again";
+            return SettingsWriteFailure(reason, $"{remedy}, or copy the three lines and create the file yourself.");
+        }
+    }
+
+    private static bool IsFolderAccessFailure(Exception exception)
+    {
+        if(exception is UnauthorizedAccessException or SecurityException)
+            return true;
+
+        // Windows ERROR_WRITE_PROTECT and Unix EROFS surface as IOExceptions.
+        return exception is IOException && exception.HResult == (OperatingSystem.IsWindows() ? unchecked((int)0x80070013) : 30);
+    }
+
+    private static SetupReport SettingsWriteFailure(string reason, string remedy)
+    {
+        return new SetupReport([$"Could not write {_settingsFile}: {reason}.", $"Nothing was written. {remedy}"], true);
+    }
+
+    /// <inheritdoc />
+    public SetupReport AddHookLine(string folder, HookAddition addition)
+    {
+        var shown = addition.Before.Path;
+        try
+        {
+            var repository = _git.FindRepository(folder);
+            if(repository == null)
+                return new SetupReport([$"Could not write {shown}: the folder is not in a Git repository.", "Nothing was changed. Open a Git repository, then check again."], true);
+
+            shown = Path.GetRelativePath(repository.WorkFolder, shown).Replace('\\', '/');
+            var edit = _hooks.Inspect(repository, addition.Kind);
+            if(edit.ManualReason != null)
+                return new SetupReport([$"Could not write {shown}: the hook can no longer be edited here.", $"Nothing was changed. {edit.ManualReason} Check again."], true);
+
+            var matches = edit.Path == addition.Before.Path && edit.Updated != null && edit.Original != null
+                && edit.InsertionLine == addition.After.Line && DoctorExcerpt.ReadLines(edit.Updated).SequenceEqual(addition.After.Lines.Select(line => line.Text));
+            if(!matches)
+                return new SetupReport([$"Could not write {shown}: the hook changed since it was checked.", "Nothing was changed. Check again for the current script."], true);
+
+            _hooks.Write(edit);
+            return new SetupReport([$"Added the CommitFence line to {shown} at line {edit.InsertionLine}."], false) { WorktreeRoot = repository.WorkFolder };
+        }
+        catch(Exception exception) when(IsSetupFailure(exception))
+        {
+            var reason = DoctorCheck.Message(exception).TrimEnd('.');
+            var next = exception is UnauthorizedAccessException
+                ? $"Make it writable and try again, or copy the line and add it by hand as line {addition.After.Line}."
+                : $"Check again to confirm the insertion point, then retry or copy the line and add it by hand as line {addition.After.Line}.";
+            return new SetupReport([$"Could not write {shown}: {reason}.", $"Nothing was changed. {next}"], true);
+        }
+    }
+
+    private static string Failure(string name, Exception exception)
+    {
+        return $"Could not write {name}: {DoctorCheck.Message(exception).TrimEnd('.')}. Nothing was changed.";
+    }
+
+    private (string Message, bool Created) WriteStarterSettings(string repositoryFolder, bool print = false)
+    {
+        var settingsPath = Path.GetFullPath(Path.Combine(repositoryFolder, _settingsFile));
+        if(_fileSystem.FileExists(settingsPath))
+            return ($"{settingsPath} already exists and was left as it is.", false);
+
+        if(print)
+            return ($"Would write {settingsPath}, with no rules yet.", false);
+
+        try
+        {
+            _fileSystem.WriteNewFile(settingsPath, StarterSettings);
         }
         catch(IOException) when(_fileSystem.FileExists(settingsPath))
         {
-            return $"{settingsPath} already exists and was left as it is.";
+            return ($"{settingsPath} already exists and was left as it is.", false);
         }
 
-        return $"Wrote {settingsPath}, with no rules yet. Add rules with commitfence rules add.";
+        return ($"Wrote {settingsPath}, with no rules yet. Add rules with commitfence rules add.", true);
     }
 
     /// <summary>

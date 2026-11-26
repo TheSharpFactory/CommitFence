@@ -1,5 +1,6 @@
 using CF.Core.Findings;
 using CF.Core.Rules;
+using CF.Core.Services;
 
 namespace CF.App.Rules;
 
@@ -54,4 +55,20 @@ internal interface IRuleChanges
     /// Drops the new rule that was being written.
     /// </summary>
     void DiscardDraft();
+
+    /// <summary>
+    /// When this app last wrote the rule, in the words the page says it ("today at 10:38"), or nothing when it did not write it
+    /// since it started.
+    /// </summary>
+    string? SavedWhen(string ruleId);
+
+    /// <summary>
+    /// The name of the repository the rules are for, as the words of the path picker use it.
+    /// </summary>
+    string RepositoryName { get; }
+
+    /// <summary>
+    /// The files of a language that a path pattern names, or nothing when that cannot be told.
+    /// </summary>
+    PathMatches? FindPathFiles(string languageId, string pattern);
 }

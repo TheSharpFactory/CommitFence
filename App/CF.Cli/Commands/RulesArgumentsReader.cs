@@ -141,21 +141,40 @@ internal sealed class RulesArgumentsReader
 
     private string? StoreCondition(string option, string value)
     {
-        var equals = value.IndexOf('=', StringComparison.Ordinal);
-        if(equals <= 0)
-            return $"{option} takes a condition written property=value, such as braces=false, or property=a,b for one of several values.";
+        var index = value.AsSpan().IndexOfAny("=~<>!");
+        var (comparison, width) = index > 0 ? ReadComparison(value.AsSpan(index)) : (Comparison.Is, 0);
+        if(width == 0)
+            return $"{option} takes a condition written property=value, such as braces=false, or use <=, >=, != or ~.";
 
-        var values = value.Substring(equals + 1).Split(',');
-        if(string.IsNullOrWhiteSpace(value.Substring(0, equals)) || values.Any(string.IsNullOrWhiteSpace))
+        var property = value[..index];
+        var operand = value[(index + width)..];
+        var values = comparison is Comparison.Is or Comparison.IsNot ? operand.Split(',') : new[] { operand };
+        if(string.IsNullOrWhiteSpace(property) || values.Any(string.IsNullOrWhiteSpace))
             return $"{option} '{value}' has an empty property or an empty value. Write property=value, or property=a,b.";
 
-        var draft = new ConditionDraft(value.Substring(0, equals), values, values.Length > 1);
+        if(comparison == Comparison.Is && values.Length > 1)
+            comparison = Comparison.IsOneOf;
+
+        var draft = new ConditionDraft(property, values, comparison);
         if(option == "--where")
             (_fields.Where ??= new List<ConditionDraft>()).Add(draft);
         else
             (_fields.Require ??= new List<ConditionDraft>()).Add(draft);
 
         return null;
+    }
+
+    private static (Comparison Comparison, int Width) ReadComparison(ReadOnlySpan<char> text)
+    {
+        return text switch
+        {
+            ['=', ..] => (Comparison.Is, 1),
+            ['~', ..] => (Comparison.Matches, 1),
+            ['<', '=', ..] => (Comparison.AtMost, 2),
+            ['>', '=', ..] => (Comparison.AtLeast, 2),
+            ['!', '=', ..] => (Comparison.IsNot, 2),
+            _ => (Comparison.Is, 0)
+        };
     }
 
     private static Severity? ReadSeverity(string text)

@@ -63,6 +63,12 @@ internal sealed class RulesTryCommand
 
     private void Print(RuleTryResult result, string name)
     {
+        if(result.Status == TryStatus.NeedsFileName)
+        {
+            _output.WriteLine(result.Reason);
+            return;
+        }
+
         if(result.Status == TryStatus.NeedsBuild)
         {
             _output.WriteLine($"{_ruleId}: cannot be tried without a build: {result.Reason}.");

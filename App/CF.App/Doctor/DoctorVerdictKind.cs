@@ -9,5 +9,6 @@ internal enum DoctorVerdictKind
     Checking,
     Ready,
     Fails,
+    LeftToYou,
     Unfinished
 }

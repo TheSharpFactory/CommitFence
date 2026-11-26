@@ -31,6 +31,16 @@ internal sealed class FakeGit : IGit
 
     public bool Shallow { get; set; }
 
+    /// <summary>
+    /// How many times the last commit (HEAD) was asked for by name.
+    /// </summary>
+    public int HeadReads { get; private set; }
+
+    /// <summary>
+    /// What happens right after HEAD is read: a test moves HEAD here, as a commit made in the middle of a review does.
+    /// </summary>
+    public Action? AfterHeadRead { get; set; }
+
     public string StagedTree { get; set; } = EmptyTreeId;
 
     public List<string> RemoteTips { get; } = new List<string>();
@@ -153,6 +163,14 @@ internal sealed class FakeGit : IGit
 
     public string? ResolveCommit(RepositoryLocation repository, string revision)
     {
+        if(revision == "HEAD")
+        {
+            HeadReads++;
+            var head = _revisions.GetValueOrDefault(revision);
+            AfterHeadRead?.Invoke();
+            return head;
+        }
+
         if(_revisions.TryGetValue(revision, out var named))
             return named;
 
@@ -274,6 +292,16 @@ internal sealed class FakeGit : IGit
     public string? RemoteUrl(RepositoryLocation repository, string remoteName)
     {
         return "https://example.invalid/" + remoteName;
+    }
+
+    public string? ConfiguredPushRemote(RepositoryLocation repository, string branch)
+    {
+        return null;
+    }
+
+    public string? PushDefault(RepositoryLocation repository)
+    {
+        return null;
     }
 
     public BranchUpstream? Upstream(RepositoryLocation repository, string branch)

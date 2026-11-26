@@ -17,14 +17,16 @@ internal sealed class DoctorGitStub(string folder) : IDoctorGit
         return new RepositoryLocation(folder, Path.Combine(folder, ".git"));
     }
 
-    public string FindPrePushHook(RepositoryLocation repository)
+    public string? HooksFolder { get; init; }
+
+    public string FindHook(RepositoryLocation repository, string hook)
     {
-        return Path.Combine(repository.GitDirectory, "hooks", "pre-push");
+        return Path.Combine(HooksFolder ?? Path.Combine(repository.GitDirectory, "hooks"), hook);
     }
 
     public string? ReadHookSetting(RepositoryLocation repository, string key)
     {
-        return ProgramSetting;
+        return key == "core.hooksPath" ? HooksFolder : ProgramSetting;
     }
 
     public RepositoryLocation Repository

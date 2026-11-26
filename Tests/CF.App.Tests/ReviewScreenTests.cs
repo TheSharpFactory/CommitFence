@@ -191,7 +191,7 @@ public sealed class ReviewScreenTests
         var first = model.RunCommand.ExecuteAsync(null);
         await Task.Run(() => host.Review.Entered.Wait(TestContext.Current.CancellationToken), TestContext.Current.CancellationToken);
         var second = model.RunCommand.ExecuteAsync(null);
-        model.SelectedChoice = model.Choices[1];
+        model.SelectedChoice = model.Choices[2];
         model.SelectedChoice = model.Choices[0];
 
         Assert.True(model.IsBusy);
@@ -244,7 +244,7 @@ public sealed class ReviewScreenTests
                 break;
             default:
                 host.Review.Result = _ => Samples.Result(ReviewOutcome.Warned, new[] { Samples.Finding("a.cs", 3, "TEAM002", Severity.Warn) }, new[] { Samples.Reviewed("a.cs") });
-                model.SelectedChoice = model.Choices[1];
+                model.SelectedChoice = model.Choices[2];
                 await host.RunAsync();
                 var before = model.Verdict;
                 host.Review.Failure = new ReviewTargetException("The folder is outside the repository.");
@@ -256,6 +256,27 @@ public sealed class ReviewScreenTests
                 Assert.Single(model.FileGroups);
                 break;
         }
+    }
+
+    [Fact]
+    public async Task NoPushAfterARunWithFindingsRetiresTheEarlierResult()
+    {
+        using var host = new ReviewHost();
+        host.Review.Result = _ => Samples.Result(ReviewOutcome.Blocked, new[] { Samples.Finding("a.cs", 3, "TEAM001", Severity.Block) }, new[] { Samples.Reviewed("a.cs") });
+        await host.RunAsync();
+        Assert.True(host.Model.HasResult);
+        Assert.True(host.Model.CanCopyAll);
+
+        host.Review.PushScope = _ => PushScopeAnswer.None("This repository has no remote, so the branch main has nowhere to be pushed.", "main");
+        await host.RunAsync();
+
+        var model = host.Model;
+        Assert.Equal(VerdictKind.NoPush, model.Verdict.Kind);
+        Assert.False(model.HasResult);
+        Assert.False(model.CanCopyAll);
+        Assert.False(model.HasBlocking);
+        Assert.Empty(model.FileGroups);
+        Assert.DoesNotContain(model.Items, item => item is FileGroupViewModel or FindingViewModel);
     }
 
     [Fact]
@@ -329,7 +350,7 @@ public sealed class ReviewScreenTests
             LeavesOutUncommittedWork = leavesOutUncommitted
         };
         var model = host.Model;
-        model.SelectedChoice = model.Choices[1];
+        model.SelectedChoice = model.Choices[2];
         model.UseTarget(path);
         Assert.Empty(host.Review.Scopes);
 
@@ -371,7 +392,7 @@ public sealed class ReviewScreenTests
             },
             new[] { Samples.Reviewed("a.cs"), Samples.Reviewed("b.cs") });
         var model = host.Model;
-        model.SelectedChoice = model.Choices[1];
+        model.SelectedChoice = model.Choices[2];
         await host.RunAsync();
         Assert.Equal(new[] { "TEAM001", "TEAM002" }, model.RuleRows.Select(row => row.RuleId));
         Assert.Equal(2, model.FileGroups.Count);
@@ -403,7 +424,7 @@ public sealed class ReviewScreenTests
         await host.RunAsync();
         Assert.Equal(VerdictKind.AllowedClean, model.Verdict.Kind);
 
-        model.SelectedChoice = model.Choices[1];
+        model.SelectedChoice = model.Choices[2];
         var target = Path.Combine(host.RepositoryPath, "src");
         model.UseTarget(target);
         Assert.False(model.HasResult);
@@ -416,34 +437,63 @@ public sealed class ReviewScreenTests
         model.SelectedChoice = model.Choices[0];
         Assert.Equal(VerdictKind.AllowedClean, model.Verdict.Kind);
         Assert.Equal(new[] { "c.cs" }, model.CleanPushFiles);
-        model.SelectedChoice = model.Choices[1];
+        model.SelectedChoice = model.Choices[2];
 
         Assert.Equal(VerdictKind.FolderFindings, model.Verdict.Kind);
         Assert.Equal("TEAM002", model.ChosenRule);
         Assert.Equal(target, model.FolderPath);
         Assert.Equal("b.cs", Assert.Single(model.FileGroups).Path);
         Assert.Equal(2, host.Review.Scopes.Count);
+
+        Assert.Equal("Review again", model.RunText);
+        Assert.Equal(model.RunText, model.RunName);
+        var changes = new List<string?>();
+        model.PropertyChanged += (_, change) => changes.Add(change.PropertyName);
+        model.UseTarget(Path.Combine(host.RepositoryPath, "other"));
+        Assert.Equal("Review now", model.RunText);
+        Assert.Equal(model.RunText, model.RunName);
+        Assert.Contains(nameof(model.RunText), changes);
+        Assert.Contains(nameof(model.RunName), changes);
     }
 
     [AvaloniaFact]
     public async Task KeyboardUserCanInspectReview()
     {
         using var host = new ReviewHost();
-        host.Review.Result = scope => Samples.Result(
-            ReviewOutcome.Blocked,
-            new[]
-            {
-                Samples.Finding("a.cs", 3, "TEAM001", Severity.Block),
-                Samples.Finding("a.cs", 9, "TEAM002", Severity.Warn),
-                Samples.Finding("b.cs", 4, "TEAM002", Severity.Warn)
-            },
-            new[] { Samples.Reviewed("a.cs"), Samples.Reviewed("b.cs") });
+        using var release = new ManualResetEventSlim();
+        host.Review.Result = scope =>
+        {
+            release.Wait();
+            return Samples.Result(
+                ReviewOutcome.Blocked,
+                new[]
+                {
+                    Samples.Finding("a.cs", 3, "TEAM001", Severity.Block),
+                    Samples.Finding("a.cs", 9, "TEAM002", Severity.Warn),
+                    Samples.Finding("b.cs", 4, "TEAM002", Severity.Warn)
+                },
+                new[] { Samples.Reviewed("a.cs"), Samples.Reviewed("b.cs") });
+        };
         var model = host.Model;
         var view = new ReviewView { DataContext = model };
         using var window = new ViewHost(view, 1500, 900);
 
         view.FocusRunButton();
-        window.Press(PhysicalKey.Enter);
+        var run = window.Find<Button>(button => button.IsEffectivelyVisible && button.Name is "RunButton" or "BlockRunButton")!;
+        var width = run.Bounds.Width;
+        try
+        {
+            window.Press(PhysicalKey.Enter);
+            Assert.True(run.IsEffectivelyVisible);
+            Assert.Equal("Reviewing, busy", AutomationProperties.GetName(run));
+            Assert.True(width > 0);
+            Assert.Equal(width, run.Bounds.Width);
+        }
+        finally
+        {
+            release.Set();
+        }
+
         await Signals.Until(model, () => model.HasResult && !model.IsBusy);
         window.Pump();
 
@@ -474,7 +524,7 @@ public sealed class ReviewScreenTests
         window.Press(PhysicalKey.Enter);
         Assert.NotEmpty(host.ShownRules);
 
-        model.SelectedChoice = model.Choices[1];
+        model.SelectedChoice = model.Choices[2];
         view.FocusRunButton();
         window.Press(PhysicalKey.Enter);
         await Signals.Until(model, () => model.HasResult && !model.IsBusy);
@@ -595,7 +645,7 @@ public sealed class ReviewScreenTests
         var text = string.Join('\n', Enumerable.Range(1, 20).Select(number => $"// reviewed line {number}"));
         host.Review.Result = _ => Samples.Result(ReviewOutcome.Blocked, findings, coverage, new Dictionary<string, string> { ["src/f0000.cs"] = text });
         model = host.Model;
-        model.SelectedChoice = model.Choices[1];
+        model.SelectedChoice = model.Choices[2];
         return host;
     }
 

@@ -7,6 +7,10 @@ namespace CF.Core.Code;
 /// </summary>
 public sealed class FileRule
 {
+    /// <summary>Explains the status of a diagnostic with no known analyzer.</summary>
+    /// <summary>What both programs say of an ID that CommitFence has no title for, when the build may still report it.</summary>
+    public const string UndescribedIdNote = "CommitFence has no description of this ID. It is applied only if an analyzer in the build reports it; check the spelling.";
+
     /// <summary>
     /// Creates a rule of a file.
     /// </summary>
@@ -28,6 +32,19 @@ public sealed class FileRule
 
     /// <summary>The language as shown to the reader.</summary>
     public string Language { get; }
+
+    /// <summary>
+    /// Whether CommitFence has no title for this ID. A compiler ID never counts: the build always checks it.
+    /// </summary>
+    public bool IsUndescribed { get; init; }
+
+    /// <summary>
+    /// What to say besides the effect when <see cref="IsUndescribed" />, otherwise nothing.
+    /// </summary>
+    public string? Note
+    {
+        get { return IsUndescribed ? UndescribedIdNote : null; }
+    }
 
     /// <summary>The last setting for the language as a whole.</summary>
     public FileRulePlace? Main { get; }

@@ -41,4 +41,10 @@ public sealed class PropertyDescriptor
     /// The texts a text property may hold; empty when any text will do.
     /// </summary>
     public IReadOnlyList<string> AllowedValues { get; }
+
+    /// <summary>Whether the property reads the source file's name.</summary>
+    public bool ReadsFileName { get; init; }
+
+    /// <summary>The first CommitFence version that accepts this property in a rule, when a floor is needed.</summary>
+    public string? RuleVersion { get; init; }
 }

@@ -7,7 +7,7 @@ using Microsoft.CodeAnalysis.CSharp.Syntax;
 namespace CF.Languages.CSharp.Reader;
 
 /// <summary>
-/// Walks the syntax tree of one file and makes an artifact of every if statement, method and class. The parent of an
+/// Walks the syntax tree and makes an artifact for the file and for each if statement, method and class. The parent of an
 /// artifact is the nearest artifact around it.
 /// </summary>
 internal sealed class ArtifactWalker : CSharpSyntaxWalker
@@ -28,6 +28,32 @@ internal sealed class ArtifactWalker : CSharpSyntaxWalker
         get { return _artifacts; }
     }
 
+    public override void VisitCompilationUnit(CompilationUnitSyntax node)
+    {
+        var span = _lines.SpanBetween(node.FullSpan);
+        var reach = new ArtifactReach(span, [], null) { IsWholeFile = true };
+        var properties = new PropertyList()
+            .Syntax(CSharpNames.Name, Path.GetFileName(_file.Path))
+            .Syntax(CSharpNames.TypesInFile, CountTypes(node.Members))
+            .ToList();
+        _artifacts.Add(new Artifact(CSharpNames.File, _file.Language, _file.Path, span, null, properties, reach));
+        base.VisitCompilationUnit(node);
+    }
+
+    private static int CountTypes(SyntaxList<MemberDeclarationSyntax> members)
+    {
+        var count = 0;
+        foreach(var member in members)
+        {
+            if(member is BaseNamespaceDeclarationSyntax space)
+                count += CountTypes(space.Members);
+            else if(member is BaseTypeDeclarationSyntax or DelegateDeclarationSyntax)
+                count++;
+        }
+
+        return count;
+    }
+
     public override void VisitIfStatement(IfStatementSyntax node)
     {
         Enter(CSharpNames.IfStatement, node, IfStatementProperties.Create(node, _lines), ArtifactReaches.ForIfStatement(node, _lines));
@@ -44,7 +70,7 @@ internal sealed class ArtifactWalker : CSharpSyntaxWalker
 
     public override void VisitClassDeclaration(ClassDeclarationSyntax node)
     {
-        Enter(CSharpNames.Class, node, ClassProperties.Create(node, _lines), ArtifactReaches.ForClass(node, _lines));
+        Enter(CSharpNames.Class, node, ClassProperties.Create(node, _lines, Path.GetFileNameWithoutExtension(_file.Path)), ArtifactReaches.ForClass(node, _lines));
         base.VisitClassDeclaration(node);
         _parents.Pop();
     }

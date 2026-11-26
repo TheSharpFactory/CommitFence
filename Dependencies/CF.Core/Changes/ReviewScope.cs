@@ -27,10 +27,13 @@ public sealed class ReviewScope
     /// <summary>Which entry point asked for a push review.</summary>
     public ReviewSource Source { get; private init; }
 
+    /// <summary>Whether to review without running the build.</summary>
+    public bool Quick { get; private init; }
+
     /// <summary>Supplies the entry point without changing what is under review.</summary>
     public ReviewScope WithSource(ReviewSource source)
     {
-        return new ReviewScope(Kind, RemoteName, RemoteUrl, PushedRefs, BaseRevision, HeadRevision, TargetPath) { Source = source };
+        return new ReviewScope(Kind, RemoteName, RemoteUrl, PushedRefs, BaseRevision, HeadRevision, TargetPath) { Source = source, Quick = Quick };
     }
 
     /// <summary>
@@ -74,9 +77,9 @@ public sealed class ReviewScope
     /// <summary>
     /// What is staged in the index, against HEAD.
     /// </summary>
-    public static ReviewScope ForStaged()
+    public static ReviewScope ForStaged(bool quick = false)
     {
-        return new ReviewScope(ScopeKind.Staged, string.Empty, string.Empty, PushedRefs.None, string.Empty, string.Empty, string.Empty);
+        return new ReviewScope(ScopeKind.Staged, string.Empty, string.Empty, PushedRefs.None, string.Empty, string.Empty, string.Empty) { Quick = quick };
     }
 
     /// <summary>

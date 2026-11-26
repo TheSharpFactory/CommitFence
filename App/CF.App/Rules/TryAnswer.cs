@@ -3,7 +3,7 @@ using CF.Core.Rules;
 namespace CF.App.Rules;
 
 /// <summary>
-/// What trying a rule on code answered: the result, or the message of the refusal that saving the same rule would have given.
+/// What trying a rule on code answered: the result, or a message explaining why the trial was refused.
 /// </summary>
 internal sealed class TryAnswer
 {
@@ -19,7 +19,7 @@ internal sealed class TryAnswer
 
     public static TryAnswer Of(RuleTryResult result)
     {
-        return new TryAnswer(result, null);
+        return result.Status == TryStatus.NeedsFileName ? Refused(result.Reason) : new TryAnswer(result, null);
     }
 
     public static TryAnswer Refused(string message)

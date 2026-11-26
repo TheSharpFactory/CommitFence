@@ -27,6 +27,31 @@ internal enum VerdictKind
     Running,
 
     /// <summary>
+    /// Files are staged and not reviewed yet.
+    /// </summary>
+    StagedReady,
+
+    /// <summary>
+    /// Nothing is staged, so there is nothing to review.
+    /// </summary>
+    NothingStaged,
+
+    /// <summary>
+    /// The index could not be read, so nothing can be said of the staged changes.
+    /// </summary>
+    StagedUnreadable,
+
+    /// <summary>
+    /// The staged changes were reviewed and have findings. They count; they refuse nothing.
+    /// </summary>
+    StagedFindings,
+
+    /// <summary>
+    /// The staged changes were reviewed and have no findings.
+    /// </summary>
+    StagedClean,
+
+    /// <summary>
     /// A folder was reviewed and has findings. They count; they refuse nothing.
     /// </summary>
     FolderFindings,

@@ -1,0 +1,73 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:review="using:CF.App.Review"
+             xmlns:parts="using:CF.App.Parts"
+             xmlns:settings="using:CF.App.Settings"
+             x:Class="CF.App.Review.CodeHead"
+             x:ClassModifier="internal"
+             x:DataType="review:FindingViewModel">
+
+  <!-- The head of a finding's code, three things in this order: the action (filled), a tag with the state of the copy on disk (20 high,
+       radius 6, line fill, its own 12 icon for each state: the one signal of the state, its text 13/20 at 600), then a sentence of at most two lines in ink-2 that says which copy
+       the lines are. When the file is gone, what to do stands under the row in full. The first row inside the box: at least 40 high, a
+       hairline under it, its items 8 apart and centred. When the file is gone the action is to review again. -->
+  <UserControl.Styles>
+    <Style Selector="Border.statetag">
+      <Setter Property="Height" Value="20"/>
+      <Setter Property="CornerRadius" Value="6"/>
+      <Setter Property="Padding" Value="6,0,7,0"/>
+      <Setter Property="Background" Value="{DynamicResource line}"/>
+      <Setter Property="VerticalAlignment" Value="Top"/>
+    </Style>
+    <Style Selector="settings|MarkedText.headtext">
+      <Setter Property="Foreground" Value="{DynamicResource ink-2}"/>
+    </Style>
+  </UserControl.Styles>
+
+  <Border IsVisible="{Binding HasCodeHead}" Background="{DynamicResource well}" BorderBrush="{DynamicResource line}"
+          BorderThickness="0,0,0,1" MinHeight="40" Padding="6,6,12,6">
+    <StackPanel Spacing="6">
+    <Grid ColumnDefinitions="Auto,*" ColumnSpacing="8" VerticalAlignment="Center">
+      <Button Classes="cf main small" Height="32" VerticalAlignment="Center" IsVisible="{Binding ShowsOpenSource}" Command="{Binding OpenSourceCommand}"
+              ToolTip.Tip="{Binding OpenSourceTip}" ToolTip.ShowOnDisabled="True" AutomationProperties.Name="{Binding OpenSourceSpokenName}">
+        <StackPanel Orientation="Horizontal" Spacing="6">
+          <parts:Icon Data="{StaticResource i-open}" Width="14" Height="14" Stroke="{Binding $parent[Button].Foreground}"/>
+          <TextBlock Theme="{StaticResource type-meta-strong}" Text="{Binding OpenSourceText}"/>
+        </StackPanel>
+      </Button>
+      <Button Classes="cf main small" Height="32" VerticalAlignment="Center" IsVisible="{Binding ShowsReviewAgain}"
+              Command="{Binding $parent[review:ReviewView].((review:ReviewViewModel)DataContext).RunCommand}" AutomationProperties.Name="Review again">
+        <StackPanel Orientation="Horizontal" Spacing="6">
+          <parts:Icon Data="{StaticResource i-review}" Width="14" Height="14" Stroke="{Binding $parent[Button].Foreground}"/>
+          <TextBlock Theme="{StaticResource type-meta-strong}" Text="Review again"/>
+        </StackPanel>
+      </Button>
+      <Grid Grid.Column="1" ColumnDefinitions="Auto,*" ColumnSpacing="8" VerticalAlignment="Center" AutomationProperties.Name="{Binding CopyNote}">
+        <Border Classes="statetag" Margin="0,0,0,0">
+          <StackPanel Orientation="Horizontal" Spacing="5" VerticalAlignment="Center">
+            <parts:Icon IsVisible="{Binding TagIsSame}" Data="{StaticResource i-check}" Width="12" Height="12" StrokeThickness="2.2"
+                        Stroke="{DynamicResource req-ink}" VerticalAlignment="Center"/>
+            <parts:Icon IsVisible="{Binding TagIsMoved}" Data="{StaticResource i-moved}" Width="12" Height="12" StrokeThickness="2"
+                        Stroke="{DynamicResource ink}" VerticalAlignment="Center"/>
+            <parts:Icon IsVisible="{Binding TagIsGone}" Data="{StaticResource i-nofile}" Width="12" Height="12" StrokeThickness="2"
+                        Stroke="{DynamicResource ink}" VerticalAlignment="Center"/>
+            <parts:Icon IsVisible="{Binding TagIsLost}" Data="{StaticResource i-search}" Width="12" Height="12" StrokeThickness="2.2"
+                        Stroke="{DynamicResource ink}" VerticalAlignment="Center"/>
+            <parts:Icon IsVisible="{Binding TagIsAmbiguous}" Data="{StaticResource i-layers}" Width="12" Height="12" StrokeThickness="2.2"
+                        Stroke="{DynamicResource ink}" VerticalAlignment="Center"/>
+            <parts:Icon IsVisible="{Binding TagIsNotCompared}" Data="{StaticResource i-off}" Width="12" Height="12" StrokeThickness="2.2"
+                        Stroke="{DynamicResource ink-3}" VerticalAlignment="Center"/>
+            <TextBlock Theme="{StaticResource type-meta-strong}" LineHeight="20" Foreground="{DynamicResource ink}" VerticalAlignment="Center"
+                       Text="{Binding CopyTag}"/>
+          </StackPanel>
+        </Border>
+        <settings:MarkedText Grid.Column="1" Classes="headtext" Theme="{StaticResource type-body}" MaxLines="2" TextTrimming="CharacterEllipsis"
+                             VerticalAlignment="Center" Marked="{Binding HeadText}"/>
+      </Grid>
+    </Grid>
+    <settings:MarkedText IsVisible="{Binding HasGoneText}" Classes="headtext" Theme="{StaticResource type-body}" Margin="6,0,0,2"
+                         Marked="{Binding GoneText}"/>
+    </StackPanel>
+  </Border>
+
+</UserControl>

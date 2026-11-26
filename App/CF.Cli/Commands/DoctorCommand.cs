@@ -46,7 +46,7 @@ internal sealed class DoctorCommand(IDoctorService doctor, TextWriter output)
         if(fix.Excerpt != null)
         {
             output.WriteLine($"  {fix.Excerpt.Path}");
-            if(fix.AfterMove != null)
+            if(fix.AfterMove != null || fix.Addition != null)
                 output.WriteLine($"  {DoctorFix.NowHeading}");
 
             ShowExcerpt(fix.Excerpt);
@@ -58,11 +58,20 @@ internal sealed class DoctorCommand(IDoctorService doctor, TextWriter output)
             ShowExcerpt(fix.AfterMove);
         }
 
+        if(fix.Addition != null)
+        {
+            output.WriteLine($"  {DoctorFix.AfterAddingHeading}");
+            ShowExcerpt(fix.Addition.After);
+        }
+
         foreach(var action in fix.Actions)
         {
-            if(action.Kind != DoctorActionKind.OpenFile)
+            if(action.Kind is not (DoctorActionKind.OpenFile or DoctorActionKind.OpenFolder))
                 output.WriteLine($"  {action.Label}: {action.Value}");
         }
+
+        if(fix.EntryHint != null)
+            output.WriteLine($"  {fix.EntryHint}");
     }
 
     private void ShowExcerpt(DoctorExcerpt excerpt)

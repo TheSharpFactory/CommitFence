@@ -50,6 +50,14 @@ internal sealed class SentencePieceViewModel
         }
     }
 
+    public bool IsPath
+    {
+        get
+        {
+            return Kind == SentencePieceKind.Path;
+        }
+    }
+
     public bool IsWhere
     {
         get
@@ -92,6 +100,9 @@ internal sealed class SentencePieceViewModel
     public static IReadOnlyList<SentencePieceViewModel> Of(RuleDefinition rule)
     {
         var pieces = new List<SentencePieceViewModel> { new SentencePieceViewModel(SentencePieceKind.For, "For", SentenceWords.Artifact(rule.ArtifactType), string.Empty, string.Empty) };
+        for(var index = 0; index < rule.Paths.Count; index++)
+            pieces.Add(new SentencePieceViewModel(SentencePieceKind.Path, index == 0 ? "within" : "or", rule.Paths[index], string.Empty, string.Empty));
+
         AddClause(pieces, "where", rule.Where, SentencePieceKind.Where);
         if(rule.Forbid)
             pieces.Add(new SentencePieceViewModel(SentencePieceKind.Word, "forbid", string.Empty, string.Empty, string.Empty));
@@ -121,7 +132,7 @@ internal sealed class SentencePieceViewModel
         {
             var condition = conditions[index];
             var values = condition.ExpectedValues.Select(value => value.ToString()).ToList();
-            pieces.Add(new SentencePieceViewModel(kind, index == 0 ? word : "and", SentenceWords.Property(condition.PropertyName), SentenceWords.Comparison(condition.Comparison == CF.Core.Rules.Comparison.IsOneOf), SentenceWords.Value(values)));
+            pieces.Add(new SentencePieceViewModel(kind, index == 0 ? word : "and", SentenceWords.Property(condition.PropertyName), RuleSentence.ComparisonWords(condition.Comparison, condition.IsList), SentenceWords.Value(values)));
         }
     }
 }
@@ -134,6 +145,8 @@ internal enum SentencePieceKind
     Word,
 
     For,
+
+    Path,
 
     Where,
 

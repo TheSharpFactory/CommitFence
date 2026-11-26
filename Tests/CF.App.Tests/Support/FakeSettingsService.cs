@@ -66,6 +66,14 @@ internal sealed class FakeLanguageService : ILanguageService
     {
         return Reports;
     }
+
+    public IReadOnlyList<string> Tracked { get; set; } = [];
+
+    public PathMatches? FindFiles(string folder, string languageId, string pattern)
+    {
+        var start = pattern.Replace("**", "");
+        return new PathMatches(Tracked.Where(path => path.StartsWith(start.TrimEnd('*'), StringComparison.Ordinal)).ToList());
+    }
 }
 
 /// <summary>

@@ -10,5 +10,8 @@ public enum DoctorActionKind
     CopyText,
 
     /// <summary>Open the action's web address.</summary>
-    OpenWeb
+    OpenWeb,
+
+    /// <summary>Open a directory in the file manager.</summary>
+    OpenFolder
 }

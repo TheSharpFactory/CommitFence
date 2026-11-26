@@ -32,8 +32,8 @@ internal sealed class RuleEditor
     {
         CheckNewId(draft.Id);
         var language = ChooseLanguage(draft.Language);
-        var where = ToConditions(draft.Where, language, draft.ArtifactType);
-        var require = ToConditions(draft.Require, language, draft.ArtifactType);
+        var where = ToConditions(draft.Where, language, draft.ArtifactType, "require");
+        var require = ToConditions(draft.Require, language, draft.ArtifactType, "where");
 
         return new RuleDefinition(draft.Id, language, draft.ArtifactType, draft.Severity, draft.Title, where, require, draft.Forbid, draft.Paths, NothingWhenEmpty(draft.Message), NothingWhenEmpty(draft.Why), draft.Enabled);
     }
@@ -41,8 +41,8 @@ internal sealed class RuleEditor
     public RuleDefinition Change(RuleDefinition rule, RuleChange change)
     {
         var artifactType = change.ArtifactType ?? rule.ArtifactType;
-        var where = change.Where == null ? rule.Where : ToConditions(change.Where, rule.Language, artifactType);
-        var require = change.Require == null ? rule.Require : ToConditions(change.Require, rule.Language, artifactType);
+        var where = change.Where == null ? rule.Where : ToConditions(change.Where, rule.Language, artifactType, "require");
+        var require = change.Require == null ? rule.Require : ToConditions(change.Require, rule.Language, artifactType, "where");
         (var forbid, require) = ReconcileForbidAndRequire(rule, change, require);
 
         return new RuleDefinition(rule.Id, rule.Language, artifactType, rule.Severity, change.Title ?? rule.Title, where, require, forbid, change.Paths ?? rule.Paths, Replace(rule.Message, change.Message), Replace(rule.Why, change.Why), rule.Enabled);
@@ -86,8 +86,12 @@ internal sealed class RuleEditor
         throw new RuleChangeException($"Say which language the rule is for. Languages: {string.Join(", ", _languages.Select(language => language.Id))}.");
     }
 
-    private IReadOnlyList<RuleCondition> ToConditions(IReadOnlyList<ConditionDraft> drafts, string languageId, string artifactTypeName)
+    private List<RuleCondition> ToConditions(IReadOnlyList<ConditionDraft> drafts, string languageId, string artifactTypeName, string otherClause)
     {
+        var refusal = ClauseShape.Refusal(drafts, otherClause);
+        if(refusal != null)
+            throw new RuleChangeException(refusal);
+
         var artifactType = _languages.FirstOrDefault(language => language.Id == languageId)?.Catalog.FindArtifactType(artifactTypeName);
         return drafts.Select(draft => ToCondition(draft, artifactType)).ToList();
     }
@@ -97,7 +101,7 @@ internal sealed class RuleEditor
         var descriptor = artifactType?.FindProperty(draft.PropertyName);
         var values = draft.Values.Select(text => ToValue(text, descriptor)).ToList();
 
-        return new RuleCondition(draft.PropertyName, draft.IsOneOf ? Comparison.IsOneOf : Comparison.Is, values);
+        return new RuleCondition(draft.PropertyName, draft.Comparison, values, draft.IsList);
     }
 
     /// <summary>

@@ -1,0 +1,33 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:parts="using:CF.App.Parts"
+             xmlns:review="using:CF.App.Review"
+             x:Class="CF.App.Parts.SetupNextStepView"
+             x:ClassModifier="internal"
+             x:DataType="parts:SetupNextStep">
+  <UserControl.Resources>
+    <ItemsPanelTemplate x:Key="CommandWords">
+      <WrapPanel/>
+    </ItemsPanelTemplate>
+    <DataTemplate x:Key="CommandWord" x:DataType="x:String">
+      <TextBlock Theme="{StaticResource code}" Text="{Binding}" Margin="0,0,8,0"/>
+    </DataTemplate>
+  </UserControl.Resources>
+  <StackPanel Spacing="8">
+    <TextBlock Theme="{StaticResource type-body}" Foreground="{DynamicResource ink-2}" TextWrapping="Wrap">
+      <Run Text="{Binding Lead}" FontWeight="SemiBold" Foreground="{DynamicResource ink}"/><Run Text="{Binding Detail}"/>
+    </TextBlock>
+    <Border Background="{DynamicResource well}" CornerRadius="10" MinHeight="44" Padding="14,10,4,10">
+      <Grid ColumnDefinitions="*,Auto" ColumnSpacing="4">
+        <StackPanel Spacing="2">
+          <ItemsControl ItemsSource="{Binding AddWords}"
+                        ItemsPanel="{StaticResource CommandWords}" ItemTemplate="{StaticResource CommandWord}"/>
+          <ItemsControl ItemsSource="{Binding CommitWords}"
+                        ItemsPanel="{StaticResource CommandWords}" ItemTemplate="{StaticResource CommandWord}"/>
+        </StackPanel>
+        <review:CopyButton Grid.Column="1" VerticalAlignment="Top" IsCompact="True" DataContext="{Binding Copy}"/>
+      </Grid>
+    </Border>
+    <TextBlock Theme="{StaticResource type-meta}" Foreground="{DynamicResource ink-2}" Text="It commits only this file."/>
+  </StackPanel>
+</UserControl>

@@ -1,5 +1,6 @@
 using CF.Core.Code;
 using CF.Core.Review;
+using CF.Core.Rules;
 using CF.Core.Services;
 
 namespace CF.Cli.Commands;
@@ -41,7 +42,10 @@ internal sealed class CatalogCommand
         _output.WriteLine($"  {artifactType.Name}{note}: {artifactType.Description}");
         var width = artifactType.Properties.Max(property => property.Name.Length);
         foreach(var property in artifactType.Properties)
-            _output.WriteLine($"    {property.Name.PadRight(width)}  {FormatValueType(property),-13}  {FormatKind(property),-14}  {property.Description}");
+        {
+            var comparisons = RuleComparisons.For(property.ValueType).Select(comparison => RuleSentence.ComparisonWords(comparison));
+            _output.WriteLine($"    {property.Name.PadRight(width)}  {FormatValueType(property),-13}  {FormatKind(property),-14}  {property.Description} Comparisons: {string.Join(", ", comparisons)}.");
+        }
     }
 
     private static string FormatValueType(PropertyDescriptor property)

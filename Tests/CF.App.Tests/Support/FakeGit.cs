@@ -52,6 +52,16 @@ internal sealed class FakeGit : IGit
         return RemoteAddresses.GetValueOrDefault(remoteName);
     }
 
+    public string? ConfiguredPushRemote(RepositoryLocation repository, string branch)
+    {
+        return null;
+    }
+
+    public string? PushDefault(RepositoryLocation repository)
+    {
+        return null;
+    }
+
     public BranchUpstream? Upstream(RepositoryLocation repository, string branch)
     {
         return FollowedBranch;

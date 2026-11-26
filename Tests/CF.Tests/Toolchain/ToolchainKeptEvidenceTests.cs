@@ -304,6 +304,11 @@ public sealed class ToolchainKeptEvidenceTests
             return _inner.FileExists(path);
         }
 
+        public bool FolderExists(string path)
+        {
+            return _inner.FolderExists(path);
+        }
+
         public string ReadAllText(string path)
         {
             return _inner.ReadAllText(path);

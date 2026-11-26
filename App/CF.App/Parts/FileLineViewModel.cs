@@ -38,6 +38,12 @@ internal sealed partial class FileLineViewModel : ObservableObject
 
     public bool IsMoved { get; init; }
 
+    public bool IsAdded { get; init; }
+
+    public bool IsContinuation { get; init; }
+
+    public bool ShowsPlus { get { return IsAdded && !IsContinuation; } }
+
     /// <summary>
     /// Whether the place holds a line: a rule near the start or the end of its file has fewer lines than places.
     /// </summary>
@@ -46,7 +52,7 @@ internal sealed partial class FileLineViewModel : ObservableObject
 
     public bool IsHeaderOrGap
     {
-        get { return !HasNumber || Text.TrimStart().StartsWith('['); }
+        get { return !IsContinuation && (!HasNumber || Text.TrimStart().StartsWith('[')); }
     }
 
     public bool HasNumber
@@ -70,6 +76,12 @@ internal sealed partial class FileLineViewModel : ObservableObject
     {
         get
         {
+            if(IsContinuation)
+                return Text.TrimStart();
+
+            if(IsAdded)
+                return HasNumber ? $"Line {Number}, added: {Text}" : $"Added: {Text.TrimStart()}";
+
             var mark = (IsCurrent, IsFinding, IsMoved) switch
             {
                 (true, _, _) => ". This line sets the rule.",

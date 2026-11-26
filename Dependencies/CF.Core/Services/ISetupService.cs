@@ -14,8 +14,16 @@ public interface ISetupService
     SetupReport Install(string programPath, InstallOptions options);
 
     /// <summary>
-    /// Writes a starter commitfence.json at the root of the repository the folder is in, unless one exists, and gives
-    /// the hook line to add.
+    /// Writes starter settings and sets up the selected hook or reports the changes in print mode.
     /// </summary>
-    SetupReport Init(string folder);
+    SetupReport Init(string folder, HookKind hook = HookKind.PrePush, bool print = false);
+
+    /// <summary>Whether the repository's root settings file exists.</summary>
+    bool HasSettings(string path);
+
+    /// <summary>Writes only the starter settings, leaving an existing file as it is.</summary>
+    SetupReport StartSettings(string folder);
+
+    /// <summary>Adds the line Doctor previewed, provided the same insertion is still safe.</summary>
+    SetupReport AddHookLine(string folder, HookAddition addition);
 }

@@ -12,7 +12,7 @@ internal sealed class RuleInfo
 {
     private static readonly List<SentencePieceViewModel> _noSentence = new List<SentencePieceViewModel>();
 
-    public RuleInfo(FindingSource source, string title, bool canOpen, IReadOnlyList<SentencePieceViewModel>? sentence, PromptRule? prompt = null, FileRule? fileRule = null)
+    public RuleInfo(FindingSource source, string title, bool canOpen, IReadOnlyList<SentencePieceViewModel>? sentence, PromptRule? prompt = null, FileRule? fileRule = null, string? why = null)
     {
         FileRule = fileRule;
         Source = source;
@@ -20,7 +20,13 @@ internal sealed class RuleInfo
         CanOpen = canOpen;
         Sentence = sentence ?? _noSentence;
         Prompt = prompt;
+        Why = why ?? string.Empty;
     }
+
+    /// <summary>
+    /// Why the team has the rule, for a team rule that says; empty otherwise.
+    /// </summary>
+    public string Why { get; }
 
     public FileRule? FileRule { get; }
 

@@ -9,6 +9,7 @@ internal static class CSharpNames
     public const string Method = "method";
     public const string Class = "class";
     public const string Usage = "usage";
+    public const string File = "file";
 
     public const string Name = "name";
     public const string WrittenAccess = "writtenAccess";
@@ -26,6 +27,10 @@ internal static class CSharpNames
     public const string DocumentationPresent = "documentationPresent";
     public const string Attributes = "attributes";
     public const string IsPartial = "isPartial";
+    public const string NestingDepth = "nestingDepth";
+    public const string IsNested = "isNested";
+    public const string IsNamedLikeFile = "isNamedLikeFile";
+    public const string TypesInFile = "typesInFile";
     public const string Target = "target";
     public const string TargetType = "targetType";
     public const string TargetAssembly = "targetAssembly";

@@ -49,7 +49,7 @@ internal sealed class CSharpToolchain : IToolchain
     }
 
     /// <summary>
-    /// A push can reach any project, so a project that cannot be evaluated always counts. A whole review judges the
+    /// On a push every evaluation failure counts. A whole review judges the
     /// projects under its target only: one outside it that cannot be evaluated counts when a project under review
     /// needs it, and the build walk says so there.
     /// </summary>
@@ -94,7 +94,10 @@ internal sealed class CSharpToolchain : IToolchain
     /// </summary>
     private ToolchainRequest WithRealTree(ToolchainRequest request)
     {
-        return new ToolchainRequest(request.Tree, _fileSystem.ResolveRealPath(request.TreeFolder), request.LogFolder, request.ChangedFiles, request.IsWholeReview);
+        return new ToolchainRequest(request.Tree, _fileSystem.ResolveRealPath(request.TreeFolder), request.LogFolder, request.ChangedFiles, request.IsWholeReview)
+        {
+            NeedsAllAssemblyNames = request.NeedsAllAssemblyNames
+        };
     }
 
     private void RunInto(ToolchainRequest request, ToolchainReport report)
@@ -120,7 +123,11 @@ internal sealed class CSharpToolchain : IToolchain
             return;
         }
 
-        var graph = new UnitGraph(_evaluator.EvaluateAll(projects, request.TreeFolder));
+        var graph = ReadReviewGraph(projects, request);
+        var skipped = projects.Count - graph.Evaluations.Count;
+        if(skipped > 0)
+            report.AddNote($"{skipped} projects the change cannot reach were not loaded.");
+
         report.SetTreeAssemblies(graph.AssemblyNames());
         foreach(var evaluation in graph.Evaluations.Where(candidate => candidate.Failure != null && IsUnderReview(candidate.Project, request)))
             report.AddCoverage(evaluation.Project.DisplayName, CoverageStatus.Failed, evaluation.Failure ?? string.Empty);
@@ -134,12 +141,42 @@ internal sealed class CSharpToolchain : IToolchain
         report.AddReadings(FileReadings.Find(graph, plan, request.TreeFolder, request.ChangedFiles));
         Compile(request.TreeFolder, request.LogFolder, request.IsWholeReview, sdk.Version, graph, plan, report);
         KeepAnswers(request.Tree, request.TreeFolder, sdk.Version, report);
-        RemoveEvidenceOfGoneProjects(request.TreeFolder, graph);
+        if(skipped == 0)
+            RemoveEvidenceOfGoneProjects(request.TreeFolder, graph);
+    }
+
+    private UnitGraph ReadReviewGraph(IReadOnlyList<ProjectFile> projects, ToolchainRequest request)
+    {
+        if(request.IsWholeReview || request.NeedsAllAssemblyNames || ChangeSelector.RequiresAllProjects(request.ChangedFiles))
+            return new UnitGraph(_evaluator.EvaluateAll(projects, request.TreeFolder));
+
+        var reach = new ProjectReach(_fileSystem, request, projects);
+        var evaluations = new List<ProjectEvaluation>();
+        var evaluated = new HashSet<string>(ToolchainPaths.Comparer);
+        var pending = reach.Pending(evaluated);
+        while(true)
+        {
+            var batch = _evaluator.EvaluateAll(pending, request.TreeFolder);
+            evaluations.AddRange(batch);
+            evaluated.UnionWith(batch.Select(evaluation => evaluation.Project.Path));
+
+            if(evaluations.Count < projects.Count && ChangeSelector.RequiresDeletedSourceFallback(evaluations, request.TreeFolder, request.ChangedFiles))
+            {
+                evaluations.AddRange(_evaluator.EvaluateAll(projects.Where(project => !evaluated.Contains(project.Path)).ToList(), request.TreeFolder));
+                return new UnitGraph(evaluations);
+            }
+
+            var graph = new UnitGraph(evaluations);
+            // The builds may need prerequisites that do not themselves see the change.
+            reach.Include(SelectPlan(graph, request).Order.SelectMany(unit => unit.ReferencedProjects));
+            pending = reach.Pending(evaluated);
+            if(pending.Count == 0)
+                return graph;
+        }
     }
 
     /// <summary>
-    /// Removes what was kept for projects that no longer exist, when every project of the tree could be read: one that
-    /// could not be read may still be there.
+    /// Removes what was kept for projects that no longer exist, after every project of the tree was loaded.
     /// </summary>
     private void RemoveEvidenceOfGoneProjects(string treeFolder, UnitGraph graph)
     {

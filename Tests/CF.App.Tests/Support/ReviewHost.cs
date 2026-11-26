@@ -17,7 +17,8 @@ internal sealed class ReviewHost : IDisposable
         Directory.CreateDirectory(RepositoryPath);
         File.WriteAllText(Path.Combine(RepositoryPath, "commitfence.json"), settings);
         Rules = new RuleServiceDouble(Path.Combine(_folder.Path, "data"));
-        Model = new ReviewViewModel(Review, Rules, Clock, Samples.Folder(RepositoryPath, insideRepository), ShownRules.Add);
+        Review.UseRules(Rules, RepositoryPath);
+        Model = new ReviewViewModel(Review, Clock, Samples.Folder(RepositoryPath, insideRepository), ShownRules.Add);
     }
 
     public string RepositoryPath { get; }

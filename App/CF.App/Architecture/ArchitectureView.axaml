@@ -248,7 +248,7 @@
                 <Border Classes="arch-line">
                   <Grid ColumnDefinitions="76,*,36" ColumnSpacing="8">
                     <TextBlock Theme="{StaticResource type-meta}" Foreground="{DynamicResource ink-2}" Text="{Binding Kind}" VerticalAlignment="Center"/>
-                    <TextBlock Grid.Column="1" Theme="{StaticResource code}" Text="{Binding Pattern}" TextWrapping="Wrap" VerticalAlignment="Center"/>
+                    <TextBlock Grid.Column="1" Theme="{StaticResource code}" Text="{Binding Pattern, Converter={x:Static parts:PathBreaks.Display}}" TextWrapping="Wrap" VerticalAlignment="Center"/>
                     <Button Grid.Column="2" Classes="remove arch-remove" IsEnabled="{Binding $parent[ItemsControl].((screen:ArchitectureViewModel)DataContext).CanEdit}"
                             Click="OnRemovePart" KeyDown="OnDelete" AutomationProperties.Name="{Binding StringFormat='Remove {0}'}" ToolTip.Tip="Remove this part">
                       <parts:Icon Data="{StaticResource i-x}" Width="16" Height="16" StrokeThickness="1.6" Stroke="{Binding $parent[Button].Foreground}"/>

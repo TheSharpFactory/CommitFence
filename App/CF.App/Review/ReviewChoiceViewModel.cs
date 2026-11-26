@@ -1,7 +1,7 @@
 namespace CF.App.Review;
 
 /// <summary>
-/// One segment of the choice of what to review. "A folder" is drawn and cannot be chosen yet: it is the next piece.
+/// One segment of the choice of what to review: the push, the staged changes (what the next commit would record) or a folder.
 /// </summary>
 internal sealed class ReviewChoiceViewModel
 {
@@ -24,6 +24,14 @@ internal sealed class ReviewChoiceViewModel
         }
     }
 
+    public bool IsStaged
+    {
+        get
+        {
+            return IconKey == "staged";
+        }
+    }
+
     public bool IsFolder
     {
         get
@@ -38,7 +46,10 @@ internal sealed class ReviewChoiceViewModel
     {
         get
         {
-            return IsAvailable ? Label : Label + ", not available yet";
+            if(!IsAvailable)
+                return Label + ", not available yet";
+
+            return IsStaged ? "Staged changes, what the next commit would record" : Label;
         }
     }
 }

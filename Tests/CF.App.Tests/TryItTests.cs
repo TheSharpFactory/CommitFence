@@ -34,6 +34,33 @@ public sealed class TryItTests
         """;
 
     [AvaloniaFact]
+    public async Task ARuleTriedOnAFileOffersTheCommandOnlyOnceItIsSaved()
+    {
+        using var host = new RulesHost("""{"rules":[{"id":"NAME","language":"csharp","for":"class","severity":"block","title":"Match the file name","require":{"isNamedLikeFile":true}}]}""");
+        await host.Loaded;
+        var page = host.Open("NAME");
+        var tryIt = page.TryIt;
+
+        // saved: the command, and where to run it
+        Assert.True(tryIt.ReadsFileName);
+        Assert.True(tryIt.ShowsCommand);
+        Assert.Equal("commitfence rules try NAME <file>", tryIt.Command);
+        Assert.Equal("This rule reads the name of the file, which pasted code does not have, so it is tried on a file instead. Run this in a terminal in `invoicing`, with the path of a file:", tryIt.CommandSentence);
+
+        // unsaved changes: the command runs the saved rule, so the box says to save first
+        page.Title += " now";
+        Assert.False(tryIt.ShowsCommand);
+        Assert.Equal("Save the rule to try it on a file.", tryIt.CommandSentence);
+        page.SaveCommand.Execute(null);
+        Assert.True(tryIt.ShowsCommand);
+
+        // a new rule has nothing saved to run
+        host.Model.NewRule();
+        var draft = host.Model.CurrentPage!;
+        Assert.False(draft.TryIt.ShowsCommand);
+    }
+
+    [AvaloniaFact]
     public async Task PreviewUsesTheUnsavedRuleAndNeverPersistsCode()
     {
         using var host = new RulesHost();

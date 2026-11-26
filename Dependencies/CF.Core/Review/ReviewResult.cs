@@ -53,6 +53,21 @@ public sealed class ReviewResult
     /// </summary>
     public IReadOnlyList<Finding> Findings { get; }
 
+    /// <summary>
+    /// The tree the review read, when it reviewed exactly one change; empty otherwise. With <see cref="BaseTreeReviewed" /> it
+    /// tells which state of the repository the findings are about.
+    /// </summary>
+    public string TreeReviewed { get; init; } = string.Empty;
+
+    /// <summary>The tree that <see cref="TreeReviewed" /> was compared with; empty when the review read no single change.</summary>
+    public string BaseTreeReviewed { get; init; } = string.Empty;
+
+    /// <summary>
+    /// The full id of the commit a review of the staged changes or of a folder was against, resolved once when the review took its
+    /// snapshot; empty for the other reviews and when the repository has no commit.
+    /// </summary>
+    public string CommitReviewed { get; init; } = string.Empty;
+
     /// <summary>The repository of the reviewed trees, when the review used git.</summary>
     public RepositoryLocation? Repository { get; internal init; }
 
@@ -71,6 +86,29 @@ public sealed class ReviewResult
         return trees.Count == 1 ? trees[0] : null;
     }
 
+    internal IReadOnlyDictionary<Finding, ReviewedRule> ReviewedRules { get; set; } = new Dictionary<Finding, ReviewedRule>();
+
+    internal IReadOnlyDictionary<Finding, string?> ReportedTrees { get; init; } = new Dictionary<Finding, string?>();
+
+    internal IReadOnlyDictionary<(string? Tree, string Path), string> ReviewedSources { get; init; } = new Dictionary<(string? Tree, string Path), string>();
+
+    /// <summary>Gets the definition used for this finding, when one was available.</summary>
+    public ReviewedRule? RuleOf(Finding finding)
+    {
+        return ReviewedRules.GetValueOrDefault(finding);
+    }
+
+    /// <summary>Gets the source from the tree that supplied this finding.</summary>
+    public string? SourceOf(Finding finding)
+    {
+        if(finding.File == null)
+            return null;
+
+        return ReportedTrees.TryGetValue(finding, out var tree)
+            ? ReviewedSources.GetValueOrDefault((tree, finding.File))
+            : Sources.GetValueOrDefault(finding.File);
+    }
+
     /// <summary>Findings set aside by allow comments, with the comments' lines and reasons.</summary>
     public IReadOnlyList<ExemptedFinding> ExemptedFindings { get; init; } = [];
 
@@ -87,6 +125,9 @@ public sealed class ReviewResult
     /// </summary>
     public IReadOnlyList<string> Skipped { get; }
 
+    /// <summary>Whether the review intentionally omitted the checks that require a build.</summary>
+    public bool IsQuick { get; internal init; }
+
     /// <summary>
     /// A short account of the review.
     /// </summary>
@@ -98,8 +139,7 @@ public sealed class ReviewResult
     public TimeSpan Duration { get; }
 
     /// <summary>
-    /// The text of each file that has a finding, as the reviewed tree held it (never the working folder), by the
-    /// path a finding names. It is empty for a review that read no tree.
+    /// Source text supplied by path for a result constructed without tree data. Use <see cref="SourceOf" /> for a finding.
     /// </summary>
     public IReadOnlyDictionary<string, string> Sources { get; }
 

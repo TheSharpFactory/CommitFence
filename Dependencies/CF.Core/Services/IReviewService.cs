@@ -14,7 +14,7 @@ public interface IReviewService
     /// makes the result incomplete.
     /// </summary>
     /// <exception cref="SettingsException">The settings file is missing or wrong.</exception>
-    ReviewResult ReviewFiles(string settingsPath, IReadOnlyList<FileToReview> files);
+    ReviewResult ReviewFiles(string settingsPath, IReadOnlyList<FileToReview> files, bool quick = false);
 
     /// <summary>
     /// Reviews what a push, the staged content or a range changes, or the whole of a folder as the last commit holds
@@ -33,4 +33,13 @@ public interface IReviewService
     /// Finds what a push of the folder's current branch would send, or the plain reason there is none.
     /// </summary>
     PushScopeAnswer FindPushScope(string folder);
+
+    /// <summary>
+    /// Tells what the index holds now: which files are staged, how many have changes that are not staged. A review of the staged
+    /// changes is <see cref="ReviewChanges" /> with <see cref="ReviewScope.ForStaged" />.
+    /// </summary>
+    StagedAnswer FindStaged(string folder);
+
+    /// <summary>Finds what a push of the named local branch would send, without checking it out.</summary>
+    PushScopeAnswer FindPushScope(string folder, string branch);
 }

@@ -98,8 +98,18 @@ internal sealed class EditorConfigRules : IRepositoryRules
         }
 
         var named = primary ?? settings.First();
-        var title = titles.Find(named.Id) ?? CommentTitle.From(named.TrailingComment) ?? CommentTitle.From(named.CommentAbove);
-        return new FileRule(named.Id, title, _fileName, "C#", main, exceptions);
+        var analyzerTitle = titles.Find(named.Id);
+        var title = analyzerTitle ?? CommentTitle.From(named.TrailingComment) ?? CommentTitle.From(named.CommentAbove);
+
+        // A missing title is not evidence that nothing checks the ID: the compiler's own IDs are never titled, and an
+        // analyzer package of the build may report others.
+        var undescribed = analyzerTitle == null && !IsCompilerId(named.Id);
+        return new FileRule(named.Id, title, _fileName, "C#", main, exceptions) { IsUndescribed = undescribed };
+    }
+
+    private static bool IsCompilerId(string id)
+    {
+        return id.Length > 2 && id.StartsWith("CS", StringComparison.OrdinalIgnoreCase) && id.Skip(2).All(char.IsAsciiDigit);
     }
 
     private static bool IsDifferentSetting(FileRulePlace main, FileRulePlace place)

@@ -20,7 +20,7 @@ internal static class CliApplication
         {
             var services = CompositionRoot.Create();
 
-            var runner = new CommandRunner(services.ProductInfo, services.Rules, services.Review, services.Setup, services.Updater, environment, services.Doctor, services.Settings, services.Structure, services.Clock, services.Exemptions, services.Stats, services.Fixes);
+            var runner = new CommandRunner(services.ProductInfo, services.Rules, services.Review, services.Setup, services.Updater, environment, services.Doctor, services.Settings, services.Structure, services.Clock, services.Exemptions, services.Stats, services.Fixes, services.Folders);
             if(args.Length > 0 && args[0] == CommandRunner.DoctorCommandName)
                 return runner.Run(args);
 

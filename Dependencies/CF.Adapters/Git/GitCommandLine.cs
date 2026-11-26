@@ -7,7 +7,7 @@ namespace CF.Adapters.Git;
 /// <summary>
 /// Answers the product's questions about a repository by running the git command, on git's own objects and refs.
 /// </summary>
-public sealed class GitCommandLine : IGit, IDoctorGit
+public sealed class GitCommandLine : IGit, IDoctorGit, IWorkingStatus
 {
     private const string _endOfOptions = "--end-of-options";
     private const int _filesPerTextReading = 50;
@@ -291,6 +291,20 @@ public sealed class GitCommandLine : IGit, IDoctorGit
         return new BranchUpstream(remote, merge);
     }
 
+    /// <inheritdoc />
+    public string? ConfiguredPushRemote(RepositoryLocation repository, string branch)
+    {
+        return ReadConfig(repository, $"branch.{branch}.pushRemote")
+            ?? ReadConfig(repository, "remote.pushDefault")
+            ?? ReadConfig(repository, $"branch.{branch}.remote");
+    }
+
+    /// <inheritdoc />
+    public string? PushDefault(RepositoryLocation repository)
+    {
+        return ReadConfig(repository, "push.default");
+    }
+
     private string? ReadConfig(RepositoryLocation repository, string key)
     {
         var result = _git.Run(repository, new List<string> { "config", "--get", key });
@@ -306,6 +320,35 @@ public sealed class GitCommandLine : IGit, IDoctorGit
             arguments.Add(Pathspec(folder));
 
         return _git.RunChecked(repository, arguments).Length > 0;
+    }
+
+    /// <inheritdoc />
+    public WorkingStatus Read(RepositoryLocation repository)
+    {
+        // every untracked file on its own line: a new folder is not one file
+        var arguments = new List<string> { "--no-optional-locks", "-c", "core.fsmonitor=false", "status", "--porcelain=v1", "-z", "--untracked-files=all" };
+        var fields = _git.RunChecked(repository, arguments).Split('\0', StringSplitOptions.RemoveEmptyEntries);
+        var staged = new List<string>();
+        var unstaged = new List<string>();
+        for(var index = 0; index < fields.Length; index++)
+        {
+            var entry = fields[index];
+            if(entry.Length < 4)
+                continue;
+
+            var path = entry[3..];
+            if(entry[0] != ' ' && entry[0] != '?')
+                staged.Add(path);
+
+            if(entry[1] != ' ')
+                unstaged.Add(path);
+
+            // a rename or a copy is followed by the name it came from
+            if(entry[0] is 'R' or 'C' || entry[1] is 'R' or 'C')
+                index++;
+        }
+
+        return new WorkingStatus(staged, unstaged);
     }
 
     /// <summary>
@@ -335,9 +378,9 @@ public sealed class GitCommandLine : IGit, IDoctorGit
     }
 
     /// <inheritdoc />
-    public string FindPrePushHook(RepositoryLocation repository)
+    public string FindHook(RepositoryLocation repository, string hook)
     {
-        var path = _git.RunChecked(repository, new List<string> { "rev-parse", "--path-format=absolute", "--git-path", "hooks/pre-push" });
+        var path = _git.RunChecked(repository, new List<string> { "rev-parse", "--path-format=absolute", "--git-path", "hooks/" + hook });
         return Path.GetFullPath(path.TrimEnd('\r', '\n'), repository.WorkFolder);
     }
 

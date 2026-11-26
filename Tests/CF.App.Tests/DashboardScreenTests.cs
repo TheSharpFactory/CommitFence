@@ -328,7 +328,7 @@ public sealed class DashboardScreenTests
             return;
 
         Assert.NotNull(host.Find<TextBlock>(text => text.IsEffectivelyVisible && text.Text == StatsReport.EmptyHeading));
-        shell.Model.Review.SelectedChoice = shell.Model.Review.Choices[1];
+        shell.Model.Review.SelectedChoice = shell.Model.Review.Choices[2];
         model.ReviewNowCommand.Execute(null);
         await shell.Model.Review.RunCommand.ExecutionTask!;
         Assert.Equal(Screen.Review, shell.Model.CurrentScreen);

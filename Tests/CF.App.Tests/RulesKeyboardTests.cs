@@ -1,12 +1,16 @@
+using Avalonia;
 using Avalonia.Automation;
 using Avalonia.Controls;
+using Avalonia.Controls.Presenters;
 using Avalonia.Controls.Primitives;
 using Avalonia.Headless.XUnit;
 using Avalonia.Input;
+using Avalonia.VisualTree;
 using CF.App.Rules;
 using CF.App.Rules.Page;
 using CF.App.Shell;
 using CF.App.Tests.Support;
+using CF.Core.Rules;
 using Xunit;
 
 namespace CF.App.Tests;
@@ -92,6 +96,127 @@ public sealed class RulesKeyboardTests
         window.Press(PhysicalKey.Escape);
         Assert.False(model.ShowsPage);
         Assert.True(window.HasFocusWithin(view.Rows));
+    }
+
+    [AvaloniaFact]
+    public async Task EscapeClosesAPickerAndPutsTheKeyboardBackOnItsTokenAndEveryRemoveButtonNamesWhatItRemoves()
+    {
+        const string rule = """{"rules":[{"id":"TEAM005","language":"csharp","for":"method","severity":"block","title":"Short methods","paths":["src/Billing/**"],"where":{"declaredAccess":"public","lines":{"atMost":40}},"require":{"documentationPresent":true}}]}""";
+        using var shell = new ShellHost(rule);
+        await Signals.FileRulesArrived(shell.Model.Rules);
+        using var window = new ViewHost(new MainWindow { DataContext = shell.Model, Width = 1440, Height = 900 });
+        shell.Model.ShowRules();
+        window.Pump();
+        shell.Model.Rules.SelectedItem = shell.Model.Rules.Items.OfType<TeamRuleRowViewModel>().Single();
+        window.Pump();
+        var page = shell.Model.Rules.CurrentPage!;
+
+        // each × says what it removes
+        Assert.Equal("Remove the path src/Billing/**", page.Paths[0].RemoveSpokenName);
+        var where = page.WhereFlow.OfType<ConditionViewModel>().ToList();
+        Assert.Equal("Remove the condition lines is at most 40", where[1].RemoveSpokenName);
+
+        // a clause's own refusal is a live region that names its clause
+        where[1].SetProperty("declaredAccess");
+        where[1].SetComparison(Comparison.IsNot);
+        where[1].SetValues(["public"]);
+        window.Pump();
+        var refusal = window.Find<Control>(control => control is Grid && control.IsEffectivelyVisible && AutomationProperties.GetName(control)?.StartsWith("Where clause: No method can have", StringComparison.Ordinal) == true)!;
+        Assert.Equal(AutomationLiveSetting.Polite, AutomationProperties.GetLiveSetting(refusal));
+        page.DiscardCommand.Execute(null);
+        window.Pump();
+        where = page.WhereFlow.OfType<ConditionViewModel>().ToList();
+
+        // Escape in each picker closes it and the keyboard stands on the token that opened it
+        var path = window.Find<Button>(button => button.Name == "PathButton" && button.IsEffectivelyVisible)!;
+        path.Command!.Execute(null);
+        window.Pump();
+        Assert.True(page.Paths[0].IsOpen);
+        window.Press(PhysicalKey.Escape);
+        Assert.False(page.Paths[0].IsOpen);
+        Assert.True(path.IsFocused);
+
+        var comparison = window.Find<Button>(button => button.Name == "ComparisonButton" && button.IsEffectivelyVisible)!;
+        comparison.Command!.Execute(null);
+        window.Pump();
+        Assert.True(where[0].ComparisonPicker.IsOpen);
+        window.Press(PhysicalKey.Escape);
+        Assert.False(where[0].ComparisonPicker.IsOpen);
+        Assert.True(comparison.IsFocused);
+
+        var property = window.Find<Button>(button => button.Name == "PropertyButton" && button.IsEffectivelyVisible)!;
+        property.Command!.Execute(null);
+        window.Pump();
+        Assert.True(where[0].PropertyPicker.IsOpen);
+        window.Press(PhysicalKey.Escape);
+        Assert.False(where[0].PropertyPicker.IsOpen);
+        Assert.True(property.IsFocused);
+    }
+
+    [AvaloniaFact]
+    public async Task TabAndShiftTabVisitTheClauseInTheOrderItIsSeenWithTheAddButtonInTheKeywordColumn()
+    {
+        const string rule = """{"rules":[{"id":"TEAM005","language":"csharp","for":"method","severity":"block","title":"Short methods","paths":["src/Billing/**"],"where":{"declaredAccess":"public"},"require":{"documentationPresent":true,"lines":{"atMost":40}}}]}""";
+        using var shell = new ShellHost(rule);
+        await Signals.FileRulesArrived(shell.Model.Rules);
+        using var window = new ViewHost(new MainWindow { DataContext = shell.Model, Width = 1440, Height = 900 });
+        shell.Model.ShowRules();
+        window.Pump();
+        shell.Model.Rules.SelectedItem = shell.Model.Rules.Items.OfType<TeamRuleRowViewModel>().Single();
+        window.Pump();
+        var page = shell.Model.Rules.CurrentPage!;
+        page.RequireFlow[1].MakeRange();
+        page.RequireFlow[1].SetValues(["50", "40"]);
+        window.Pump();
+
+        // the add button stands in the keyword's column, left of the flow
+        var flow = window.Find<TokenFlow>(candidate => candidate.IsEffectivelyVisible && candidate.Children.Any(child => child is ContentPresenter { Content: AddRequirementItem }))!;
+        var add = window.Find<Button>(button => button.Classes.Contains("addrequirement") && button.IsEffectivelyVisible)!;
+        Assert.True(add.TranslatePoint(new Point(0, 0), flow)!.Value.X < 0);
+
+        // Tab and Shift+Tab visit the controls row by row, and the button that stands level with the last row comes before that row's controls
+        var controls = flow.GetVisualDescendants().OfType<Button>().Where(button => button.Focusable && button.IsEffectivelyVisible).ToList();
+        var addTop = add.TranslatePoint(new Point(0, 0), flow)!.Value.Y;
+        var seen = controls.Where(control => !ReferenceEquals(control, add)).ToList();
+        var level = seen.FindIndex(control => Middle(control, flow) >= addTop);
+        Assert.True(level > 0);
+        seen.Insert(level, add);
+
+        var forward = new List<Control>();
+        controls[0].Focus(NavigationMethod.Tab);
+        for(var step = 0; step < controls.Count; step++)
+        {
+            forward.Add((Control)window.Window.FocusManager!.GetFocusedElement()!);
+            window.Press(PhysicalKey.Tab);
+        }
+
+        Assert.Equal(seen.Select(Describe), forward.Select(Describe));
+
+        // within a condition the keys visit what is drawn first: the comparison, then the remove button to its right
+        var removes = forward.Select((control, index) => (control, index)).Where(stop => stop.control.Classes.Contains("remove")).ToList();
+        Assert.NotEmpty(removes);
+        Assert.All(removes, stop => Assert.Equal("ComparisonButton", forward[stop.index - 1].Name));
+
+        var backward = new List<Control>();
+        seen[^1].Focus(NavigationMethod.Tab);
+        for(var step = 0; step < controls.Count; step++)
+        {
+            backward.Add((Control)window.Window.FocusManager!.GetFocusedElement()!);
+            window.Press(PhysicalKey.Tab, RawInputModifiers.Shift);
+        }
+
+        backward.Reverse();
+        Assert.Equal(seen.Select(Describe), backward.Select(Describe));
+    }
+
+    private static double Middle(Control control, Visual flow)
+    {
+        return control.TranslatePoint(new Point(0, 0), flow)!.Value.Y + (control.Bounds.Height / 2);
+    }
+
+    private static string Describe(Control control)
+    {
+        return $"{control.Name}:{AutomationProperties.GetName(control)}";
     }
 
     private static string? NameOfRow(ViewHost window, TeamRuleRowViewModel row)

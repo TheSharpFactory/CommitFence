@@ -20,8 +20,119 @@ internal sealed partial class ConditionViewModel : ObservableObject
     [ObservableProperty]
     public partial string? PropertyName { get; set; }
 
+    public bool IsOneOf
+    {
+        get { return Comparison == Comparison.IsOneOf; }
+    }
+
+    public Comparison Comparison { get; private set; }
+
+    public bool IsList { get; private set; }
+
+    /// <summary>
+    /// A range: "is at least" one number "and at most" another, as one token. Its two values are the two bounds, the lower first.
+    /// </summary>
+    public bool IsRange { get; private set; }
+
+    public bool IsNotRange
+    {
+        get { return !IsRange; }
+    }
+
+    public string RangeLow
+    {
+        get { return IsRange && Values.Count > 0 ? Values[0] : string.Empty; }
+    }
+
+    public string RangeHigh
+    {
+        get { return IsRange && Values.Count > 1 ? Values[1] : string.Empty; }
+    }
+
+    /// <summary>
+    /// Whether another condition of the same clause already stands on this property: a clause holds at most two comparisons on one
+    /// property, the two ends of a range, so such a condition cannot become a range.
+    /// </summary>
+    public bool HasOtherConditionsOnProperty
+    {
+        get { return PropertyName != null && _page.OtherConditionsOn(this, PropertyName).Count > 0; }
+    }
+
+    public bool CanEditComparison
+    {
+        get { return PropertyName != null; }
+    }
+
+    /// <summary>
+    /// A requirement that was just added and has no property yet: dismissing its first picker takes it away again.
+    /// </summary>
+    public bool IsJustAdded { get; set; }
+
     [ObservableProperty]
-    public partial bool IsOneOf { get; set; }
+    public partial bool IsConflicted { get; set; }
+
+    /// <summary>
+    /// Whether the token is drawn with the edge of an invalid one: its property is missing, or it cannot hold with another.
+    /// </summary>
+    public bool ShowsInvalid
+    {
+        get { return IsInvalid || IsConflicted; }
+    }
+
+    /// <summary>
+    /// Whether the property token is the refused one: the artifact type has no such property.
+    /// </summary>
+    public bool PropertyIsRefused
+    {
+        get { return IsInvalid; }
+    }
+
+    /// <summary>
+    /// Whether the comparison token is the refused one: it cannot hold with another condition, or no code can meet it. The property token
+    /// beside it is not marked.
+    /// </summary>
+    public bool ComparisonIsRefused
+    {
+        get { return IsConflicted; }
+    }
+
+    private void NotifyRefused()
+    {
+        OnPropertyChanged(nameof(ShowsInvalid));
+        OnPropertyChanged(nameof(PropertyIsRefused));
+        OnPropertyChanged(nameof(ComparisonIsRefused));
+    }
+
+    /// <summary>
+    /// A pattern is typed code, so the value is drawn in the code style.
+    /// </summary>
+    public bool ValueIsCode
+    {
+        get { return Comparison == Comparison.Matches || ValuesAreTypedNames; }
+    }
+
+    /// <summary>
+    /// Names a person types (not words the property offers, and not numbers) are code, so they are drawn in the code face.
+    /// </summary>
+    private bool ValuesAreTypedNames
+    {
+        get { return Descriptor is { ValueType: PropertyValueType.Text, AllowedValues.Count: 0 } && Values.Count > 0; }
+    }
+
+    public bool ValueIsNotCode
+    {
+        get { return !ValueIsCode; }
+    }
+
+    public string CodeValueText
+    {
+        get { return ValueIsCode ? ValueText : string.Empty; }
+    }
+
+    public string PlainValueText
+    {
+        get { return ValueIsCode ? string.Empty : ValueText; }
+    }
 
     [ObservableProperty]
     public partial IReadOnlyList<string> Values { get; set; } = new List<string>();
@@ -35,16 +146,19 @@ internal sealed partial class ConditionViewModel : ObservableObject
     [ObservableProperty]
     public partial bool IsWhereClause { get; set; }
 
-    public ConditionViewModel(RulePageViewModel page, ClauseKind clause, string? propertyName, bool isOneOf, IReadOnlyList<string> values)
+    public ConditionViewModel(RulePageViewModel page, ClauseKind clause, string? propertyName, Comparison comparison, IReadOnlyList<string> values, bool isList = false, bool isRange = false)
     {
         _page = page;
         Clause = clause;
         PropertyName = propertyName;
-        IsOneOf = isOneOf;
+        Comparison = comparison;
+        IsRange = isRange;
+        IsList = !isRange && (isList || IsOneOf);
         Values = values;
         IsWhereClause = clause == ClauseKind.Where;
         PropertyPicker = new PickerViewModel("Property", 340, "Find a property", "No property matches.");
         PropertyPicker.Chosen += OnPropertyChosen;
+        PropertyPicker.Dismissed += OnPropertyDismissed;
         ComparisonPicker = new ComparisonPickerViewModel(this);
     }
 
@@ -96,7 +210,7 @@ internal sealed partial class ConditionViewModel : ObservableObject
     {
         get
         {
-            return PropertyName != null && Values.Count > 0 && Values.All(value => value.Length > 0 && FitsKind(value));
+            return PropertyName != null && Values.Count > 0 && Values.All(value => (!CanEditComparison || value.Length > 0) && FitsKind(value));
         }
     }
 
@@ -112,7 +226,18 @@ internal sealed partial class ConditionViewModel : ObservableObject
     {
         get
         {
-            return SentenceWords.Comparison(IsOneOf);
+            return RuleSentence.ComparisonWords(Comparison, IsList);
+        }
+    }
+
+    /// <summary>
+    /// The comparison as it is spoken: a range is one comparison, "is between", whatever its first bound is called.
+    /// </summary>
+    public string SpokenComparison
+    {
+        get
+        {
+            return IsRange ? "is between" : ComparisonWord;
         }
     }
 
@@ -120,7 +245,75 @@ internal sealed partial class ConditionViewModel : ObservableObject
     {
         get
         {
-            return SentenceWords.Value(Values);
+            return IsRange ? $"{RangeLow} and {RangeHigh}" : SentenceWords.Value(Values);
+        }
+    }
+
+    /// <summary>
+    /// The whole reason this condition is refused, while it is; the comparison's picker carries it.
+    /// </summary>
+    public string? ConflictReason
+    {
+        get { return _page.ReasonForCondition(this); }
+    }
+
+    public string RemoveTip
+    {
+        get { return IsWhereClause ? "Remove this condition" : "Remove this requirement"; }
+    }
+
+    /// <summary>
+    /// What this condition says of its property when it is named beside others on the same property: "at least 50", "not 40".
+    /// </summary>
+    public string ConflictPart
+    {
+        get
+        {
+            if(IsRange)
+                return $"between {RangeLow} and {RangeHigh}";
+
+            var values = SentenceWords.Value(Values);
+            return Comparison switch
+            {
+                Comparison.AtMost => $"at most {values}",
+                Comparison.AtLeast => $"at least {values}",
+                Comparison.IsNot => IsList ? $"none of {values}" : $"not {values}",
+                Comparison.IsOneOf => $"one of {values}",
+                Comparison.Matches => $"matching {values}",
+                Comparison.Is => $"equal to {values}",
+                _ => $"equal to {values}"
+            };
+        }
+    }
+
+    /// <summary>
+    /// The artifact the rule is about, as the words of a note say it.
+    /// </summary>
+    public string ArtifactWords
+    {
+        get { return _page.ArtifactWords; }
+    }
+
+    /// <summary>
+    /// "a" or "an" for the artifact words.
+    /// </summary>
+    public string Article
+    {
+        get { return "aeiou".Contains(char.ToLowerInvariant(ArtifactWords[0]), StringComparison.Ordinal) ? "an" : "a"; }
+    }
+
+    /// <summary>
+    /// What the numbers of this property count, said as a plural: "parameter count" counts parameters, "lines" counts lines.
+    /// </summary>
+    public string PropertyUnit
+    {
+        get
+        {
+            var words = PropertyWords;
+            if(words.EndsWith(" count", StringComparison.Ordinal))
+                return words[..^" count".Length] + "s";
+
+            return words.EndsWith(" depth", StringComparison.Ordinal) ? "levels of " + words[..^" depth".Length] : words;
         }
     }
 
@@ -144,7 +337,7 @@ internal sealed partial class ConditionViewModel : ObservableObject
     {
         get
         {
-            return $"Comparison: {ComparisonWord} {ValueText}";
+            return Comparison == Comparison.Matches && !IsRange ? $"Comparison: matches the pattern {ValueText}" : $"Comparison: {SpokenComparison} {ValueText}";
         }
     }
 
@@ -152,7 +345,7 @@ internal sealed partial class ConditionViewModel : ObservableObject
     {
         get
         {
-            return $"Remove the condition: {PropertyWords} {ComparisonWord} {ValueText}";
+            return $"{(IsWhereClause ? "Remove the condition" : "Remove the requirement")} {PropertyWords} {SpokenComparison} {ValueText}";
         }
     }
 
@@ -165,16 +358,21 @@ internal sealed partial class ConditionViewModel : ObservableObject
     }
 
     /// <summary>
-    /// What the service is given for this condition.
+    /// What the service is given for this condition: one draft, or the two bounds of a range.
     /// </summary>
-    public ConditionDraft ToDraft()
+    public IEnumerable<ConditionDraft> ToDrafts()
     {
-        return new ConditionDraft(PropertyName ?? string.Empty, Values, IsOneOf);
+        return ConditionRanges.Drafts(PropertyName ?? string.Empty, Comparison, IsList, Values, IsRange);
     }
 
-    public string Signature()
+    public ConditionSignature Signature()
     {
-        return $"{PropertyName}|{IsOneOf}|{string.Join(",", Values)}";
+        return new ConditionSignature(PropertyName, Comparison, IsList, Values);
+    }
+
+    partial void OnIsConflictedChanged(bool value)
+    {
+        NotifyRefused();
     }
 
     /// <summary>
@@ -185,6 +383,7 @@ internal sealed partial class ConditionViewModel : ObservableObject
     {
         OnPropertyChanged(nameof(Descriptor));
         OnPropertyChanged(nameof(IsInvalid));
+        NotifyRefused();
         OnPropertyChanged(nameof(IsComplete));
         OnPropertyChanged(nameof(PropertyTip));
         OnPropertyChanged(nameof(InvalidText));
@@ -199,15 +398,32 @@ internal sealed partial class ConditionViewModel : ObservableObject
         foreach(var property in _page.PropertiesOffered().OrderBy(property => property.Kind))
         {
             var group = property.Kind == PropertyKind.Syntax ? _quickGroup : _buildGroup;
-            entries.Add(new PickerEntryViewModel(property.Name, RuleCatalog.Words(property.Name), RuleCatalog.ValueKind(property), group, property.Name == PropertyName, false));
+            var full = property.Name != PropertyName && IsFullOn(property.Name);
+            entries.Add(new PickerEntryViewModel(property.Name, RuleCatalog.Words(property.Name), full ? "already has its range here" : RuleCatalog.ValueKind(property), group, property.Name == PropertyName, full));
         }
 
         PropertyPicker.Open(entries, byKeyboard);
     }
 
-    public void OpenComparisonPicker(bool byKeyboard)
+    /// <summary>
+    /// Whether the clause has no room for another comparison on this property: it holds a range on it, or two conditions.
+    /// </summary>
+    private bool IsFullOn(string propertyName)
     {
-        ComparisonPicker.Open(byKeyboard);
+        var others = _page.OtherConditionsOn(this, propertyName);
+        return others.Any(other => other.IsRange) || others.Count >= 2;
+    }
+
+    /// <summary>
+    /// Opens the picker of the comparison and the value. Typed text goes into the value field when there is one that takes it;
+    /// the answer is whether it did.
+    /// </summary>
+    public bool OpenComparisonPicker(bool byKeyboard, string? typed = null)
+    {
+        if(!CanEditComparison)
+            return false;
+
+        return ComparisonPicker.Open(byKeyboard, typed);
     }
 
     /// <summary>
@@ -224,19 +440,77 @@ internal sealed partial class ConditionViewModel : ObservableObject
 
     public void SetIsOneOf(bool isOneOf)
     {
-        if(IsOneOf == isOneOf)
+        SetComparison(isOneOf ? Comparison.IsOneOf : Comparison.Is);
+    }
+
+    /// <summary>
+    /// The picker of the range holds an edit, or no longer does: the head of the page says so.
+    /// </summary>
+    public void PendingChanged()
+    {
+        _page.DraftChanged();
+    }
+
+    /// <summary>
+    /// Changes how the property is compared and keeps the value where it fits: "is 40" becomes "is at most 40", "is one of 0 1"
+    /// becomes "is 0", "is DisposeAsync" becomes "matches DisposeAsync". A range keeps the end its new comparison is about: the
+    /// upper for "is at most", the lower for any other.
+    /// </summary>
+    public void SetComparison(Comparison comparison)
+    {
+        if(!CanEditComparison || (Comparison == comparison && !IsRange))
             return;
 
-        IsOneOf = isOneOf;
-        if(!isOneOf && Values.Count > 1)
-            Values = new List<string> { Values[0] };
+        var keepsMany = comparison is Comparison.IsOneOf or Comparison.IsNot;
+        var keptEnd = IsRange && comparison == Comparison.AtMost && Values.Count > 1 ? 1 : 0;
+        IsRange = false;
+        Comparison = comparison;
+        if(!keepsMany && Values.Count > 1)
+            Values = new List<string> { Values[keptEnd] };
 
+        if(Values.Count == 0)
+            Values = new List<string> { FirstValueFor(Descriptor) };
+
+        IsList = comparison == Comparison.IsOneOf || (comparison == Comparison.IsNot && Values.Count > 1);
+
+        Changed();
+    }
+
+    /// <summary>
+    /// Puts back the comparison, its form and the values the condition had, whatever was changed since.
+    /// </summary>
+    public void Restore(Comparison comparison, bool isList, IReadOnlyList<string> values, bool isRange)
+    {
+        Comparison = comparison;
+        IsList = isList;
+        IsRange = isRange;
+        Values = values;
+        Changed();
+    }
+
+    /// <summary>
+    /// Makes the condition a range. From "at most" the lower end is 0; otherwise both ends start at the number it held.
+    /// </summary>
+    public void MakeRange()
+    {
+        if(!CanEditComparison || IsRange)
+            return;
+
+        var first = Values.Count > 0 && long.TryParse(Values[0], NumberStyles.Integer, CultureInfo.InvariantCulture, out _) ? Values[0] : "0";
+        var low = Comparison == Comparison.AtMost ? "0" : first;
+        Comparison = Comparison.AtLeast;
+        IsList = false;
+        IsRange = true;
+        Values = new List<string> { low, first };
         Changed();
     }
 
     public void SetValues(IReadOnlyList<string> values)
     {
         Values = values;
+        if(Comparison == Comparison.IsNot && !IsRange)
+            IsList = values.Count > 1;
+
         Changed();
     }
 
@@ -251,7 +525,9 @@ internal sealed partial class ConditionViewModel : ObservableObject
         var after = Descriptor;
         if(before == null || after == null || before.ValueType != after.ValueType)
         {
-            IsOneOf = false;
+            Comparison = Comparison.Is;
+            IsList = false;
+            IsRange = false;
             Values = new List<string> { FirstValueFor(after) };
         }
 
@@ -286,6 +562,19 @@ internal sealed partial class ConditionViewModel : ObservableObject
         OnPropertyChanged(nameof(PropertyWords));
         OnPropertyChanged(nameof(IsEmpty));
         OnPropertyChanged(nameof(IsNotEmpty));
+        OnPropertyChanged(nameof(IsOneOf));
+        OnPropertyChanged(nameof(IsList));
+        OnPropertyChanged(nameof(IsRange));
+        OnPropertyChanged(nameof(IsNotRange));
+        OnPropertyChanged(nameof(RangeLow));
+        OnPropertyChanged(nameof(RangeHigh));
+        OnPropertyChanged(nameof(ValueIsCode));
+        OnPropertyChanged(nameof(CodeValueText));
+        OnPropertyChanged(nameof(PlainValueText));
+        OnPropertyChanged(nameof(ValueIsNotCode));
+        NotifyRefused();
+        OnPropertyChanged(nameof(RemoveTip));
+        OnPropertyChanged(nameof(CanEditComparison));
         OnPropertyChanged(nameof(ComparisonWord));
         OnPropertyChanged(nameof(ValueText));
         OnPropertyChanged(nameof(PropertySpokenName));
@@ -295,8 +584,15 @@ internal sealed partial class ConditionViewModel : ObservableObject
         _page.EditMade();
     }
 
+    private void OnPropertyDismissed()
+    {
+        if(IsJustAdded && IsEmpty)
+            _page.RemoveCondition(this);
+    }
+
     private void OnPropertyChosen(PickerEntryViewModel entry)
     {
+        IsJustAdded = false;
         SetProperty(entry.Key);
     }
 
@@ -315,6 +611,6 @@ internal sealed partial class ConditionViewModel : ObservableObject
     [RelayCommand]
     private void Remove()
     {
-        _page.RemoveCondition(this);
+        _page.RemoveByButton(this);
     }
 }

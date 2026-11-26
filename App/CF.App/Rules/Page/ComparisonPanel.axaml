@@ -6,21 +6,25 @@
              x:ClassModifier="internal"
              x:DataType="local:ComparisonPickerViewModel">
 
-  <!-- The panel of a comparison token: 340 wide; the comparisons that fit, a hairline,
-       then the value: two entries for true or false, the possible values for a list, a field for a number or a text. -->
-  <Border Name="Surface" Classes="picker" Width="340" AutomationProperties.Name="Comparison and value">
+  <!-- The panel of a comparison token: as wide as its longest line, 340 at the least; the comparisons that fit the property's type, each with its note and a tick for the
+       current one, a hairline, then the value: two entries for true or false, the possible values to tick, a field for a number, a
+       text or a pattern, or a list of fields. -->
+  <Border Name="Surface" Classes="picker" local:PickerRoom.Least="340" AutomationProperties.Name="Comparison and value">
+    <ScrollViewer HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
     <StackPanel>
 
-      <ItemsControl ItemsSource="{Binding Comparisons}">
+      <ItemsControl IsVisible="{Binding ShowsComparisons}" ItemsSource="{Binding Comparisons}">
         <ItemsControl.ItemTemplate>
           <DataTemplate DataType="local:PickerEntryViewModel" x:DataType="local:PickerEntryViewModel">
-            <Button Classes="pick" Classes.highlight="{Binding IsHighlighted}"
+            <Button Classes="pick" Classes.highlight="{Binding IsHighlighted}" IsEnabled="{Binding IsEnabled}"
                     Command="{Binding $parent[ItemsControl].((local:ComparisonPickerViewModel)DataContext).ChooseComparisonCommand}"
                     CommandParameter="{Binding}" AutomationProperties.Name="{Binding Name}">
-              <Grid ColumnDefinitions="*,16" ColumnSpacing="10">
+              <Grid ColumnDefinitions="*,Auto,16" ColumnSpacing="24">
                 <TextBlock Classes="entry-name" Classes.current="{Binding IsCurrent}" Theme="{StaticResource type-body}"
                            Text="{Binding Name}" VerticalAlignment="Center"/>
-                <parts:Icon Grid.Column="1" IsVisible="{Binding IsCurrent}" Data="{StaticResource i-check}" Width="14"
+                <TextBlock Grid.Column="1" Theme="{StaticResource type-meta}" Foreground="{DynamicResource ink-2}"
+                           Text="{Binding KindText}" VerticalAlignment="Center"/>
+                <parts:Icon Grid.Column="2" IsVisible="{Binding IsCurrent}" Data="{StaticResource i-check}" Width="14"
                             Height="14" Stroke="{DynamicResource ink}"/>
               </Grid>
             </Button>
@@ -28,7 +32,7 @@
         </ItemsControl.ItemTemplate>
       </ItemsControl>
 
-      <Border Height="1" Margin="0,4" Background="{DynamicResource line}"/>
+      <Border IsVisible="{Binding ShowsComparisons}" Height="1" Margin="0,4" Background="{DynamicResource line}"/>
 
       <ItemsControl IsVisible="{Binding ShowsEntries}" ItemsSource="{Binding ValueEntries}">
         <ItemsControl.ItemTemplate>
@@ -47,14 +51,91 @@
         </ItemsControl.ItemTemplate>
       </ItemsControl>
 
-      <!-- A number or a text: a field of 36 high with an edge of 2 in focus; Enter keeps, Esc drops, Up and Down change a
-           number by 1. -->
-      <Border IsVisible="{Binding ShowsField}" Height="36" Margin="4,0" CornerRadius="8" BorderThickness="2"
-              BorderBrush="{DynamicResource focus}" Padding="8,0">
-        <TextBox Name="Field" Classes="bare" Text="{Binding FieldText, Mode=TwoWay}" AutomationProperties.Name="{Binding FieldName}"/>
+      <!-- A number, a text or a pattern: a field of 36 high with an edge of 2 in focus (in block when it is refused); Enter keeps,
+           Esc drops, Up and Down change a number by 1. -->
+      <Border Name="FieldFrame" Classes="valuefield" Classes.refused="{Binding FieldIsRefused}" IsVisible="{Binding ShowsField}"
+              Height="36" Margin="4,0" CornerRadius="8" BorderThickness="2" Padding="8,0">
+        <TextBox Name="Field" Classes="bare" Text="{Binding FieldText, Mode=TwoWay}" AutomationProperties.Name="{Binding FieldName}"
+                 FontFamily="{StaticResource code-font}" FontSize="13"/>
       </Border>
 
+      <!-- A range: "from" and "to", each with a box of 36 high, typed in the code face; under them what the ends mean. -->
+      <StackPanel IsVisible="{Binding ShowsRange}">
+        <Grid ColumnDefinitions="Auto,*,Auto,*" ColumnSpacing="8" Margin="10,4,4,2">
+          <TextBlock Theme="{StaticResource type-body}" Foreground="{DynamicResource ink-2}" VerticalAlignment="Center" Text="from"/>
+          <Border Grid.Column="1" Classes="valuefield row" Classes.refused="{Binding FieldIsRefused}" MinWidth="80" Height="36" CornerRadius="8" Padding="8,0">
+            <TextBox Name="LowBox" Classes="bare" Text="{Binding RangeLowText, Mode=TwoWay}" AutomationProperties.Name="Lower end, from" AutomationProperties.HelpText="{Binding RangeHelp}"
+                     FontFamily="{StaticResource code-font}" FontSize="13"/>
+          </Border>
+          <TextBlock Grid.Column="2" Theme="{StaticResource type-body}" Foreground="{DynamicResource ink-2}" VerticalAlignment="Center" Text="to"/>
+          <Border Grid.Column="3" Classes="valuefield row" Classes.refused="{Binding FieldIsRefused}" MinWidth="80" Height="36" CornerRadius="8" Padding="8,0">
+            <TextBox Name="HighBox" Classes="bare" Text="{Binding RangeHighText, Mode=TwoWay}" AutomationProperties.Name="Upper end, to" AutomationProperties.HelpText="{Binding RangeHelp}"
+                     FontFamily="{StaticResource code-font}" FontSize="13"/>
+          </Border>
+        </Grid>
+        <TextBlock Margin="10,6,10,4" TextWrapping="Wrap" Theme="{StaticResource type-body}" Foreground="{DynamicResource ink-2}" Text="{Binding RangeNote}"/>
+      </StackPanel>
+
+      <!-- A value list: a row for each value, then the entry that adds one. -->
+      <StackPanel IsVisible="{Binding ShowsList}" Spacing="6" Margin="4,0">
+        <ItemsControl ItemsSource="{Binding Rows}">
+          <ItemsControl.ItemsPanel>
+            <ItemsPanelTemplate>
+              <StackPanel Spacing="6"/>
+            </ItemsPanelTemplate>
+          </ItemsControl.ItemsPanel>
+          <ItemsControl.ItemTemplate>
+            <DataTemplate DataType="local:ValueRowViewModel" x:DataType="local:ValueRowViewModel">
+              <Grid ColumnDefinitions="*,Auto" ColumnSpacing="2">
+                <Border Classes="valuefield row" Classes.refused="{Binding IsRefused}" Height="36" CornerRadius="8" Padding="8,0">
+                  <TextBox Classes="bare" Text="{Binding Text, Mode=TwoWay}" AutomationProperties.Name="{Binding SpokenName}"
+                           FontFamily="{StaticResource code-font}" FontSize="13"/>
+                </Border>
+                <Button Grid.Column="1" Classes="remove boxed" Command="{Binding RemoveCommand}" ToolTip.Tip="Remove this value"
+                        AutomationProperties.Name="{Binding RemoveSpokenName}">
+                  <parts:Icon Data="{StaticResource i-x}" Width="16" Height="16" StrokeThickness="1.8"
+                              Stroke="{Binding $parent[Button].Foreground}"/>
+                </Button>
+              </Grid>
+            </DataTemplate>
+          </ItemsControl.ItemTemplate>
+        </ItemsControl>
+        <Button Classes="pick" Margin="-4,0,-4,0" Command="{Binding AddRowCommand}" AutomationProperties.Name="{Binding AddRowText}">
+          <StackPanel Orientation="Horizontal" Spacing="8">
+            <parts:Icon Data="{StaticResource i-plus}" Width="14" Height="14" Stroke="{DynamicResource ink}"/>
+            <TextBlock Theme="{StaticResource type-body}" FontWeight="Medium" Text="{Binding AddRowText}"/>
+          </StackPanel>
+        </Button>
+      </StackPanel>
+
+      <!-- Why a value was not kept: 14 mark and the words, under the field. -->
+      <StackPanel IsVisible="{Binding HasRefusal}" Orientation="Horizontal" Spacing="8" Margin="10,6,10,2"
+                  AutomationProperties.LiveSetting="Polite">
+        <parts:EffectMark Kind="Block" Width="14" Height="14" Shape="{DynamicResource block}" Sign="{DynamicResource on-block}"
+                          VerticalAlignment="Center"/>
+        <TextBlock Theme="{StaticResource type-body}" Foreground="{DynamicResource block-ink}" TextWrapping="Wrap" Text="{Binding RefusalText}"/>
+      </StackPanel>
+
+      <!-- Why the token is refused, while its picker is open: the reason of its clause, here and not under the clause. -->
+      <StackPanel IsVisible="{Binding HasConflictReason}" Orientation="Horizontal" Spacing="8" Margin="10,6,10,2"
+                  AutomationProperties.LiveSetting="Polite">
+        <parts:EffectMark Kind="Block" Width="14" Height="14" Shape="{DynamicResource block}" Sign="{DynamicResource on-block}"
+                          VerticalAlignment="Top" Margin="0,3,0,0"/>
+        <TextBlock Theme="{StaticResource type-body}" Foreground="{DynamicResource block-ink}" TextWrapping="Wrap" MaxWidth="320"
+                   Text="{Binding ConflictReason}"/>
+      </StackPanel>
+
+      <!-- A pattern: what the wildcards stand for. -->
+      <TextBlock IsVisible="{Binding FieldIsPattern}" Margin="10,6,10,4" TextWrapping="Wrap" Theme="{StaticResource type-body}"
+                 Foreground="{DynamicResource ink-2}">
+        <Run FontFamily="{StaticResource code-font}" Foreground="{DynamicResource ink}" Text="*"/>
+        <Run Text=" stands for any characters, "/>
+        <Run FontFamily="{StaticResource code-font}" Foreground="{DynamicResource ink}" Text="?"/>
+        <Run Text=" for one. Upper and lower case count."/>
+      </TextBlock>
+
     </StackPanel>
+    </ScrollViewer>
   </Border>
 
 </UserControl>

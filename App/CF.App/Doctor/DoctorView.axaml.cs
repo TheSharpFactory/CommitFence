@@ -1,4 +1,6 @@
 using System.ComponentModel;
+using Avalonia.Automation;
+using Avalonia.Automation.Peers;
 using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Platform.Storage;
@@ -14,6 +16,7 @@ namespace CF.App.Doctor;
 internal sealed partial class DoctorView : UserControl
 {
     private const double _paneGap = 40;
+    private const string _addingStatus = "Adding";
 
     private DoctorViewModel? _model;
     private (Button Button, DoctorCheckViewModel? Check, DoctorActionViewModel? Action)? _focusBeforeCheck;
@@ -31,9 +34,12 @@ internal sealed partial class DoctorView : UserControl
         {
             _model.PropertyChanged -= OnModelChanged;
             _model.OpenFileRequested -= OnOpenFileRequested;
+            _model.OpenFolderRequested -= OnOpenFolderRequested;
             _model.OpenWebRequested -= OnOpenWebRequested;
             _model.ChecksFinished -= OnChecksFinished;
             _model.ChecksStarting -= OnChecksStarting;
+            _model.HookAdded -= OnHookAdded;
+            _model.HookWriteFinished -= AnnounceHookStatus;
         }
 
         _focusBeforeCheck = null;
@@ -42,9 +48,12 @@ internal sealed partial class DoctorView : UserControl
         {
             _model.PropertyChanged += OnModelChanged;
             _model.OpenFileRequested += OnOpenFileRequested;
+            _model.OpenFolderRequested += OnOpenFolderRequested;
             _model.OpenWebRequested += OnOpenWebRequested;
             _model.ChecksFinished += OnChecksFinished;
             _model.ChecksStarting += OnChecksStarting;
+            _model.HookAdded += OnHookAdded;
+            _model.HookWriteFinished += AnnounceHookStatus;
             _model.Clipboard = new TopLevelClipboard(this);
         }
 
@@ -57,6 +66,13 @@ internal sealed partial class DoctorView : UserControl
     private void OnModelChanged(object? sender, PropertyChangedEventArgs e)
     {
         Fit();
+        if(e.PropertyName != nameof(DoctorViewModel.IsAdding))
+            return;
+
+        if(_model?.IsAdding == true)
+            AnnounceHookStatus(_addingStatus);
+        else if(AutomationProperties.GetName(GroupList) == _addingStatus)
+            GroupList.ClearValue(AutomationProperties.NameProperty);
     }
 
     private void Fit()
@@ -96,6 +112,21 @@ internal sealed partial class DoctorView : UserControl
         CheckAgainButton.Focus(NavigationMethod.Tab);
     }
 
+    private void OnHookAdded()
+    {
+        if(IsEffectivelyVisible)
+            CheckAgainButton.Focus(NavigationMethod.Tab);
+    }
+
+    private void AnnounceHookStatus(string message)
+    {
+        if(!GroupList.IsEffectivelyVisible)
+            return;
+
+        AutomationProperties.SetName(GroupList, message);
+        ControlAutomationPeer.CreatePeerForElement(GroupList).RaisePropertyChangedEvent(AutomationElementIdentifiers.NameProperty, null, message);
+    }
+
     private static T? ContextOf<T>(Control control) where T : class
     {
         return control.GetSelfAndVisualAncestors().OfType<Control>().Select(ancestor => ancestor.DataContext).OfType<T>().FirstOrDefault();
@@ -118,5 +149,12 @@ internal sealed partial class DoctorView : UserControl
         var launcher = TopLevel.GetTopLevel(this)?.Launcher;
         if(launcher != null && Uri.TryCreate(address, UriKind.Absolute, out var uri))
             await launcher.LaunchUriAsync(uri);
+    }
+
+    private async void OnOpenFolderRequested(string path)
+    {
+        var launcher = TopLevel.GetTopLevel(this)?.Launcher;
+        if(launcher != null)
+            await launcher.LaunchDirectoryInfoAsync(new DirectoryInfo(path));
     }
 }

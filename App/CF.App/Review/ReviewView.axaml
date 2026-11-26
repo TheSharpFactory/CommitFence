@@ -2,6 +2,7 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:review="using:CF.App.Review"
              xmlns:parts="using:CF.App.Parts"
+             xmlns:rulespage="using:CF.App.Rules.Page"
              xmlns:sys="using:System"
              x:Class="CF.App.Review.ReviewView"
              x:ClassModifier="internal"
@@ -116,6 +117,36 @@
     <Style Selector="review|ReviewView Border.badge.allowed">
       <Setter Property="Background" Value="{DynamicResource req-ink}"/>
     </Style>
+    <Style Selector="review|ReviewView TextBlock.reviewednumber">
+      <Setter Property="Foreground" Value="{DynamicResource ink-3}"/>
+    </Style>
+    <Style Selector="review|ReviewView Border.foundnumber">
+      <Setter Property="MinWidth" Value="24"/>
+      <Setter Property="CornerRadius" Value="5"/>
+      <Setter Property="Padding" Value="5,0"/>
+    </Style>
+    <Style Selector="review|ReviewView Border.foundnumber.on">
+      <Setter Property="Background" Value="{DynamicResource block}"/>
+    </Style>
+    <Style Selector="review|ReviewView Border.foundnumber.on TextBlock.reviewednumber">
+      <Setter Property="Foreground" Value="{DynamicResource on-block}"/>
+      <Setter Property="FontWeight" Value="SemiBold"/>
+    </Style>
+    <Style Selector="review|ReviewView Border.foundnumber.warned">
+      <Setter Property="Background" Value="{DynamicResource warn}"/>
+    </Style>
+    <Style Selector="review|ReviewView Border.foundnumber.warned TextBlock.reviewednumber">
+      <Setter Property="Foreground" Value="{DynamicResource on-warn}"/>
+      <Setter Property="FontWeight" Value="SemiBold"/>
+    </Style>
+    <Style Selector="review|ReviewView Border.badge.warned">
+      <Setter Property="Background" Value="{DynamicResource warn}"/>
+    </Style>
+    <Style Selector="review|ReviewView Border.badge.idle">
+      <Setter Property="Background" Value="{DynamicResource well}"/>
+      <Setter Property="BorderBrush" Value="{DynamicResource line-strong}"/>
+      <Setter Property="BorderThickness" Value="1"/>
+    </Style>
     <Style Selector="review|ReviewView Border.badge.incomplete">
       <Setter Property="Background" Value="{DynamicResource solid}"/>
     </Style>
@@ -130,15 +161,6 @@
       <Setter Property="Height" Value="34"/>
       <Setter Property="CornerRadius" Value="10"/>
       <Setter Property="Padding" Value="10,0,13,0"/>
-    </Style>
-    <Style Selector="review|ReviewView Border.piece.block">
-      <Setter Property="Background" Value="{DynamicResource block}"/>
-    </Style>
-    <Style Selector="review|ReviewView Border.piece.warn">
-      <Setter Property="Background" Value="{DynamicResource warn}"/>
-    </Style>
-    <Style Selector="review|ReviewView Border.piece.allow">
-      <Setter Property="Background" Value="{DynamicResource req-ink}"/>
     </Style>
 
     <Style Selector="review|ReviewView StackPanel.reasonbody">
@@ -220,8 +242,28 @@
       <Setter Property="IsVisible" Value="True"/>
     </Style>
 
+    <!-- The number on disk of the line that holds the finding: the line the button opens. -->
+    <Style Selector="review|ReviewView TextBlock.found">
+      <Setter Property="Foreground" Value="{DynamicResource ink}"/>
+      <Setter Property="FontWeight" Value="SemiBold"/>
+    </Style>
+
     <Style Selector="review|ReviewView ListBox.segmented ListBoxItem:disabled TextBlock.segment">
       <Setter Property="Foreground" Value="{DynamicResource ink-disabled}"/>
+    </Style>
+
+    <!-- The chosen segment of the review bar is the strongest grey on the bar: line-strong, no edge and no shadow, its words at 600 in ink
+         and its icon in ink. -->
+    <Style Selector="review|ReviewView ListBox.segmented ListBoxItem:selected /template/ Border#Thumb">
+      <Setter Property="Background" Value="{DynamicResource line-strong}"/>
+      <Setter Property="BorderBrush" Value="Transparent"/>
+      <Setter Property="BoxShadow" Value="none"/>
+    </Style>
+    <Style Selector="review|ReviewView ListBox.segmented parts|Icon.segicon">
+      <Setter Property="Stroke" Value="{DynamicResource ink-2}"/>
+    </Style>
+    <Style Selector="review|ReviewView ListBox.segmented ListBoxItem:selected parts|Icon.segicon">
+      <Setter Property="Stroke" Value="{DynamicResource ink}"/>
     </Style>
 
   </UserControl.Styles>
@@ -240,14 +282,16 @@
             <parts:SegmentedList.ItemTemplate>
               <DataTemplate DataType="review:ReviewChoiceViewModel" x:DataType="review:ReviewChoiceViewModel">
                 <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Center" AutomationProperties.Name="{Binding SpokenName}">
-                  <parts:Icon Data="{StaticResource i-branch}" Width="14" Height="14" Stroke="{DynamicResource ink-2}" IsVisible="{Binding IsChanges}"/>
-                  <parts:Icon Data="{StaticResource i-folder}" Width="14" Height="14" Stroke="{DynamicResource ink-2}" IsVisible="{Binding IsFolder}"/>
+                  <parts:Icon Classes="segicon" Data="{StaticResource i-branch}" Width="14" Height="14" IsVisible="{Binding IsChanges}"/>
+                  <parts:Icon Classes="segicon" Data="{StaticResource i-staged}" Width="14" Height="14" IsVisible="{Binding IsStaged}"/>
+                  <parts:Icon Classes="segicon" Data="{StaticResource i-folder}" Width="14" Height="14" IsVisible="{Binding IsFolder}"/>
                   <TextBlock Classes="segment" Theme="{StaticResource type-body}" Text="{Binding Label}"/>
                 </StackPanel>
               </DataTemplate>
             </parts:SegmentedList.ItemTemplate>
             <parts:SegmentedList.Styles>
               <Style Selector="ListBoxItem" x:DataType="review:ReviewChoiceViewModel">
+                <Setter Property="Width" Value="164"/>
                 <Setter Property="IsEnabled" Value="{Binding IsAvailable}"/>
               </Style>
             </parts:SegmentedList.Styles>
@@ -290,29 +334,152 @@
               </StackPanel>
             </Border>
           </Popup>
-          <Button Name="RunButton" Grid.Column="6" Classes="cf" IsVisible="{Binding ShowsBarRun}" Classes.main="{Binding RunIsMain}" Classes.outlined="{Binding RunIsSecond}"
-                  Command="{Binding RunCommand}" AutomationProperties.Name="{Binding RunText}">
+          <parts:BusyButton Name="RunButton" Grid.Column="6" Classes="cf" IsVisible="{Binding ShowsBarRun}" Classes.main="{Binding RunIsMain}" Classes.outlined="{Binding RunIsSecond}"
+                            IsBusy="{Binding IsBusy}" Command="{Binding RunFromButtonCommand}" AutomationProperties.Name="{Binding RunName}">
             <StackPanel Orientation="Horizontal" Spacing="8">
               <parts:Icon Data="{StaticResource i-review}" Width="16" Height="16" Stroke="{Binding $parent[Button].Foreground}"
                           IsVisible="{Binding RunShowsIcon}"/>
-              <parts:TurningRing Width="14" Height="14" VerticalAlignment="Center" IsVisible="{Binding IsBusy}"/>
+              <parts:TurningRing Classes="button-ring" Classes.on-solid="{Binding RunIsMain}" VerticalAlignment="Center" IsVisible="{Binding IsBusy}"/>
               <TextBlock Theme="{StaticResource type-body-strong}" Text="{Binding RunText}"/>
             </StackPanel>
-          </Button>
+          </parts:BusyButton>
         </Grid>
       </Border>
     </Border>
 
+    <!-- The states before a review of the staged changes take the head of a result, in the main column: the 44 tile in idle (well with a ring and
+         the staged glyph), the title, the one action at the right of that row, then the facts, a body line and the list of files. -->
+    <ScrollViewer Name="ResultEmpty" Grid.Row="2" IsVisible="{Binding ShowsResultEmpty}" HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
+      <Border Classes="pagerow" Padding="32,24,32,32">
+        <Border Classes="pageframe">
+        <Panel>
+        <Border Classes="pagecolumn">
+          <StackPanel>
+            <!-- The title row: the tile, the title, and at the right the actions of the state. Nothing is staged: a slot of 200 for the answer of
+                 Check again (empty and as wide before any check, so nothing moves), then Check again filled (a folder review reads the last commit,
+                 so it is no way to review unstaged changes). The index
+                 cannot be read: Open Doctor, then Try again filled. When the row is too narrow for the slot it takes its own row under the title. -->
+            <Grid Name="StagedHead" ColumnDefinitions="Auto,*,Auto" RowDefinitions="Auto,Auto" MinHeight="44">
+              <Border Classes="badge" Classes.idle="{Binding !Verdict.IsUnreadable}" Classes.refused="{Binding Verdict.IsUnreadable}" VerticalAlignment="Top" Margin="0,0,14,0">
+                <Panel>
+                  <parts:Icon Data="{StaticResource i-staged}" Width="24" Height="24" StrokeThickness="1.8" Stroke="{DynamicResource ink-2}"
+                              IsVisible="{Binding !Verdict.IsUnreadable}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                  <parts:Icon Data="{StaticResource i-alert}" Width="24" Height="24" StrokeThickness="1.8" Stroke="{DynamicResource on-block}"
+                              IsVisible="{Binding Verdict.IsUnreadable}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                </Panel>
+              </Border>
+              <TextBlock Name="StagedTitle" Grid.Column="1" Theme="{StaticResource type-verdict}" VerticalAlignment="Center" Text="{Binding Verdict.Heading}"/>
+              <StackPanel Name="StagedActions" Grid.Column="2" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center" Margin="14,0,0,0">
+                <Border Name="StatusSlot" Width="200" IsVisible="{Binding Verdict.ShowsCheckAgain}" VerticalAlignment="Center">
+                  <StackPanel Orientation="Horizontal" Spacing="6" HorizontalAlignment="Right" IsVisible="{Binding HasCheckNote}"
+                              AutomationProperties.LiveSetting="Polite" AutomationProperties.Name="{Binding CheckNote}">
+                    <parts:Icon Data="{StaticResource i-check}" Width="14" Height="14" Stroke="{DynamicResource ink-3}" VerticalAlignment="Center"/>
+                    <TextBlock Theme="{StaticResource type-body}" Foreground="{DynamicResource ink-2}" FontFeatures="+tnum" VerticalAlignment="Center"
+                               TextWrapping="NoWrap" Text="{Binding CheckNote}"/>
+                  </StackPanel>
+                </Border>
+                <parts:BusyButton Name="StagedCheckAgainButton" Classes="cf main" Width="NaN" IsVisible="{Binding Verdict.ShowsCheckAgain}" IsBusy="{Binding IsChecking}"
+                                  Command="{Binding CheckAgainCommand}" AutomationProperties.Name="Check again">
+                  <StackPanel Orientation="Horizontal" Spacing="8">
+                    <parts:Icon IsVisible="{Binding !IsChecking}" Data="{StaticResource i-review}" Width="16" Height="16" Stroke="{Binding $parent[Button].Foreground}"/>
+                    <parts:TurningRing Classes="button-ring" VerticalAlignment="Center" IsVisible="{Binding IsChecking}"/>
+                    <TextBlock Theme="{StaticResource type-body-strong}" Text="Check again"/>
+                  </StackPanel>
+                </parts:BusyButton>
+                <parts:BusyButton Name="StagedRunButton" Classes="cf main" IsVisible="{Binding Verdict.HasButton}"
+                                  IsBusy="{Binding IsBusy}" Command="{Binding RunFromButtonCommand}" AutomationProperties.Name="{Binding RunName}">
+                  <StackPanel Orientation="Horizontal" Spacing="8">
+                    <parts:Icon IsVisible="{Binding !IsBusy}" Data="{StaticResource i-review}" Width="16" Height="16" Stroke="{Binding $parent[Button].Foreground}"/>
+                    <parts:TurningRing Classes="button-ring on-solid" VerticalAlignment="Center" IsVisible="{Binding IsBusy}"/>
+                    <TextBlock Theme="{StaticResource type-body-strong}" Text="{Binding RunText}"/>
+                  </StackPanel>
+                </parts:BusyButton>
+                <Button Name="OpenDoctorButton" Classes="cf second" IsVisible="{Binding Verdict.ShowsTryAgain}" Command="{Binding OpenDoctorFromReviewCommand}"
+                        AutomationProperties.Name="Open Doctor">
+                  <StackPanel Orientation="Horizontal" Spacing="8">
+                    <parts:Icon Data="{StaticResource i-doc}" Width="16" Height="16" Stroke="{Binding $parent[Button].Foreground}"/>
+                    <TextBlock Theme="{StaticResource type-body-strong}" Text="Open Doctor"/>
+                  </StackPanel>
+                </Button>
+                <parts:BusyButton Name="TryAgainButton" Classes="cf main" Width="124" IsVisible="{Binding Verdict.ShowsTryAgain}" IsBusy="{Binding IsChecking}"
+                                  Command="{Binding CheckAgainCommand}" AutomationProperties.Name="Try again">
+                  <StackPanel Orientation="Horizontal" Spacing="8">
+                    <parts:Icon IsVisible="{Binding !IsChecking}" Data="{StaticResource i-refresh}" Width="16" Height="16" Stroke="{Binding $parent[Button].Foreground}"/>
+                    <parts:TurningRing Classes="button-ring on-solid" VerticalAlignment="Center" IsVisible="{Binding IsChecking}"/>
+                    <TextBlock Theme="{StaticResource type-body-strong}" Text="Try again"/>
+                  </StackPanel>
+                </parts:BusyButton>
+              </StackPanel>
+              <Border Name="StatusRow" Grid.Row="1" Grid.ColumnSpan="3" IsVisible="False" Margin="58,6,0,0"/>
+            </Grid>
+
+            <StackPanel Orientation="Horizontal" Spacing="20" Margin="0,14,0,0">
+              <ItemsControl ItemsSource="{Binding Verdict.Facts}">
+                <ItemsControl.ItemsPanel>
+                  <ItemsPanelTemplate>
+                    <StackPanel Orientation="Horizontal" Spacing="20"/>
+                  </ItemsPanelTemplate>
+                </ItemsControl.ItemsPanel>
+                <ItemsControl.ItemTemplate>
+                  <DataTemplate DataType="review:FactViewModel" x:DataType="review:FactViewModel">
+                    <StackPanel Orientation="Horizontal" Spacing="6">
+                      <parts:Icon Data="{StaticResource i-branch}" Width="15" Height="15" Stroke="{DynamicResource ink-3}" IsVisible="{Binding IsCommits}"/>
+                      <parts:Icon Data="{StaticResource i-file}" Width="15" Height="15" Stroke="{DynamicResource ink-3}" IsVisible="{Binding IsFiles}"/>
+                      <parts:Icon Data="{StaticResource i-staged}" Width="15" Height="15" Stroke="{DynamicResource ink-3}" IsVisible="{Binding IsStaged}"/>
+                      <parts:Icon Data="{StaticResource i-commit}" Width="15" Height="15" Stroke="{DynamicResource ink-3}" IsVisible="{Binding IsCommit}"/>
+                      <TextBlock Theme="{StaticResource type-body}" Foreground="{DynamicResource ink-2}" FontFeatures="+tnum" VerticalAlignment="Center"
+                                 AutomationProperties.Name="{Binding Spoken}">
+                        <Run Text="{Binding Text}"/><Run FontFamily="{StaticResource code-font}" FontSize="13" Foreground="{DynamicResource ink}" Text="{Binding Code}"/>
+                      </TextBlock>
+                    </StackPanel>
+                  </DataTemplate>
+                </ItemsControl.ItemTemplate>
+              </ItemsControl>
+              <StackPanel Orientation="Horizontal" Spacing="6" IsVisible="{Binding ShowsReadyRules}">
+                <parts:Icon Data="{StaticResource i-rules}" Width="15" Height="15" Stroke="{DynamicResource ink-3}"/>
+                <TextBlock Theme="{StaticResource type-body}" Foreground="{DynamicResource ink-2}" FontFeatures="+tnum" VerticalAlignment="Center" Text="{Binding ReadyRulesText}"/>
+              </StackPanel>
+            </StackPanel>
+
+            <TextBlock IsVisible="{Binding Verdict.HasProblem}" Theme="{StaticResource type-body}" Foreground="{DynamicResource ink-2}" TextWrapping="Wrap" MaxWidth="640"
+                       HorizontalAlignment="Left" Margin="0,14,0,0" AutomationProperties.Name="{Binding Verdict.ProblemSpoken}">
+              <Run Foreground="{DynamicResource block-ink}" Text="{Binding Verdict.ProblemFirst}"/><Run Text=" "/><Run Text="{Binding Verdict.ProblemRest}"/>
+            </TextBlock>
+
+            <TextBlock Theme="{StaticResource type-body}" Foreground="{DynamicResource ink-2}" TextWrapping="Wrap" MaxWidth="640" HorizontalAlignment="Left" Margin="0,10,0,0"
+                       AutomationProperties.Name="{Binding Verdict.Lead}">
+              <Run Text="{Binding Verdict.LeadBefore}"/><Run FontFamily="{StaticResource code-font}" FontSize="13" FontWeight="SemiBold" Foreground="{DynamicResource ink}"
+                       Text="{Binding Verdict.LeadCode}"/><Run Text="{Binding Verdict.LeadAfter}"/>
+            </TextBlock>
+
+            <review:FilesPanel Margin="0,20,0,0" IsVisible="{Binding IsOnePane}" DataContext="{Binding}"/>
+          </StackPanel>
+        </Border>
+        <review:FilesPanel HorizontalAlignment="Right" VerticalAlignment="Top" Width="340" IsVisible="{Binding !IsOnePane}" DataContext="{Binding}"/>
+        </Panel>
+        </Border>
+      </Border>
+    </ScrollViewer>
+
     <!-- The states before a review: one block across the pane, its middle at 40
          percent of the pane's height and its top at least 32 below the pane's top. Nothing but its button takes the keyboard. -->
-    <Panel Name="EmptyBlock" Grid.Row="2" IsVisible="{Binding ShowsEmptyBlock}">
+    <Panel Name="EmptyBlock" Grid.Row="2" IsVisible="{Binding ShowsHeroEmpty}">
       <StackPanel Name="EmptyBlockBody" MaxWidth="520" HorizontalAlignment="Center" VerticalAlignment="Top" Margin="32,32,32,0">
         <Viewbox Width="56" Height="56" Margin="0,0,0,20" IsVisible="{Binding Verdict.HasEmblem}" Focusable="False">
           <parts:LogoMark/>
         </Viewbox>
         <TextBlock Theme="{StaticResource type-verdict}" TextAlignment="Center" TextWrapping="Wrap" Text="{Binding Verdict.Heading}"/>
         <TextBlock Theme="{StaticResource type-lead}" Foreground="{DynamicResource ink-2}" TextAlignment="Center" TextWrapping="Wrap" Margin="0,8,0,0"
-                   IsVisible="{Binding Verdict.HasLead}" Text="{Binding Verdict.Lead}"/>
+                   IsVisible="{Binding Verdict.HasLead}" AutomationProperties.Name="{Binding Verdict.Lead}">
+          <Run Text="{Binding Verdict.LeadBefore}"/><Run FontFamily="{StaticResource code-font}" FontSize="16" Foreground="{DynamicResource ink}" Text="{Binding Verdict.LeadCode, Converter={x:Static parts:PathBreaks.Display}}"/><Run Text="{Binding Verdict.LeadAfter}"/>
+        </TextBlock>
+        <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Center" Margin="0,16,0,0" IsVisible="{Binding Verdict.HasContentLine}">
+          <parts:Icon Data="{StaticResource i-file}" Width="15" Height="15" Stroke="{DynamicResource ink-3}" VerticalAlignment="Center"/>
+          <TextBlock Theme="{StaticResource type-body}" Foreground="{DynamicResource ink-2}" VerticalAlignment="Center" Text="{Binding Verdict.ContentLine}"/>
+        </StackPanel>
+        <TextBlock Theme="{StaticResource type-body}" Foreground="{DynamicResource ink-2}" TextAlignment="Center" TextWrapping="Wrap" Margin="0,6,0,0"
+                   IsVisible="{Binding Verdict.HasAfterLine}" Text="{Binding Verdict.AfterLine}"/>
+
         <StackPanel Orientation="Horizontal" Spacing="20" HorizontalAlignment="Center" Margin="0,16,0,0" IsVisible="{Binding ShowsRulesLine}">
           <StackPanel Orientation="Horizontal" Spacing="6" IsVisible="{Binding HasRulesBlock}">
             <parts:EffectMark Classes="block" Kind="Block" Width="15" Height="15" VerticalAlignment="Center"/>
@@ -324,13 +491,14 @@
           </StackPanel>
           <TextBlock Theme="{StaticResource type-body}" Foreground="{DynamicResource ink-2}" VerticalAlignment="Center" IsVisible="{Binding HasNoRuleOn}" Text="No rule is on."/>
         </StackPanel>
-        <Button Name="BlockRunButton" Classes="cf main" HorizontalAlignment="Center" Margin="0,24,0,0" IsVisible="{Binding Verdict.HasButton}"
-                Command="{Binding RunCommand}" AutomationProperties.Name="Review now">
+        <parts:BusyButton Name="BlockRunButton" Classes="cf main" HorizontalAlignment="Center" Margin="0,24,0,0" IsVisible="{Binding ShowsBlockRun}"
+                          IsBusy="{Binding IsBusy}" Command="{Binding RunFromButtonCommand}" AutomationProperties.Name="{Binding RunName}">
           <StackPanel Orientation="Horizontal" Spacing="8">
-            <parts:Icon Data="{StaticResource i-review}" Width="16" Height="16" Stroke="{Binding $parent[Button].Foreground}"/>
-            <TextBlock Theme="{StaticResource type-body-strong}" Text="Review now"/>
+            <parts:Icon IsVisible="{Binding !IsBusy}" Data="{StaticResource i-review}" Width="16" Height="16" Stroke="{Binding $parent[Button].Foreground}"/>
+            <parts:TurningRing Classes="button-ring on-solid" VerticalAlignment="Center" IsVisible="{Binding IsBusy}"/>
+            <TextBlock Theme="{StaticResource type-body-strong}" Text="{Binding RunText}"/>
           </StackPanel>
-        </Button>
+        </parts:BusyButton>
       </StackPanel>
     </Panel>
 
@@ -373,35 +541,41 @@
                   <!-- The verdict. -->
                   <StackPanel Name="VerdictBlock" DataContext="{Binding Verdict}" x:DataType="review:VerdictViewModel">
                     <Grid ColumnDefinitions="Auto,*,Auto" MinHeight="44">
-                      <Border IsVisible="{Binding HasBadge}" Classes="badge" Classes.refused="{Binding IsRefused}" Classes.allowed="{Binding IsAllowed}"
+                      <Border IsVisible="{Binding HasBadge}" Classes="badge" Classes.refused="{Binding ShowsBlockTile}" Classes.allowed="{Binding IsAllowedTile}" Classes.warned="{Binding ShowsWarnTile}"
                               Classes.incomplete="{Binding IsIncomplete}" Classes.running="{Binding IsRunning}" Classes.folder="{Binding IsFolderFindings}" VerticalAlignment="Top" Margin="0,0,14,0">
                         <Panel>
                           <parts:Icon Data="{StaticResource i-x}" Width="24" Height="24" StrokeThickness="2.4" Stroke="{DynamicResource on-block}"
                                       IsVisible="{Binding IsRefused}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
                           <parts:Icon Data="{StaticResource i-check}" Width="24" Height="24" StrokeThickness="2.4" Stroke="{DynamicResource page}"
-                                      IsVisible="{Binding IsAllowed}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                      IsVisible="{Binding ShowsCheckTile}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
                           <parts:Icon Data="{StaticResource i-folder}" Width="24" Height="24" StrokeThickness="1.8" Stroke="{DynamicResource on-solid}"
                                       IsVisible="{Binding IsFolderFindings}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                          <parts:Icon Data="{StaticResource i-staged}" Width="24" Height="24" StrokeThickness="1.8" Stroke="{DynamicResource on-block}"
+                                      IsVisible="{Binding ShowsBlockStagedGlyph}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                          <parts:Icon Data="{StaticResource i-staged}" Width="24" Height="24" StrokeThickness="1.8" Stroke="{DynamicResource on-warn}"
+                                      IsVisible="{Binding ShowsWarnTile}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                          <parts:Icon Data="{StaticResource i-staged}" Width="24" Height="24" StrokeThickness="1.8" Stroke="{DynamicResource page}"
+                                      IsVisible="{Binding IsStagedClean}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
                           <parts:Icon Data="M8 4v5M8 11.9v.1" Width="24" Height="24" StrokeThickness="2.4" Stroke="{DynamicResource on-solid}"
                                       IsVisible="{Binding IsIncomplete}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
                           <parts:TurningRing Width="24" Height="24" IsVisible="{Binding IsRunning}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
                         </Panel>
                       </Border>
-                      <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                      <StackPanel Grid.Column="1" VerticalAlignment="Top" Margin="0,2,0,0">
                         <WrapPanel Orientation="Horizontal">
-                          <TextBlock Name="Heading" Theme="{StaticResource type-verdict}" Margin="0,0,10,0" Text="{Binding Heading}"/>
+                          <TextBlock Name="Heading" Theme="{StaticResource type-verdict}" Margin="0,0,10,0" TextWrapping="Wrap" Text="{Binding Heading}"/>
                           <TextBlock Name="HeadingTail" Theme="{StaticResource type-verdict}" TextTrimming="PrefixCharacterEllipsis" MaxWidth="560"
                                      IsVisible="{Binding HasTail}" Text="{Binding HeadingTail}"/>
                         </WrapPanel>
                         <TextBlock Theme="{StaticResource type-lead}" Foreground="{DynamicResource ink-2}" TextWrapping="Wrap" Margin="0,8,0,0"
                                    IsVisible="{Binding HasLead}" Text="{Binding Lead}"/>
                       </StackPanel>
-                      <review:CopyButton Grid.Column="2" Margin="14,0,0,0" VerticalAlignment="Center" HorizontalAlignment="Right"
+                      <review:CopyButton Grid.Column="2" Margin="14,4,0,0" VerticalAlignment="Top" HorizontalAlignment="Right"
                                          DataContext="{Binding $parent[review:ReviewView].((review:ReviewViewModel)DataContext).CopyAll}"
                                          IsVisible="{Binding $parent[review:ReviewView].((review:ReviewViewModel)DataContext).CanCopyAll}"/>
                     </Grid>
 
-                    <ItemsControl ItemsSource="{Binding Counts}" IsVisible="{Binding HasCounts}" Margin="0,16,0,0">
+                    <ItemsControl ItemsSource="{Binding Counts}" IsVisible="{Binding HasCounts}" Margin="0,10,0,0">
                       <ItemsControl.ItemsPanel>
                         <ItemsPanelTemplate>
                           <WrapPanel Orientation="Horizontal"/>
@@ -409,25 +583,19 @@
                       </ItemsControl.ItemsPanel>
                       <ItemsControl.ItemTemplate>
                         <DataTemplate DataType="review:CountPieceViewModel" x:DataType="review:CountPieceViewModel">
-                          <Panel Margin="0,0,8,8">
-                            <Border Classes="piece block" IsVisible="{Binding IsBlock}">
-                              <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
-                                <parts:EffectMark Kind="Block" Width="17" Height="17" Shape="{DynamicResource on-block}" Sign="{DynamicResource block}"/>
-                                <TextBlock Theme="{StaticResource type-count}" Foreground="{DynamicResource on-block}" VerticalAlignment="Center" Text="{Binding Text}"/>
-                              </StackPanel>
-                            </Border>
-                            <Border Classes="piece allow" IsVisible="{Binding IsAllow}">
-                              <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
-                                <parts:Icon Data="{StaticResource i-check}" Width="17" Height="17" StrokeThickness="2" Stroke="{DynamicResource page}" VerticalAlignment="Center"/>
-                                <TextBlock Theme="{StaticResource type-count}" Foreground="{DynamicResource page}" VerticalAlignment="Center" Text="{Binding Text}"/>
-                              </StackPanel>
-                            </Border>
-                            <Border Classes="piece warn" IsVisible="{Binding IsWarn}">
-                              <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
-                                <parts:EffectMark Kind="Warn" Width="17" Height="17" Shape="{DynamicResource on-warn}" Sign="{DynamicResource warn}"/>
-                                <TextBlock Theme="{StaticResource type-count}" Foreground="{DynamicResource on-warn}" VerticalAlignment="Center" Text="{Binding Text}"/>
-                              </StackPanel>
-                            </Border>
+                          <Panel Margin="0,0,20,4">
+                            <StackPanel Orientation="Horizontal" Spacing="8" IsVisible="{Binding IsBlock}">
+                              <parts:EffectMark Classes="block" Kind="Block" Width="16" Height="16" VerticalAlignment="Center"/>
+                              <TextBlock Theme="{StaticResource type-h3}" VerticalAlignment="Center" Text="{Binding Text}"/>
+                            </StackPanel>
+                            <StackPanel Orientation="Horizontal" Spacing="8" IsVisible="{Binding IsAllow}">
+                              <parts:Icon Data="{StaticResource i-check}" Width="16" Height="16" StrokeThickness="2" Stroke="{DynamicResource req-ink}" VerticalAlignment="Center"/>
+                              <TextBlock Theme="{StaticResource type-h3}" VerticalAlignment="Center" Text="{Binding Text}"/>
+                            </StackPanel>
+                            <StackPanel Orientation="Horizontal" Spacing="8" IsVisible="{Binding IsWarn}">
+                              <parts:EffectMark Classes="warn" Kind="Warn" Width="16" Height="16" VerticalAlignment="Center"/>
+                              <TextBlock Theme="{StaticResource type-h3}" VerticalAlignment="Center" Text="{Binding Text}"/>
+                            </StackPanel>
                             <Border Classes="piece" Background="{DynamicResource hover}" Padding="12,0,4,0" IsVisible="{Binding IsFilter}">
                               <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
                                 <TextBlock Theme="{StaticResource type-body}" FontWeight="500" VerticalAlignment="Center" Text="Only"/>
@@ -461,19 +629,39 @@
                           <StackPanel Orientation="Horizontal" Spacing="6">
                             <parts:Icon Data="{StaticResource i-branch}" Width="15" Height="15" Stroke="{DynamicResource ink-3}" IsVisible="{Binding IsCommits}"/>
                             <parts:Icon Data="{StaticResource i-file}" Width="15" Height="15" Stroke="{DynamicResource ink-3}" IsVisible="{Binding IsFiles}"/>
+                            <parts:Icon Data="{StaticResource i-staged}" Width="15" Height="15" Stroke="{DynamicResource ink-3}" IsVisible="{Binding IsStaged}"/>
+                      <parts:Icon Data="{StaticResource i-commit}" Width="15" Height="15" Stroke="{DynamicResource ink-3}" IsVisible="{Binding IsCommit}"/>
                             <parts:Icon Data="{StaticResource i-time}" Width="15" Height="15" Stroke="{DynamicResource ink-3}" IsVisible="{Binding IsTime}"/>
                             <TextBlock Theme="{StaticResource type-body}" Foreground="{DynamicResource ink-2}" FontFeatures="+tnum"
-                                       TextTrimming="CharacterEllipsis" VerticalAlignment="Center" Text="{Binding Text}"/>
+                                       TextTrimming="CharacterEllipsis" VerticalAlignment="Center" AutomationProperties.Name="{Binding Spoken}">
+                              <Run Text="{Binding Text}"/><Run FontFamily="{StaticResource code-font}" FontSize="13" Foreground="{DynamicResource ink}" Text="{Binding Code}"/>
+                            </TextBlock>
                           </StackPanel>
                         </DataTemplate>
                       </ItemsControl.ItemTemplate>
                     </ItemsControl>
 
-                    <Border IsVisible="{Binding LeavesOutUncommitted}" Background="{DynamicResource side}" CornerRadius="10" MinHeight="36" Padding="12,8,14,8" Margin="0,14,0,0">
+                    <StackPanel IsVisible="{Binding LeavesOutAsFact}" Orientation="Horizontal" Spacing="6" Margin="0,10,0,0">
+                      <parts:Icon Data="{StaticResource i-info}" Width="15" Height="15" Stroke="{DynamicResource ink-3}" VerticalAlignment="Center"/>
+                      <TextBlock Theme="{StaticResource type-body}" Foreground="{DynamicResource ink-2}" TextWrapping="Wrap" VerticalAlignment="Center"
+                                 Text="{Binding LeavesOutText}"/>
+                    </StackPanel>
+
+                    <Border IsVisible="{Binding LeavesOutAsStrip}" Background="{DynamicResource side}" CornerRadius="10" MinHeight="36" Padding="12,8,14,8" Margin="0,14,0,0">
                       <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
                         <parts:Icon Data="{StaticResource i-info}" Width="16" Height="16" Stroke="{DynamicResource ink-2}" VerticalAlignment="Center"/>
                         <TextBlock Theme="{StaticResource type-body}" FontWeight="500" TextWrapping="Wrap" VerticalAlignment="Center"
-                                   Text="Uncommitted changes are not part of this review."/>
+                                   Text="{Binding LeavesOutText}"/>
+                      </StackPanel>
+                    </Border>
+
+                    <!-- The staged files are not the ones the review read: the review is old. -->
+                    <Border DataContext="{Binding $parent[review:ReviewView].((review:ReviewViewModel)DataContext)}" x:DataType="review:ReviewViewModel"
+                            IsVisible="{Binding ShowsStagedChanged}" Background="{DynamicResource side}" CornerRadius="10" MinHeight="36" Padding="12,8,14,8" Margin="0,14,0,0">
+                      <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                        <parts:Icon Data="{StaticResource i-info}" Width="16" Height="16" Stroke="{DynamicResource ink-2}" VerticalAlignment="Center"/>
+                        <TextBlock Theme="{StaticResource type-body}" FontWeight="500" TextWrapping="Wrap" VerticalAlignment="Center"
+                                   Text="The staged files have changed since this review."/>
                       </StackPanel>
                     </Border>
                   </StackPanel>
@@ -635,6 +823,8 @@
                       </Grid>
                     </Button>
                     <StackPanel Classes="findingbody" Classes.folder="{Binding IsFolderReview}" IsVisible="{Binding IsOpen}">
+                      <TextBlock IsVisible="{Binding HasWhy}" Theme="{StaticResource type-body}" TextWrapping="Wrap" MaxWidth="640" HorizontalAlignment="Left"
+                                 Margin="0,0,0,8" Text="{Binding WhyText}"/>
                       <TextBlock Theme="{StaticResource type-body}" Foreground="{DynamicResource ink-2}" TextWrapping="Wrap" AutomationProperties.Name="{Binding SourceLine}">
                         <Run Text="{Binding SourcePrefix}"/><Run Classes="scope" Classes.pattern="{Binding IsScoped}" Text="{Binding SourceScope}"/><Run Text="{Binding SourceSuffix}"/>
                       </TextBlock>
@@ -643,13 +833,21 @@
                                  TextWrapping="Wrap" Margin="0,8,0,0" Text="{Binding ReachText}"/>
                       <TextBlock IsVisible="{Binding HasByteChanges}" Theme="{StaticResource type-body}" Foreground="{DynamicResource ink-2}"
                                  TextWrapping="Wrap" Margin="0,8,0,0" Text="{Binding ByteChangesText}"/>
-                      <review:FixDifference IsVisible="{Binding HasDiff}" Margin="0,12,0,0"/>
+                      <Border IsVisible="{Binding HasDiff}" Margin="0,12,0,0" CornerRadius="12" BorderThickness="1" BorderBrush="{DynamicResource line}" ClipToBounds="True">
+                        <review:CodeHead/>
+                      </Border>
+                      <review:FixDifference IsVisible="{Binding HasDiff}" Margin="0,8,0,0"/>
                       <Border IsVisible="{Binding HasCode}" Margin="0,12,0,0" CornerRadius="12" BorderThickness="1" BorderBrush="{DynamicResource line}"
-                              Padding="0,8" ClipToBounds="True" Background="{DynamicResource page}">
+                              ClipToBounds="True" Background="{DynamicResource page}">
                         <StackPanel>
-                          <TextBlock IsVisible="{Binding IsExcerptStale}" Theme="{StaticResource type-meta}" Foreground="{DynamicResource ink-2}"
-                                     TextWrapping="Wrap" Margin="12,0,12,8" Text="As reviewed. The file has changed since."/>
-                          <ItemsControl ItemsSource="{Binding Lines}">
+                          <review:CodeHead/>
+                          <Grid IsVisible="{Binding HasTwoNumbers}" ColumnDefinitions="64,64,*" Height="18" Margin="0,8,0,-2">
+                            <TextBlock Theme="{StaticResource type-meta}" FontWeight="SemiBold" Foreground="{DynamicResource ink-2}" TextAlignment="Right"
+                                       Margin="0,0,14,0" Text="{Binding FirstNumberHead}"/>
+                            <TextBlock Grid.Column="1" Theme="{StaticResource type-meta}" FontWeight="SemiBold" Foreground="{DynamicResource ink-2}"
+                                       TextAlignment="Right" Margin="0,0,14,0" Text="On disk"/>
+                          </Grid>
+                          <ItemsControl ItemsSource="{Binding Lines}" Margin="0,8">
                             <ItemsControl.ItemTemplate>
                               <DataTemplate DataType="review:CodeLineViewModel" x:DataType="review:CodeLineViewModel">
                                 <Panel Height="20">
@@ -657,8 +855,19 @@
                                   <Border Background="{DynamicResource block}" Width="3" HorizontalAlignment="Left" IsVisible="{Binding IsBlocking}"/>
                                   <Border Background="{DynamicResource warn-tint}" IsVisible="{Binding IsWarning}"/>
                                   <Border Background="{DynamicResource warn}" Width="3" HorizontalAlignment="Left" IsVisible="{Binding IsWarning}"/>
-                                  <Grid ColumnDefinitions="44,14,*">
-                                    <TextBlock Theme="{StaticResource code}" Foreground="{DynamicResource ink-3}" TextAlignment="Right" Text="{Binding Number}"/>
+                                  <Grid ColumnDefinitions="44,14,*" IsVisible="{Binding OneNumber}">
+                                    <Border Classes="foundnumber" Classes.on="{Binding IsBlocking}" Classes.warned="{Binding IsWarning}" Margin="0,1,5,1" HorizontalAlignment="Right" VerticalAlignment="Stretch">
+                                      <TextBlock Theme="{StaticResource code}" Classes="reviewednumber" TextAlignment="Right" VerticalAlignment="Center" Text="{Binding Number}"/>
+                                    </Border>
+                                    <TextBlock Grid.Column="2" Theme="{StaticResource code}" TextWrapping="NoWrap" review:CodeText.Segments="{Binding Segments}"/>
+                                  </Grid>
+                                  <Grid ColumnDefinitions="64,64,*" IsVisible="{Binding TwoNumbers}">
+                                    <Border Classes="foundnumber" Classes.on="{Binding IsBlocking}" Classes.warned="{Binding IsWarning}" Margin="0,1,9,1" HorizontalAlignment="Right" VerticalAlignment="Stretch">
+                                      <TextBlock Theme="{StaticResource code}" Classes="reviewednumber" Classes.found="{Binding IsBreaking}" TextAlignment="Right" VerticalAlignment="Center"
+                                                 Text="{Binding Number}" AutomationProperties.Name="{Binding SpokenNumbers}"/>
+                                    </Border>
+                                    <TextBlock Grid.Column="1" Theme="{StaticResource code}" TextAlignment="Right" Margin="0,0,14,0" Classes.found="{Binding IsBreaking}"
+                                               Text="{Binding DiskNumberText}" AutomationProperties.AccessibilityView="Raw"/>
                                     <TextBlock Grid.Column="2" Theme="{StaticResource code}" TextWrapping="NoWrap" review:CodeText.Segments="{Binding Segments}"/>
                                   </Grid>
                                 </Panel>

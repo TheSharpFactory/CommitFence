@@ -1,0 +1,26 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:local="using:CF.App.Rules.Page"
+             x:Class="CF.App.Rules.Page.ShortValueText"
+             x:ClassModifier="internal">
+
+  <!-- The value of a token on one line: the text, and "+N" in a box of the page colour, 8 after it, when a list leaves values out. -->
+  <UserControl.Styles>
+    <Style Selector="local|ShortValueText.path TextBlock#Text">
+      <Setter Property="Theme" Value="{StaticResource code-token}"/>
+    </Style>
+    <Style Selector="local|ShortValueText.code TextBlock#Text">
+      <Setter Property="FontFamily" Value="{StaticResource code-font}"/>
+      <Setter Property="FontSize" Value="18"/>
+    </Style>
+  </UserControl.Styles>
+
+  <StackPanel Orientation="Horizontal">
+    <TextBlock Name="Text" Theme="{StaticResource type-token}" TextWrapping="NoWrap" VerticalAlignment="Top"/>
+    <Border Name="More" IsVisible="False" Margin="8,0,0,0" Height="24" CornerRadius="6" Padding="7,0" VerticalAlignment="Center"
+            Background="{DynamicResource page}">
+      <TextBlock Name="MoreText" Theme="{StaticResource type-card}" VerticalAlignment="Center"/>
+    </Border>
+  </StackPanel>
+
+</UserControl>

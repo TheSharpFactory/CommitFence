@@ -23,11 +23,12 @@ internal sealed class SettingsWriter
         _newline = newline;
     }
 
-    public string Write(RuleSettings settings)
+    public string Write(RuleSettings settings, string? featureVersion = null)
     {
         var parts = new List<string>();
-        if(settings.Requires != null)
-            parts.Add(_indent + "\"requires\": " + JsonText.Quote(settings.Requires));
+        var requires = featureVersion ?? settings.Requires;
+        if(requires != null)
+            parts.Add(_indent + "\"requires\": " + JsonText.Quote(requires));
 
         if(settings.ConfiguredStrictness != null)
             parts.Add(_indent + "\"strictness\": " + WriteStrictness(settings.ConfiguredStrictness));
@@ -105,17 +106,50 @@ internal sealed class SettingsWriter
         if(conditions.Count == 0)
             return;
 
-        var entries = conditions.Select(WriteCondition);
+        var entries = ConditionEntries(conditions);
         lines.Add($"\"{key}\": {{ {string.Join(", ", entries)} }}");
+    }
+
+    private static IEnumerable<string> ConditionEntries(IReadOnlyList<RuleCondition> conditions)
+    {
+        var ranges = conditions.GroupBy(condition => condition.PropertyName, StringComparer.Ordinal)
+            .Where(group => group.Count() == 2 && group.Any(condition => condition.Comparison == Comparison.AtLeast)
+                && group.Any(condition => condition.Comparison == Comparison.AtMost))
+            .ToDictionary(group => group.Key, group => group.ToList(), StringComparer.Ordinal);
+
+        foreach(var condition in conditions)
+        {
+            var name = JsonText.Quote(condition.PropertyName);
+            if(!ranges.TryGetValue(condition.PropertyName, out var range))
+            {
+                yield return name + ": " + WriteCondition(condition);
+                continue;
+            }
+
+            if(ReferenceEquals(range[0], condition))
+                yield return name + ": " + WriteComparisonObject(range);
+        }
     }
 
     private static string WriteCondition(RuleCondition condition)
     {
-        var name = JsonText.Quote(condition.PropertyName);
-        if(condition.Comparison == Comparison.IsOneOf)
-            return name + ": [" + string.Join(", ", condition.ExpectedValues.Select(JsonText.Value)) + "]";
+        return RuleComparisons.ObjectKey(condition.Comparison) == null
+            ? WriteOperand(condition)
+            : WriteComparisonObject([condition]);
+    }
 
-        return name + ": " + JsonText.Value(condition.ExpectedValues[0]);
+    private static string WriteComparisonObject(IReadOnlyList<RuleCondition> conditions)
+    {
+        var entries = conditions.Select(condition => JsonText.Quote(RuleComparisons.ObjectKey(condition.Comparison)!) + ": " + WriteOperand(condition));
+        return "{ " + string.Join(", ", entries) + " }";
+    }
+
+    private static string WriteOperand(RuleCondition condition)
+    {
+        if(condition.Comparison == Comparison.IsOneOf || (condition.Comparison == Comparison.IsNot && condition.IsList))
+            return "[" + string.Join(", ", condition.ExpectedValues.Select(JsonText.Value)) + "]";
+
+        return JsonText.Value(condition.ExpectedValues[0]);
     }
 
     public string ReplaceStructure(string settingsText, StructureRules structure)

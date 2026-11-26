@@ -51,6 +51,24 @@ public sealed class AgentPromptTests
         Assert.Equal(hasCode, prompt.Contains("The code", StringComparison.Ordinal));
     }
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void PromptNamesCoverageProblemsEvenWhenThereAreFindings(bool hasFinding)
+    {
+        using var fixture = RulesFixture.Canonical(RulesFixture.BracedIfRule);
+        fixture.Write("src/Visible.cs", _visible);
+        var files = hasFinding ? new List<string> { "src/Visible.cs", "src/Missing.cs" } : ["src/Missing.cs"];
+
+        var prompt = fixture.Commands.Run(["review", "--format", "prompt", "--files", .. files]);
+
+        Assert.Equal(hasFinding ? ExitCode.Blocked : ExitCode.Incomplete, prompt.ExitCode);
+        var sections = prompt.Output.Split("What could not be checked:", StringSplitOptions.None);
+        Assert.Equal(2, sections.Length);
+        Assert.Contains(hasFinding ? "TEAM010" : "CommitFence found nothing to fix, but it could not check everything.", sections[0], StringComparison.Ordinal);
+        Assert.Contains("- src/Missing.cs:", sections[1], StringComparison.Ordinal);
+    }
+
     [Fact]
     public void FormatPromptPrintsThePromptAloneAndAnUnknownFormatIsRefused()
     {

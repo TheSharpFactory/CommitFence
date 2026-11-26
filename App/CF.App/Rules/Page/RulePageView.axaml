@@ -12,14 +12,60 @@
        breaks it". Try it is the last part. The sheet scrolls; its content is never wider than
        900. In one pane the page has a back button, and its sides are 24. -->
   <UserControl.Styles>
+    <Style Selector="Popup">
+      <Setter Property="local:PickerRoom.Fits" Value="True"/>
+    </Style>
     <Style Selector="local|RulePageView Border.sheet">
-      <Setter Property="Padding" Value="32,4,32,32"/>
+      <Setter Property="Padding" Value="32,0,32,32"/>
+    </Style>
+    <Style Selector="local|RulePageView Border.rulehead">
+      <Setter Property="Padding" Value="32,0"/>
+      <Setter Property="BorderBrush" Value="Transparent"/>
+    </Style>
+    <Style Selector="local|RulePageView.onepane Border.rulehead">
+      <Setter Property="Padding" Value="24,0"/>
+    </Style>
+    <Style Selector="local|RulePageView Border.rulehead.stuck">
+      <Setter Property="BorderBrush" Value="{DynamicResource line}"/>
+    </Style>
+    <Style Selector="local|RulePageView Border.rulehead.tighter TextBlock.tagword">
+      <Setter Property="IsVisible" Value="False"/>
+    </Style>
+    <Style Selector="local|RulePageView Border.rulehead.tight TextBlock.switchword">
+      <Setter Property="IsVisible" Value="False"/>
+    </Style>
+    <Style Selector="local|RulePageView StackPanel.stategroup">
+      <Setter Property="Opacity" Value="0"/>
+      <Setter Property="IsHitTestVisible" Value="False"/>
+      <Setter Property="AutomationProperties.AccessibilityView" Value="Raw"/>
+    </Style>
+    <Style Selector="local|RulePageView StackPanel.stategroup.on">
+      <Setter Property="Opacity" Value="1"/>
+      <Setter Property="AutomationProperties.AccessibilityView" Value="Content"/>
+    </Style>
+    <Style Selector="local|RulePageView Button.rename">
+      <Setter Property="Foreground" Value="{DynamicResource ink-2}"/>
+    </Style>
+    <Style Selector="local|RulePageView Button.rename:pointerover">
+      <Setter Property="Foreground" Value="{DynamicResource ink}"/>
+    </Style>
+    <Style Selector="local|RulePageView Button.reasonlink">
+      <Setter Property="Height" Value="20"/>
+      <Setter Property="Padding" Value="0"/>
+      <Setter Property="CornerRadius" Value="4"/>
+      <Setter Property="HorizontalAlignment" Value="Left"/>
+    </Style>
+    <Style Selector="local|RulePageView Button.reasonlink:pointerover TextBlock.headline">
+      <Setter Property="TextDecorations" Value="Underline"/>
+    </Style>
+    <Style Selector="local|RulePageView TextBlock.headline.bad">
+      <Setter Property="Foreground" Value="{DynamicResource block-ink}"/>
     </Style>
     <Style Selector="local|RulePageView StackPanel.content">
       <Setter Property="HorizontalAlignment" Value="Left"/>
     </Style>
     <Style Selector="local|RulePageView.onepane Border.sheet">
-      <Setter Property="Padding" Value="24,4,24,32"/>
+      <Setter Property="Padding" Value="24,0,24,32"/>
     </Style>
     <Style Selector="local|RulePageView.onepane StackPanel.content">
       <Setter Property="HorizontalAlignment" Value="Center"/>
@@ -32,7 +78,105 @@
     </Style>
   </UserControl.Styles>
 
-  <ScrollViewer Name="Scroller" HorizontalScrollBarVisibility="Disabled" AllowAutoHide="False">
+  <Grid RowDefinitions="Auto,*">
+
+  <!-- The head: one row of 48 in every state, opaque, above the sheet that scrolls under it. At the left the tag, the id, a hairline
+       and the switch, which never move; at the right, always the same four, right to left: the menu, Save rule, Discard and
+       the state word. Once the sheet has scrolled, a line of 1 runs along its bottom. -->
+  <Border Name="Head" Classes="rulehead" Height="48" Background="{DynamicResource page}" BorderThickness="0,0,0,1" ZIndex="3">
+    <Grid Name="HeadRow" ColumnDefinitions="Auto,*,Auto" HorizontalAlignment="Left">
+      <StackPanel Name="LeftGroup" Orientation="Horizontal" Spacing="10" VerticalAlignment="Center">
+        <Button Classes="cf quiet back" Padding="8,0,12,0" Command="{Binding $parent[rules:RulesView].((rules:RulesViewModel)DataContext).BackCommand}"
+                AutomationProperties.Name="Back to the rules">
+          <StackPanel Orientation="Horizontal" Spacing="8">
+            <parts:Icon Data="{StaticResource i-left}" Width="16" Height="16" Stroke="{Binding $parent[Button].Foreground}"/>
+            <TextBlock Classes="tagword" Theme="{StaticResource type-body-strong}" FontWeight="Medium" Text="Rules"/>
+          </StackPanel>
+        </Button>
+        <Border Height="24" CornerRadius="7" Padding="7,0,9,0" Background="{DynamicResource hover}" VerticalAlignment="Center">
+          <StackPanel Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
+            <parts:Icon Data="{StaticResource i-pen}" Width="12" Height="12" Stroke="{DynamicResource ink-2}"/>
+            <TextBlock Classes="tagword" Theme="{StaticResource type-label}" Foreground="{DynamicResource ink-2}" Text="Custom rule"/>
+          </StackPanel>
+        </Border>
+        <TextBlock Name="IdText" Theme="{StaticResource code-strong}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" TextWrapping="NoWrap"
+                   ToolTip.Tip="{Binding Id}" Text="{Binding Id}"/>
+        <Border Width="1" Height="24" Margin="6,0,0,0" Background="{DynamicResource line}"/>
+        <StackPanel Name="SwitchGroup" Orientation="Horizontal" Spacing="12" Margin="6,0,0,0" VerticalAlignment="Center">
+          <TextBlock Classes="switchword" Theme="{StaticResource type-body}" FontWeight="Medium" Foreground="{DynamicResource ink-2}"
+                     VerticalAlignment="Center" Text="{Binding SwitchWord}"/>
+          <ToggleButton Classes="cfswitch" Focusable="True" IsEnabled="{Binding IsSaved}" IsChecked="{Binding IsOn, Mode=OneWay}"
+                        Command="{Binding ToggleSwitchCommand}" AutomationProperties.Name="{Binding SwitchSpokenName}"/>
+        </StackPanel>
+      </StackPanel>
+
+      <StackPanel Name="RightGroup" Grid.Column="2" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+
+        <!-- The three states are drawn on top of each other and the one that is on shows: the state's place is as wide as the widest word,
+             "Cannot save", in every state, so the head keeps its shape. -->
+        <Panel Margin="0,0,2,0" VerticalAlignment="Center" AutomationProperties.Name="{Binding SaveStateSpoken}"
+               AutomationProperties.LiveSetting="Polite">
+          <StackPanel Classes="stategroup" Classes.on="{Binding IsSavedState}" Orientation="Horizontal" Spacing="6" HorizontalAlignment="Right">
+            <parts:Icon Data="{StaticResource i-check}" Width="14" Height="14" Stroke="{DynamicResource req-ink}" VerticalAlignment="Center"/>
+            <TextBlock Classes="save-state" Theme="{StaticResource type-body}" Foreground="{DynamicResource ink-2}"
+                       VerticalAlignment="Center" Text="Saved"/>
+          </StackPanel>
+          <StackPanel Classes="stategroup" Classes.on="{Binding IsUnsavedState}" Orientation="Horizontal" Spacing="6" HorizontalAlignment="Right">
+            <Ellipse Width="7" Height="7" Fill="{DynamicResource ink}" VerticalAlignment="Center"/>
+            <TextBlock Classes="save-state" Theme="{StaticResource type-body}" Foreground="{DynamicResource ink}"
+                       FontWeight="Medium" VerticalAlignment="Center" Text="Unsaved"/>
+          </StackPanel>
+          <StackPanel Classes="stategroup" Classes.on="{Binding IsCannotSaveState}" Orientation="Horizontal" Spacing="6" HorizontalAlignment="Right">
+            <parts:EffectMark Kind="Block" Width="14" Height="14" Shape="{DynamicResource block}" Sign="{DynamicResource on-block}"
+                              VerticalAlignment="Center"/>
+            <TextBlock Classes="save-state" Theme="{StaticResource type-body}" Foreground="{DynamicResource block-ink}"
+                       VerticalAlignment="Center" Text="Cannot save"/>
+          </StackPanel>
+        </Panel>
+
+        <Button Classes="cf second" Width="84" IsEnabled="{Binding IsUnsaved}" Command="{Binding DiscardCommand}"
+                AutomationProperties.Name="Discard">
+          <TextBlock Theme="{StaticResource type-body-strong}" HorizontalAlignment="Center" Text="Discard"/>
+        </Button>
+        <Button Classes="cf main" Width="96" Command="{Binding SaveCommand}"
+                ToolTip.Tip="{Binding SaveTip}" ToolTip.ShowOnDisabled="True" AutomationProperties.Name="Save rule"
+                AutomationProperties.HelpText="{Binding SaveBlockerText}">
+          <TextBlock Theme="{StaticResource type-body-strong}" HorizontalAlignment="Center" Text="Save rule"/>
+        </Button>
+
+        <Panel>
+          <Button Name="MoreButton" Classes="cf quiet" Width="36" Padding="0" IsEnabled="{Binding IsSaved}" Command="{Binding OpenMoreCommand}"
+                  AutomationProperties.Name="{Binding MoreSpokenName}">
+            <parts:Icon Data="{StaticResource i-more}" Width="16" Height="16" StrokeThickness="2.4"
+                        Stroke="{Binding $parent[Button].Foreground}"/>
+          </Button>
+          <Popup IsOpen="{Binding IsMoreOpen, Mode=TwoWay}" PlacementTarget="{Binding #MoreButton}"
+                 Placement="BottomEdgeAlignedRight" VerticalOffset="6" IsLightDismissEnabled="True"
+                 ShouldUseOverlayLayer="True" PlacementConstraintAdjustment="SlideX, FlipY">
+            <Border Classes="picker" Width="220">
+              <StackPanel>
+              <Button Classes="pick" Command="{Binding DuplicateRuleCommand}" AutomationProperties.Name="Duplicate rule">
+                <StackPanel Orientation="Horizontal" Spacing="8">
+                  <parts:Icon Data="{StaticResource i-copy}" Width="14" Height="14" Stroke="{DynamicResource ink-2}"/>
+                  <TextBlock Theme="{StaticResource type-body}" Text="Duplicate rule"/>
+                </StackPanel>
+              </Button>
+              <Border Height="1" Margin="0,4" Background="{DynamicResource line}"/>
+              <Button Classes="pick" Command="{Binding RemoveRuleCommand}" AutomationProperties.Name="Remove rule">
+                <StackPanel Orientation="Horizontal" Spacing="8">
+                  <parts:Icon Data="{StaticResource i-bin}" Width="14" Height="14" Stroke="{DynamicResource block-ink}"/>
+                  <TextBlock Theme="{StaticResource type-body}" Foreground="{DynamicResource block-ink}" Text="Remove rule"/>
+                </StackPanel>
+              </Button>
+              </StackPanel>
+            </Border>
+          </Popup>
+        </Panel>
+      </StackPanel>
+    </Grid>
+  </Border>
+
+  <ScrollViewer Name="Scroller" Grid.Row="1" HorizontalScrollBarVisibility="Disabled" AllowAutoHide="False">
     <Border Name="Sheet" Classes="sheet">
       <StackPanel Classes="content" Name="SheetContent">
 
@@ -46,101 +190,40 @@
           </Grid>
         </Border>
 
-        <!-- The first row: the tag and the id at the left; at the right the switch with its word, the save state, Discard,
-             Save rule and the menu. When it does not fit, everything from the switch on takes the second line, at the right. -->
-        <Grid Name="FirstRow" ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto" MinHeight="36">
-          <StackPanel Name="LeftGroup" Orientation="Horizontal" Spacing="10" VerticalAlignment="Center">
-            <Button Classes="cf quiet back" Padding="8,0,12,0" Command="{Binding $parent[rules:RulesView].((rules:RulesViewModel)DataContext).BackCommand}"
-                    AutomationProperties.Name="Back to the rules">
-              <StackPanel Orientation="Horizontal" Spacing="8">
-                <parts:Icon Data="{StaticResource i-left}" Width="16" Height="16" Stroke="{Binding $parent[Button].Foreground}"/>
-                <TextBlock Theme="{StaticResource type-body-strong}" FontWeight="Medium" Text="Rules"/>
-              </StackPanel>
-            </Button>
-            <Border Height="24" CornerRadius="7" Padding="7,0,9,0" Background="{DynamicResource hover}" VerticalAlignment="Center">
-              <StackPanel Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
-                <parts:Icon Data="{StaticResource i-pen}" Width="12" Height="12" Stroke="{DynamicResource ink-2}"/>
-                <TextBlock Theme="{StaticResource type-label}" Foreground="{DynamicResource ink-2}" Text="Custom rule"/>
-              </StackPanel>
-            </Border>
-            <TextBlock Theme="{StaticResource code-strong}" VerticalAlignment="Center" Text="{Binding Id}"/>
-          </StackPanel>
-
-          <StackPanel Name="RightGroup" Grid.Column="1" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center"
-                      HorizontalAlignment="Right">
-            <StackPanel Orientation="Horizontal" Spacing="12" IsVisible="{Binding IsSaved}" Margin="0,0,4,0">
-              <TextBlock Theme="{StaticResource type-body}" FontWeight="Medium" Foreground="{DynamicResource ink-2}"
-                         VerticalAlignment="Center" Text="{Binding SwitchWord}"/>
-              <ToggleButton Classes="cfswitch" Focusable="True" IsChecked="{Binding IsOn, Mode=OneWay}" Command="{Binding ToggleSwitchCommand}"
-                            AutomationProperties.Name="{Binding SwitchSpokenName}"/>
-            </StackPanel>
-
-            <StackPanel Orientation="Horizontal" Spacing="8" IsVisible="{Binding IsDirty}"
-                        AutomationProperties.Name="{Binding SaveStateSpokenName}" AutomationProperties.LiveSetting="Polite">
-              <Ellipse Width="7" Height="7" Fill="{DynamicResource ink}" VerticalAlignment="Center"/>
-              <TextBlock Classes="save-state" Theme="{StaticResource type-body}" Foreground="{DynamicResource ink}"
-                         VerticalAlignment="Center" Text="Unsaved"/>
-            </StackPanel>
-            <StackPanel Orientation="Horizontal" Spacing="8" IsVisible="{Binding ShowsSaved}"
-                        AutomationProperties.Name="{Binding SaveStateSpokenName}" AutomationProperties.LiveSetting="Polite">
-              <parts:Icon Data="{StaticResource i-check}" Width="14" Height="14" Stroke="{DynamicResource req-ink}"
-                          VerticalAlignment="Center"/>
-              <TextBlock Classes="save-state" Theme="{StaticResource type-body}" Foreground="{DynamicResource ink-2}"
-                         VerticalAlignment="Center" Text="Saved"/>
-            </StackPanel>
-
-            <Button Classes="cf second" IsVisible="{Binding IsDirty}" Command="{Binding DiscardCommand}"
-                    AutomationProperties.Name="Discard">
-              <TextBlock Theme="{StaticResource type-body-strong}" Text="Discard"/>
-            </Button>
-            <Button Classes="cf main" IsVisible="{Binding IsDirty}" Command="{Binding SaveCommand}"
-                    ToolTip.Tip="{Binding SaveTip}" ToolTip.ShowOnDisabled="True" AutomationProperties.Name="Save rule">
-              <TextBlock Theme="{StaticResource type-body-strong}" Text="Save rule"/>
-            </Button>
-
-            <Panel IsVisible="{Binding IsSaved}">
-              <Button Name="MoreButton" Classes="cf quiet" Width="36" Padding="0" Command="{Binding OpenMoreCommand}"
-                      AutomationProperties.Name="{Binding MoreSpokenName}">
-                <parts:Icon Data="{StaticResource i-more}" Width="16" Height="16" StrokeThickness="2.4"
-                            Stroke="{Binding $parent[Button].Foreground}"/>
-              </Button>
-              <Popup IsOpen="{Binding IsMoreOpen, Mode=TwoWay}" PlacementTarget="{Binding #MoreButton}"
-                     Placement="BottomEdgeAlignedRight" VerticalOffset="6" IsLightDismissEnabled="True"
-                     ShouldUseOverlayLayer="True" PlacementConstraintAdjustment="SlideX, FlipY">
-                <Border Classes="picker" Width="220">
-                  <StackPanel>
-                  <Button Classes="pick" Command="{Binding DuplicateRuleCommand}" AutomationProperties.Name="Duplicate rule">
-                    <StackPanel Orientation="Horizontal" Spacing="8">
-                      <parts:Icon Data="{StaticResource i-copy}" Width="14" Height="14" Stroke="{DynamicResource ink-2}"/>
-                      <TextBlock Theme="{StaticResource type-body}" Text="Duplicate rule"/>
-                    </StackPanel>
-                  </Button>
-                  <Border Height="1" Margin="0,4" Background="{DynamicResource line}"/>
-                  <Button Classes="pick" Command="{Binding RemoveRuleCommand}" AutomationProperties.Name="Remove rule">
-                    <StackPanel Orientation="Horizontal" Spacing="8">
-                      <parts:Icon Data="{StaticResource i-bin}" Width="14" Height="14" Stroke="{DynamicResource block-ink}"/>
-                      <TextBlock Theme="{StaticResource type-body}" Foreground="{DynamicResource block-ink}" Text="Remove rule"/>
-                    </StackPanel>
-                  </Button>
-                  </StackPanel>
-                </Border>
-              </Popup>
-            </Panel>
-          </StackPanel>
-        </Grid>
-
         <!-- The title: a text box that looks like a heading, as wide as its text, and Rename beside it. -->
-        <StackPanel Orientation="Horizontal" Margin="-8,8,0,12">
+        <StackPanel Orientation="Horizontal" Margin="-8,8,0,0">
           <Border Classes="titlebox">
             <TextBox Name="TitleBox" Classes="bare" Text="{Binding Title, Mode=TwoWay}" PlaceholderText="Name the rule"
                      Height="NaN" MinHeight="0" FontSize="28" FontWeight="Bold" LetterSpacing="-0.7" TextWrapping="Wrap"
                      AutomationProperties.Name="Title of the rule"/>
           </Border>
-          <Button Classes="cf quiet small" Margin="6,8,0,0" VerticalAlignment="Center" Command="{Binding RenameCommand}"
+          <Button Classes="cf quiet small rename" Margin="6,8,0,0" VerticalAlignment="Center" Command="{Binding RenameCommand}"
                   ToolTip.Tip="Rename the rule (F2)" AutomationProperties.Name="Rename the rule">
-            <TextBlock Theme="{StaticResource type-meta}" FontWeight="Medium" Text="Rename"/>
+            <StackPanel Orientation="Horizontal" Spacing="6">
+              <parts:Icon Data="{StaticResource i-pen}" Width="13" Height="13" Stroke="{Binding $parent[Button].Foreground}"/>
+              <TextBlock Theme="{StaticResource type-meta}" FontWeight="Medium" Text="Rename"/>
+            </StackPanel>
           </Button>
         </StackPanel>
+
+        <!-- The line under the title: 20 high, one line, never empty; 2 below the title and 14 above the sentence. It says when the rule
+             was saved, what changed, or why it cannot be saved. -->
+        <Grid Name="HeadLine" ColumnDefinitions="Auto,*" ColumnSpacing="8" Height="20" Margin="0,2,0,14" ClipToBounds="True">
+          <Panel VerticalAlignment="Center">
+            <parts:Icon IsVisible="{Binding IsSavedState}" Data="{StaticResource i-file}" Width="14" Height="14" Stroke="{DynamicResource ink-3}"/>
+            <parts:Icon IsVisible="{Binding IsUnsavedState}" Data="{StaticResource i-pen}" Width="14" Height="14" Stroke="{DynamicResource ink-3}"/>
+            <parts:EffectMark IsVisible="{Binding IsCannotSaveState}" Kind="Block" Width="14" Height="14" Shape="{DynamicResource block}"
+                              Sign="{DynamicResource on-block}"/>
+          </Panel>
+          <TextBlock Classes="headline" Classes.bad="{Binding HeadLineIsBad}" Theme="{StaticResource type-body}" Foreground="{DynamicResource ink-2}"
+                     Grid.Column="1" IsVisible="{Binding !IsCannotSaveState}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" TextWrapping="NoWrap" Text="{Binding HeadLine}"/>
+          <!-- Why it cannot be saved is a link: the keyboard reaches it here and it goes to the field the reason is about. -->
+          <Button Name="BlockerLink" Grid.Column="1" Classes="cf quiet reasonlink" IsVisible="{Binding IsCannotSaveState}" Command="{Binding GoToBlockerCommand}"
+                  ToolTip.Tip="{Binding SaveBlocker}" AutomationProperties.Name="{Binding SaveBlocker}">
+            <TextBlock Classes="headline bad" Theme="{StaticResource type-body}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis"
+                       TextWrapping="NoWrap" Text="{Binding HeadLine}"/>
+          </Button>
+        </Grid>
 
         <!-- Sent here from another screen to be narrowed: where from, and the way back. It goes when the rule is saved or discarded. -->
         <Border IsVisible="{Binding HasOrigin}" Margin="0,4,0,16" Background="{DynamicResource side}" CornerRadius="12" Padding="14,8,8,8">
@@ -159,10 +242,10 @@
         </Border>
 
         <!-- The sentence: a panel of well; one grid for every clause, a label column of 90, 12, then the flow. -->
-        <Border Background="{DynamicResource well}" CornerRadius="16" Padding="24,16">
+        <Border Classes="sentence" Background="{DynamicResource well}" CornerRadius="16" Padding="24,16">
           <StackPanel Spacing="8">
 
-            <Grid ColumnDefinitions="90,12,*">
+            <Grid Classes="clause" ColumnDefinitions="90,12,*">
               <TextBlock Theme="{StaticResource type-sentence}" Foreground="{DynamicResource ink-2}"
                          HorizontalAlignment="Right" Text="For"/>
               <WrapPanel Grid.Column="2" ItemSpacing="8" LineSpacing="8">
@@ -178,7 +261,7 @@
                   </Button>
                   <Popup IsOpen="{Binding ArtifactPicker.IsOpen, Mode=TwoWay}" PlacementTarget="{Binding #ArtifactButton}"
                          Placement="BottomEdgeAlignedLeft" VerticalOffset="6" IsLightDismissEnabled="True"
-                         ShouldUseOverlayLayer="True" PlacementConstraintAdjustment="SlideX, FlipY">
+                         ShouldUseOverlayLayer="True" PlacementConstraintAdjustment="SlideX">
                     <local:PickerPanel DataContext="{Binding ArtifactPicker}"/>
                   </Popup>
                 </Panel>
@@ -195,20 +278,66 @@
                   </Button>
                   <Popup IsOpen="{Binding LanguagePicker.IsOpen, Mode=TwoWay}" PlacementTarget="{Binding #LanguageButton}"
                          Placement="BottomEdgeAlignedLeft" VerticalOffset="6" IsLightDismissEnabled="True"
-                         ShouldUseOverlayLayer="True" PlacementConstraintAdjustment="SlideX, FlipY">
+                         ShouldUseOverlayLayer="True" PlacementConstraintAdjustment="SlideX">
                     <local:PickerPanel DataContext="{Binding LanguagePicker}"/>
                   </Popup>
                 </Panel>
               </WrapPanel>
             </Grid>
 
-            <Grid ColumnDefinitions="90,12,*">
+            <!-- Where the rule applies: the label "within", then a path token for each pattern, "or" between them, then the add button;
+                 "every file" and the add button while there is none. -->
+            <Grid Classes="clause" ColumnDefinitions="90,12,*">
               <TextBlock Theme="{StaticResource type-sentence}" Foreground="{DynamicResource ink-2}"
-                         HorizontalAlignment="Right" Text="where"/>
-              <ItemsControl Grid.Column="2" ItemsSource="{Binding WhereFlow}">
+                         HorizontalAlignment="Right" Text="within"/>
+              <StackPanel Grid.Column="2" Spacing="8">
+              <ItemsControl ItemsSource="{Binding WithinFlow}" ClipToBounds="False">
                 <ItemsControl.ItemsPanel>
                   <ItemsPanelTemplate>
-                    <WrapPanel ItemSpacing="8" LineSpacing="8"/>
+                    <local:TokenFlow ItemSpacing="8" LineSpacing="8"/>
+                  </ItemsPanelTemplate>
+                </ItemsControl.ItemsPanel>
+                <ItemsControl.DataTemplates>
+
+                  <DataTemplate DataType="local:PathPieceViewModel" x:DataType="local:PathPieceViewModel">
+                    <local:PathPiece/>
+                  </DataTemplate>
+
+                  <DataTemplate DataType="local:EveryFileItem" x:DataType="local:EveryFileItem">
+                    <TextBlock Theme="{StaticResource type-sentence}" Foreground="{DynamicResource ink-2}" Text="every file"/>
+                  </DataTemplate>
+
+                  <DataTemplate DataType="local:AddPathItem" x:DataType="local:AddPathItem">
+                    <Button Classes="cf second" VerticalAlignment="Bottom" Padding="10,0,13,0" Command="{Binding AddCommand}" ToolTip.Tip="Add a path"
+                            AutomationProperties.Name="{Binding SpokenName}">
+                      <StackPanel Orientation="Horizontal" Spacing="6">
+                        <parts:Icon Data="{StaticResource i-plus}" Width="13" Height="13" StrokeThickness="1.8"
+                                    Stroke="{Binding $parent[Button].Foreground}"/>
+                        <TextBlock Theme="{StaticResource type-card}" Text="{Binding Text}"/>
+                      </StackPanel>
+                    </Button>
+                  </DataTemplate>
+
+                </ItemsControl.DataTemplates>
+              </ItemsControl>
+              <Grid IsVisible="{Binding HasWithinReason}" ColumnDefinitions="Auto,*" ColumnSpacing="8"
+                    AutomationProperties.Name="{Binding InvalidSpokenName}" AutomationProperties.LiveSetting="Polite">
+                <parts:EffectMark Kind="Block" Width="14" Height="14" Shape="{DynamicResource block}" Sign="{DynamicResource on-block}"
+                                  VerticalAlignment="Top" Margin="0,3,0,0"/>
+                <TextBlock Grid.Column="1" Theme="{StaticResource type-body}" Foreground="{DynamicResource block-ink}" TextWrapping="Wrap"
+                           Text="{Binding WithinReason}"/>
+              </Grid>
+              </StackPanel>
+            </Grid>
+
+            <Grid Classes="clause" ColumnDefinitions="90,12,*">
+              <TextBlock Theme="{StaticResource type-sentence}" Foreground="{DynamicResource ink-2}"
+                         HorizontalAlignment="Right" Text="where"/>
+              <StackPanel Grid.Column="2" Spacing="8">
+              <ItemsControl ItemsSource="{Binding WhereFlow}" ClipToBounds="False">
+                <ItemsControl.ItemsPanel>
+                  <ItemsPanelTemplate>
+                    <local:TokenFlow ItemSpacing="8" LineSpacing="8"/>
                   </ItemsPanelTemplate>
                 </ItemsControl.ItemsPanel>
                 <ItemsControl.DataTemplates>
@@ -218,7 +347,7 @@
                   </DataTemplate>
 
                   <DataTemplate DataType="local:AddConditionItem" x:DataType="local:AddConditionItem">
-                    <Button Classes="cf second" Padding="10,0,13,0" Command="{Binding AddCommand}" ToolTip.Tip="Add a condition"
+                    <Button Classes="cf second" VerticalAlignment="Bottom" Padding="10,0,13,0" Command="{Binding AddCommand}" ToolTip.Tip="Add a condition"
                             AutomationProperties.Name="Add a condition">
                       <StackPanel Orientation="Horizontal" Spacing="6">
                         <parts:Icon Data="{StaticResource i-plus}" Width="13" Height="13" StrokeThickness="1.8"
@@ -230,10 +359,18 @@
 
                 </ItemsControl.DataTemplates>
               </ItemsControl>
+              <Grid IsVisible="{Binding HasWhereReason}" ColumnDefinitions="Auto,*" ColumnSpacing="8"
+                    AutomationProperties.Name="{Binding InvalidSpokenName}" AutomationProperties.LiveSetting="Polite">
+                <parts:EffectMark Kind="Block" Width="14" Height="14" Shape="{DynamicResource block}" Sign="{DynamicResource on-block}"
+                                  VerticalAlignment="Top" Margin="0,3,0,0"/>
+                <TextBlock Grid.Column="1" Theme="{StaticResource type-body}" Foreground="{DynamicResource block-ink}" TextWrapping="Wrap"
+                           Text="{Binding WhereReason}"/>
+              </Grid>
+              </StackPanel>
             </Grid>
 
-            <Grid ColumnDefinitions="90,12,*">
-              <Panel HorizontalAlignment="Right" Margin="-8,0,-6,0">
+            <Grid Classes="clause" ColumnDefinitions="90,12,*">
+              <Panel HorizontalAlignment="Right" VerticalAlignment="Top" Margin="-8,0,-6,0">
                 <Button Name="KindButton" Classes="kw" Classes.open="{Binding KindPicker.IsOpen}" Command="{Binding OpenKindCommand}"
                         ToolTip.Tip="Require or forbid" AutomationProperties.Name="{Binding KindSpokenName}">
                   <StackPanel Orientation="Horizontal" Spacing="5">
@@ -244,33 +381,47 @@
                 </Button>
                 <Popup IsOpen="{Binding KindPicker.IsOpen, Mode=TwoWay}" PlacementTarget="{Binding #KindButton}"
                        Placement="BottomEdgeAlignedLeft" VerticalOffset="6" IsLightDismissEnabled="True"
-                       ShouldUseOverlayLayer="True" PlacementConstraintAdjustment="SlideX, FlipY">
+                       ShouldUseOverlayLayer="True" PlacementConstraintAdjustment="SlideX">
                   <local:PickerPanel DataContext="{Binding KindPicker}"/>
                 </Popup>
               </Panel>
-              <ItemsControl Grid.Column="2" ItemsSource="{Binding RequireFlow}" IsVisible="{Binding IsRequire}">
+              <StackPanel Grid.Column="2" Spacing="8">
+              <ItemsControl ItemsSource="{Binding RequireItems}" IsVisible="{Binding IsRequire}" ClipToBounds="False">
                 <ItemsControl.ItemsPanel>
                   <ItemsPanelTemplate>
-                    <WrapPanel ItemSpacing="8" LineSpacing="8"/>
+                    <local:TokenFlow ItemSpacing="8" LineSpacing="8"/>
                   </ItemsPanelTemplate>
                 </ItemsControl.ItemsPanel>
-                <ItemsControl.ItemTemplate>
+                <ItemsControl.DataTemplates>
+
                   <DataTemplate DataType="local:ConditionViewModel" x:DataType="local:ConditionViewModel">
                     <local:ConditionPiece/>
                   </DataTemplate>
-                </ItemsControl.ItemTemplate>
-              </ItemsControl>
-              <TextBlock Grid.Column="2" IsVisible="{Binding IsForbid}" Theme="{StaticResource type-sentence}"
-                         Foreground="{DynamicResource ink-2}" Text="any artifact that matches"/>
-            </Grid>
 
-            <!-- A condition whose property the artifact type does not have: the reason, 8 below the clauses. -->
-            <StackPanel IsVisible="{Binding HasInvalidCondition}" Orientation="Horizontal" Spacing="8" Margin="0,8,0,0">
-              <parts:EffectMark Kind="Block" Width="14" Height="14" Shape="{DynamicResource block}" Sign="{DynamicResource on-block}"
-                                VerticalAlignment="Center"/>
-              <TextBlock Theme="{StaticResource type-body}" Foreground="{DynamicResource block-ink}" TextWrapping="Wrap"
-                         Text="{Binding InvalidText}"/>
-            </StackPanel>
+                  <DataTemplate DataType="local:AddRequirementItem" x:DataType="local:AddRequirementItem">
+                    <Button Classes="cf second addrequirement" VerticalAlignment="Bottom" Padding="10,0,13,0" Command="{Binding AddCommand}" ToolTip.Tip="Add a requirement"
+                            AutomationProperties.Name="Add a requirement">
+                      <StackPanel Orientation="Horizontal" Spacing="6">
+                        <parts:Icon Data="{StaticResource i-plus}" Width="13" Height="13" StrokeThickness="1.8"
+                                    Stroke="{Binding $parent[Button].Foreground}"/>
+                        <TextBlock Theme="{StaticResource type-card}" Text="and"/>
+                      </StackPanel>
+                    </Button>
+                  </DataTemplate>
+
+                </ItemsControl.DataTemplates>
+              </ItemsControl>
+              <TextBlock IsVisible="{Binding IsForbid}" Theme="{StaticResource type-sentence}"
+                         Foreground="{DynamicResource ink-2}" Text="any artifact that matches"/>
+              <Grid IsVisible="{Binding HasRequireReason}" ColumnDefinitions="Auto,*" ColumnSpacing="8"
+                    AutomationProperties.Name="{Binding InvalidSpokenName}" AutomationProperties.LiveSetting="Polite">
+                <parts:EffectMark Kind="Block" Width="14" Height="14" Shape="{DynamicResource block}" Sign="{DynamicResource on-block}"
+                                  VerticalAlignment="Top" Margin="0,3,0,0"/>
+                <TextBlock Grid.Column="1" Theme="{StaticResource type-body}" Foreground="{DynamicResource block-ink}" TextWrapping="Wrap"
+                           Text="{Binding RequireReason}"/>
+              </Grid>
+              </StackPanel>
+            </Grid>
 
           </StackPanel>
         </Border>
@@ -293,11 +444,44 @@
           </parts:SegmentedList.ItemTemplate>
         </parts:SegmentedList>
 
+        <!-- What a finding says: the message and the reason, two text fields. What the developer reads is a section of its own, after
+             the choice of what then happens to the push. -->
+        <TextBlock Theme="{StaticResource type-h2}" Margin="0,20,0,10" Text="What a finding says"/>
+        <StackPanel Spacing="16">
+          <StackPanel Spacing="6">
+            <WrapPanel ItemSpacing="8">
+              <TextBlock Theme="{StaticResource type-body-strong}" Text="Message"/>
+              <TextBlock Theme="{StaticResource type-body}" Foreground="{DynamicResource ink-2}" VerticalAlignment="Center"
+                         Text="One sentence. Left empty, a finding says the title."/>
+            </WrapPanel>
+            <Border Classes="textfield">
+              <TextBox Name="MessageBox" Classes="bare" Text="{Binding Message, Mode=TwoWay}" PlaceholderText="{Binding MessagePlaceholder}"
+                       Height="NaN" TextWrapping="Wrap" AcceptsReturn="False" FontSize="14" MinHeight="22"
+                       AutomationProperties.Name="Message. Left empty, a finding says the title"/>
+            </Border>
+          </StackPanel>
+          <StackPanel Spacing="6">
+            <WrapPanel ItemSpacing="8">
+              <TextBlock Theme="{StaticResource type-body-strong}" Text="Why"/>
+              <TextBlock Theme="{StaticResource type-body}" Foreground="{DynamicResource ink-2}" VerticalAlignment="Center"
+                         Text="Shown under the message on an open finding."/>
+            </WrapPanel>
+            <Border Classes="textfield">
+              <TextBox Name="WhyBox" Classes="bare" VerticalContentAlignment="Top" Text="{Binding Why, Mode=TwoWay}"
+                       PlaceholderText="Why the team wants this, in a sentence or two."
+                       Height="NaN" TextWrapping="Wrap" AcceptsReturn="True" FontSize="14" MinHeight="62" MaxHeight="162" ScrollViewer.VerticalScrollBarVisibility="Auto"
+                       AutomationProperties.Name="Why. Shown under the message on an open finding"/>
+            </Border>
+          </StackPanel>
+        </StackPanel>
+
         <!-- Try it: the code box takes the height the page has left (the view fits it, see RulePageView.FitTryIt). -->
         <local:TryItView Name="TryIt" DataContext="{Binding TryIt}"/>
 
       </StackPanel>
     </Border>
   </ScrollViewer>
+
+  </Grid>
 
 </UserControl>

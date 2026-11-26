@@ -38,10 +38,12 @@ and to read a review.
 2. **Install the command line** for your user: run `commitfence install`. It records where the program is and puts its
    folder on your `PATH`.
 3. **Set a repository up:** in the repository, run `commitfence init`. It writes a `commitfence.json` with no rules and
-   prints the line to put first in the repository's `pre-push` hook (with husky, the file `.husky/pre-push`):
+   adds the review as the first command of a supported `pre-push` hook. For an unrecognised hook, it prints the path and
+   the line to add. Use `--hook pre-commit` for a build-free review of the staged files, or `--print` to preview both writes.
+   In the app, Rules can start the settings file and Doctor can preview and add the line to a supported existing hook.
 
    ```
-   "$(git config --get commitfence.path)" review --hook pre-push "$@" || exit $?
+   p="$(git config --get commitfence.path)"; [ -n "$p" ] && [ -f "$p" ] || { echo "CommitFence is not set up on this machine: run commitfence install from the folder you unpacked it to." >&2; exit 1; }; "$p" review --hook pre-push "$@" || exit $?
    ```
 4. **Add a rule** (below), then push. A push that breaks a rule that blocks is refused and says why.
 5. **The app:** start `commitfenceapp.exe` from a terminal in the repository's folder, or give it the folder as its
@@ -57,8 +59,9 @@ runs the rule on the code you type or paste and marks each place that breaks it,
 ![The Rules screen: four team rules in a list, and the page of the rule "No braces around a single-line if" with its sentence and the code it was tried on](docs/images/rules-screen.png)
 
 **Review.** What the push would send: the verdict, every finding under its file with the code around it, and the files
-of the push. A finding of a rule of `.editorconfig` can be fixed there: the SDK's formatter prepares the change, you see
-all of it, and "Apply fix" writes it.
+of the push, or of the staged changes before a commit. "Open at line" opens a finding's file at its line, and says so
+when the code on disk has moved. A finding of a rule of `.editorconfig` can be fixed there: the SDK's formatter
+prepares the change, you see all of it, and "Apply fix" writes it.
 
 ![The Review screen after a refused push: two findings block it and one only warns, with the code of the first finding](docs/images/review-screen.png)
 
@@ -81,7 +84,7 @@ with how to fix it.
 | Command | What it does |
 |---|---|
 | `commitfence install [--print] [--no-path]` | Sets the program up for your user |
-| `commitfence init` | Starts `commitfence.json` in a repository and prints the hook line |
+| `commitfence init [--hook pre-push\|pre-commit] [--print]` | Starts `commitfence.json` and adds the line to a supported hook. `--print` previews the changes. |
 | `commitfence doctor` | Checks whether pushes from this repository will be reviewed and explains how to fix failed checks |
 | `commitfence settings show`, `set strictness <quiet\|standard\|strict>` | Shows or changes what the severity words in `.editorconfig` do to a push |
 | `commitfence stats [--all]` | Shows local push reviews from the last 30 days, the rules they found and how long they took. Use `--all` to list every rule that never fired |
@@ -91,12 +94,12 @@ with how to fix it.
 | `commitfence rules list`, `show <id>` | Lists the rules, or shows one, including the rules `.editorconfig` sets |
 | `commitfence rules add`, `set`, `copy`, `remove` | Writes, changes, copies and removes a team rule |
 | `commitfence rules enable`, `disable`, `severity <id> block\|warn` | Switches a rule, or chooses whether it blocks or only warns |
-| `commitfence rules try <id> [<file>]` | Runs a rule on a file, or on standard input |
+| `commitfence rules try <id> [<file>]` | Runs a rule on a file, or on standard input if the rule does not read the file's name |
 | `commitfence review --push` | Reviews what a push of the current branch would send |
-| `commitfence review --staged` | Reviews what is staged |
-| `commitfence fix <rule> <file> [--apply]` | Previews an .editorconfig fix for the whole file, or applies it if the file still matches the reviewed version. Uses the pushed changes by default. Select a pushed ref with `--head`, or use `--staged`, `--base` / `--head`, or `--all`. |
+| `commitfence review --staged [--quick]` | Reviews what is staged. `--quick` skips the build and rules that depend on it. |
+| `commitfence fix <rule> <file> [--apply]` | Previews an .editorconfig fix for the whole file, or applies it if the file still matches the reviewed version. Uses the pushed changes by default. Select a local branch with `--head`, or use `--staged`, `--base` / `--head`, or `--all`. |
 | `commitfence review --base <revision> [--head <revision>]` | Reviews a range of commits |
-| `commitfence review --files <path>...` | Reviews the named files |
+| `commitfence review --files <path>... [--quick]` | Reviews the named files. `--quick` treats the rules requiring a build as intentionally omitted. |
 | `commitfence review --all [<folder or project file>]` | Reviews the whole of a folder, as of the last commit |
 | `commitfence review ... --format prompt` | Prints what was found as a prompt to hand to an AI coding agent, in place of the usual report |
 | `commitfence update [--check]` | Installs the newest release; `--check` only says whether there is one |
@@ -132,6 +135,12 @@ In `commitfence.json` it is:
     ]
 }
 ```
+
+A condition can also be a comparison: `atLeast`, `atMost` (both make a range), `not`, or `matches` with a wildcard
+pattern (`*`, `?`). For example, a method rule can set `"require": { "parameterCount": { "atLeast": 1, "atMost": 5 } }`.
+A rule can also be about a whole file (`"for": "file"`, with its `name` and `typesInFile`). A rule that uses these
+needs CommitFence 1.0.0.6 or newer, so saving it writes `"requires": "1.0.0.6"`: an older program then says the review
+is incomplete and asks to be updated.
 
 `commitfence catalog csharp` lists what a rule can be about (an if statement, a method, a use of an API, and more) and
 what it can look at in each. A rule can also forbid something altogether, apply only to some paths, and carry a message

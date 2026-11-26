@@ -3,6 +3,7 @@ using CF.Core.Code;
 using CF.Core.Findings;
 using CF.Core.Ports;
 using CF.Core.Rules;
+using CF.Core.Rules.Settings;
 
 namespace CF.Core.Review;
 
@@ -78,7 +79,7 @@ public sealed class ChangeSetReview
     /// </summary>
     private void ReviewTree(TreeUnderReview tree, ReviewRun run)
     {
-        var toolchainWork = _toolchains.FindWork(tree);
+        var toolchainWork = run.Quick ? [] : _toolchains.FindWork(tree);
         NoteFilesNotLookedAt(tree, toolchainWork, run);
         if(_settings.RefusesOlderProgram(tree.SettingsPath(), run))
         {
@@ -94,17 +95,36 @@ public sealed class ChangeSetReview
         var settings = _settings.Load(tree.SettingsPath(), toReview.Count > 0);
         try
         {
-            CollectFindings(tree, toReview, settings, toolchainWork, run);
+            if(run.Quick)
+                ReviewFiles(tree, toReview, settings, [], run);
+            else
+                CollectFindings(tree, toReview, settings, toolchainWork, run);
         }
         finally
         {
-            run.ApplyPolicies(settings?.Strictness ?? Strictness.Standard, finding => ReadExemptions(tree, finding, run));
+            run.ApplyPolicies(settings?.Strictness ?? Strictness.Standard, finding => ReadExemptions(tree, finding, run),
+                settings?.ActiveRules, () => ReadFileRules(tree, settings));
+        }
+    }
+
+    private List<FileRule> ReadFileRules(TreeUnderReview tree, RuleSettings? settings)
+    {
+        try
+        {
+            return new FileRules(_languages).List(SettingsFileName.PathIn(tree.Folder), settings?.Strictness)
+                .SelectMany(listing => listing.Rules).ToList();
+        }
+        catch(RuleChangeException)
+        {
+            // The build diagnostic can be reported without its rule's display metadata.
+            return [];
         }
     }
 
     private void CollectFindings(TreeUnderReview tree, IReadOnlyList<ChangedFile> toReview, RuleSettings? settings, IReadOnlyList<ToolchainWork> toolchainWork, ReviewRun run)
     {
-        var outcomes = _toolchains.Run(tree, toolchainWork);
+        var needsAllAssemblyNames = settings != null && !settings.Structure.IsEmpty && settings.Structure.Modules.Any(module => module.IsNamedByFolder);
+        var outcomes = _toolchains.Run(tree, toolchainWork, needsAllAssemblyNames);
         run.RanBuild |= outcomes.Exists(outcome => outcome.Result.RanBuild);
         var sources = ReviewFiles(tree, toReview, settings, ToolchainStage.ReadingsOf(outcomes), run);
         var answers = ToolchainStage.Record(outcomes, tree.ChangeSet, run);
@@ -153,7 +173,7 @@ public sealed class ChangeSetReview
         foreach(var file in toReview)
         {
             var readingsOfFile = readings.Where(reading => string.Equals(reading.Path, file.Path, StringComparison.Ordinal)).ToList();
-            var source = _fileReviewer.Review(new FileToReview(file.Path, Path.Combine(tree.Folder, file.Path)), settings.ActiveRules, run, file.ChangedLines, readingsOfFile);
+            var source = _fileReviewer.Review(new FileToReview(file.Path, Path.Combine(tree.Folder, file.Path)), settings.ActiveRules, run, file, readingsOfFile);
             if(source != null)
                 sources.Add(source);
         }

@@ -88,4 +88,9 @@ public sealed class SettingsFile
     {
         return _reader.Read(text);
     }
+
+    internal string? HigherFeatureVersion(RuleSettings settings)
+    {
+        return _reader.HigherFeatureVersion(settings);
+    }
 }

@@ -8,4 +8,8 @@ namespace CF.Core.Setup;
 /// <param name="Fix">Advice and actions for a failing check.</param>
 /// <param name="Impact">The consequence used to choose the verdict when the check fails.</param>
 /// <param name="SdkVersion">An SDK version found for the machine panel, if any.</param>
-public sealed record DoctorCheckResult(string Group, string Title, DoctorOutcome Outcome, DoctorText Found, DoctorFix? Fix = null, DoctorImpact Impact = DoctorImpact.Review, string? SdkVersion = null);
+public sealed record DoctorCheckResult(string Group, string Title, DoctorOutcome Outcome, DoctorText Found, DoctorFix? Fix = null, DoctorImpact Impact = DoctorImpact.Review, string? SdkVersion = null)
+{
+    /// <summary>The full path of the pre-push script the check found, if any.</summary>
+    public string? HookPath { get; init; }
+}

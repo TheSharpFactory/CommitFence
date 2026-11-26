@@ -23,6 +23,6 @@ internal static class SentenceWords
 
     public static string Value(IReadOnlyList<string> values)
     {
-        return string.Join(' ', values);
+        return string.Join(", ", values);
     }
 }

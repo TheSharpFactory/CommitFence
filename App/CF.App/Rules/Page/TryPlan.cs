@@ -8,7 +8,7 @@ internal sealed class TryPlan
 {
     private readonly Func<string, TryAnswer> _run;
 
-    public TryPlan(string key, Func<string, TryAnswer> run)
+    public TryPlan(object key, Func<string, TryAnswer> run)
     {
         Key = key;
         _run = run;
@@ -17,7 +17,7 @@ internal sealed class TryPlan
     /// <summary>
     /// Tells two plans of the same sentence apart from two of different sentences.
     /// </summary>
-    public string Key { get; }
+    public object Key { get; }
 
     public TryAnswer Run(string code)
     {

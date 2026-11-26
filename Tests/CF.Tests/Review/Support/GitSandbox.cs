@@ -251,21 +251,16 @@ internal sealed class SandboxRepository
     }
 
     /// <summary>
-    /// The team's hook: the line that init prints, as the first command of the pre-push hook, followed by a command that
+    /// The team's hook: the line installed by init, followed by a command that
     /// succeeds, so that a failure that is lost on the way shows as a push that goes through.
     /// </summary>
     public void InstallTeamHook()
     {
         var init = _sandbox.RunProgram(Folder, "init");
         Assert.True(init.ExitCode == 0, "init ended with " + init.ExitCode + ": " + init.Error);
-        var lines = init.Output.ReplaceLineEndings("\n").Split('\n');
-        var hookLine = lines[Array.FindIndex(lines, line => line.StartsWith("Add this line", StringComparison.Ordinal)) + 1];
-        Assert.Contains("review --hook pre-push", hookLine, StringComparison.Ordinal);
-
         var hook = Path.Combine(Folder, ".git", "hooks", "pre-push");
-        File.WriteAllText(hook, "#!/bin/sh\n" + hookLine + "\nexit 0\n");
-        if(!OperatingSystem.IsWindows())
-            File.SetUnixFileMode(hook, UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute);
+        Assert.StartsWith("#!/bin/sh\n" + CF.Core.Setup.HookLine.PrePush + "\n", File.ReadAllText(hook), StringComparison.Ordinal);
+        File.AppendAllText(hook, "exit 0\n");
     }
 
     /// <summary>

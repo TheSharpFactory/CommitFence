@@ -1,3 +1,4 @@
+using CF.Core.Findings;
 using CF.Core.Review;
 
 namespace CF.App.Review;
@@ -37,7 +38,7 @@ internal sealed class ReviewState
 
     public required ReviewResult? Result { get; init; }
 
-    public required Dictionary<string, RuleInfo> RuleInfos { get; init; }
+    public required Dictionary<Finding, RuleInfo> RuleInfos { get; init; }
 
     public required string ResultTarget { get; init; }
 

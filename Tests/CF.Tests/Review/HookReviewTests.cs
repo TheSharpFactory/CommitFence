@@ -1,3 +1,4 @@
+using CF.Core.Code;
 using CF.Core.Review;
 using CF.Tests.Review.Support;
 using Xunit;
@@ -10,6 +11,38 @@ namespace CF.Tests.Review;
 /// </summary>
 public sealed class HookReviewTests
 {
+    [Theory]
+    [InlineData("--staged")]
+    [InlineData("--hook")]
+    [InlineData("--files")]
+    public void QuickReviewReadsFilesAndLeavesTheBuildOut(string form)
+    {
+        using var harness = new ReviewHarness();
+        var toolchain = new FakeToolchain();
+        harness.Languages = new List<ILanguage> { new TestLanguage(toolchain) };
+        var contents = new Dictionary<string, string>
+        {
+            ["Example.cs"] = "internal class Example {}",
+            ["commitfence.json"] = ReviewSources.Settings(ReviewSources.Team010, ReviewSources.Team011)
+        };
+        harness.Fake.AddCommit("index", contents);
+        harness.Fake.StagedTree = FakeGit.TreeIdOf("index");
+        foreach(var (file, text) in contents)
+            File.WriteAllText(Path.Combine(harness.RepositoryFolder, file), text);
+
+        var result = form switch
+        {
+            "--hook" => harness.Run("review", form, "pre-commit", "--quick"),
+            "--files" => harness.Run("review", form, "Example.cs", "--quick"),
+            _ => harness.Run("review", form, "--quick")
+        };
+
+        Assert.Equal(ExitCode.Passed, result.ExitCode);
+        Assert.Contains("1 of 1 files reviewed", result.Output, StringComparison.Ordinal);
+        Assert.Contains("Quick review left out the build", result.Output, StringComparison.Ordinal);
+        Assert.Empty(toolchain.Requests);
+    }
+
     private const string _remoteName = "origin";
 
     private static readonly string[] _hookArguments = { "review", "--hook", "pre-push", _remoteName, "https://example.invalid/origin" };
@@ -44,6 +77,53 @@ public sealed class HookReviewTests
             if(change == "breach")
                 Assert.Contains($"src/Core.cs({ReviewSources.LineOf(after, "if(x > 0)")},", outcome.Text, StringComparison.Ordinal);
         }
+    }
+
+    [Fact]
+    public void PromptUsesEachTreesRuleAndSourceForTheSameFile()
+    {
+        using var harness = new ReviewHarness();
+        const string path = "src/Core.cs";
+        var firstRule = ReviewSources.Team010.Replace("No braces", "First rule: no braces", StringComparison.Ordinal);
+        var secondRule = ReviewSources.Team010.Replace("No braces", "Second rule: no braces", StringComparison.Ordinal);
+        var firstSource = ReviewSources.Class("Core", ReviewSources.SignBad.Replace("x > 0", "x > 1", StringComparison.Ordinal));
+        var secondSource = ReviewSources.Class("Core", ReviewSources.SignBad.Replace("x > 0", "x > 2", StringComparison.Ordinal));
+        harness.Fake.AddCommit("old", new Dictionary<string, string> { ["commitfence.json"] = ReviewSources.Settings(ReviewSources.Team010) });
+        harness.Fake.AddCommit("first", new Dictionary<string, string> { ["commitfence.json"] = ReviewSources.Settings(firstRule), [path] = firstSource }, "old");
+        harness.Fake.AddCommit("second", new Dictionary<string, string> { ["commitfence.json"] = ReviewSources.Settings(secondRule), [path] = secondSource }, "old");
+
+        var outcome = harness.RunWithInput([.. _hookArguments, "--format", "prompt"], PushLine("first", "old") + "\n" + PushLine("second", "old").Replace("refs/heads/main", "refs/heads/topic", StringComparison.Ordinal));
+
+        Assert.Equal(ExitCode.Blocked, outcome.ExitCode);
+        var blocks = outcome.Output.Split("2 of 2", StringSplitOptions.None);
+        Assert.Equal(2, blocks.Length);
+        Assert.Contains("TEAM010: First rule: no braces", blocks[0], StringComparison.Ordinal);
+        Assert.Contains("x > 1", blocks[0], StringComparison.Ordinal);
+        Assert.DoesNotContain("x > 2", blocks[0], StringComparison.Ordinal);
+        Assert.Contains("TEAM010: Second rule: no braces", blocks[1], StringComparison.Ordinal);
+        Assert.Contains("x > 2", blocks[1], StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void FindingsOfDifferentTreesAreKeptWhenTheirSourceOrRuleDiffers()
+    {
+        using var harness = new ReviewHarness();
+        const string path = "src/Core.cs";
+        var withMessage = ReviewSources.Team010.Replace("\"title\":", "\"message\": \"Remove the braces\", \"title\":", StringComparison.Ordinal);
+        var otherTitle = withMessage.Replace("No braces", "Braces are not allowed", StringComparison.Ordinal);
+        var firstSource = ReviewSources.Class("Core", ReviewSources.SignBad.Replace("x > 0", "x > 1", StringComparison.Ordinal));
+        var secondSource = ReviewSources.Class("Core", ReviewSources.SignBad.Replace("x > 0", "x > 2", StringComparison.Ordinal));
+        harness.Fake.AddCommit("old", new Dictionary<string, string> { ["commitfence.json"] = ReviewSources.Settings(withMessage) });
+        harness.Fake.AddCommit("first", new Dictionary<string, string> { ["commitfence.json"] = ReviewSources.Settings(withMessage), [path] = firstSource }, "old");
+        harness.Fake.AddCommit("second", new Dictionary<string, string> { ["commitfence.json"] = ReviewSources.Settings(withMessage), [path] = secondSource }, "old");
+        harness.Fake.AddCommit("third", new Dictionary<string, string> { ["commitfence.json"] = ReviewSources.Settings(otherTitle), [path] = firstSource }, "old");
+        var input = PushLine("first", "old") + "\n" + PushLine("second", "old").Replace("refs/heads/main", "refs/heads/topic", StringComparison.Ordinal)
+            + "\n" + PushLine("third", "old").Replace("refs/heads/main", "refs/heads/other", StringComparison.Ordinal);
+
+        var outcome = harness.RunWithInput([.. _hookArguments, "--format", "prompt"], input);
+
+        Assert.Equal(ExitCode.Blocked, outcome.ExitCode);
+        Assert.Contains("3 of 3", outcome.Output, StringComparison.Ordinal);
     }
 
     [Theory]

@@ -65,22 +65,26 @@ internal sealed partial class PickerPanel : UserControl
         {
             case Key.Up:
                 model.MoveHighlight(-1);
+                PickerHighlight.Reveal(this);
                 return true;
             case Key.Down:
                 model.MoveHighlight(1);
+                PickerHighlight.Reveal(this);
                 return true;
             case Key.Home when model.FindText.Length == 0:
                 model.MoveHighlight(int.MinValue);
+                PickerHighlight.Reveal(this);
                 return true;
             case Key.End when model.FindText.Length == 0:
                 model.MoveHighlight(int.MaxValue);
+                PickerHighlight.Reveal(this);
                 return true;
             case Key.Enter:
                 model.ChooseHighlighted();
                 GiveKeyboardBack();
                 return true;
             case Key.Escape:
-                model.Close();
+                model.Escape();
                 GiveKeyboardBack();
                 return true;
             default:

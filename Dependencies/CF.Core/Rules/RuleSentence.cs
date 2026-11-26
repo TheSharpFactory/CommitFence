@@ -11,10 +11,7 @@ public static class RuleSentence
     public static string Condition(RuleCondition condition)
     {
         var values = string.Join(", ", condition.ExpectedValues);
-        if(condition.Comparison == Comparison.IsOneOf)
-            return $"{condition.PropertyName} is one of {values}";
-
-        return $"{condition.PropertyName} is {values}";
+        return $"{condition.PropertyName} {ComparisonWords(condition.Comparison, condition.IsList)} {values}";
     }
 
     /// <summary>
@@ -35,10 +32,25 @@ public static class RuleSentence
         return string.Join(", ", parts) + ".";
     }
 
+    /// <summary>The words for a comparison in a rule sentence.</summary>
+    public static string ComparisonWords(Comparison comparison, bool isList = false)
+    {
+        return comparison switch
+        {
+            Comparison.IsOneOf => "is one of",
+            Comparison.IsNot => isList ? "is none of" : "is not",
+            Comparison.AtMost => "is at most",
+            Comparison.AtLeast => "is at least",
+            Comparison.Matches => "matches",
+            Comparison.Is => "is",
+            _ => "is"
+        };
+    }
+
     private static string Spoken(RuleCondition condition)
     {
         var values = string.Join(", ", condition.ExpectedValues);
-        var comparison = condition.Comparison == Comparison.IsOneOf ? "is one of" : "is";
+        var comparison = ComparisonWords(condition.Comparison, condition.IsList);
         return $"{RuleWords.Of(condition.PropertyName)} {comparison} {values}";
     }
 }

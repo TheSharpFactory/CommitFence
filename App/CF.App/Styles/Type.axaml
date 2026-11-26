@@ -5,6 +5,8 @@
        a font's own line gap is never relied on. No colour is set here: text takes the colour it stands in (the window's is ink).
        Inter comes from the package Avalonia.Fonts.Inter. Cascadia Mono is the code font; no font file is shipped,
        so the fallback list does the work on a machine without it. -->
+  <!-- The code face, for a Run inside a line of text: a Run cannot take a text style. -->
+  <FontFamily x:Key="code-font">Cascadia Mono, Consolas, Menlo, DejaVu Sans Mono, monospace</FontFamily>
   <ControlTheme x:Key="type-verdict" TargetType="TextBlock">
     <Setter Property="FontFamily" Value="avares://Avalonia.Fonts.Inter/Assets#Inter, Segoe UI, Helvetica Neue, sans-serif"/>
     <Setter Property="FontSize" Value="34"/>
@@ -150,6 +152,14 @@
     <Setter Property="FontSize" Value="13"/>
     <Setter Property="FontWeight" Value="SemiBold"/>
     <Setter Property="LineHeight" Value="20"/>
+    <Setter Property="LetterSpacing" Value="0"/>
+  </ControlTheme>
+
+  <ControlTheme x:Key="code-token" TargetType="TextBlock">
+    <Setter Property="FontFamily" Value="Cascadia Mono, Consolas, Menlo, DejaVu Sans Mono, monospace"/>
+    <Setter Property="FontSize" Value="18"/>
+    <Setter Property="FontWeight" Value="SemiBold"/>
+    <Setter Property="LineHeight" Value="36"/>
     <Setter Property="LetterSpacing" Value="0"/>
   </ControlTheme>
 

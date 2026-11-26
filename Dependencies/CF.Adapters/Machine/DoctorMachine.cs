@@ -8,8 +8,6 @@ namespace CF.Adapters.Machine;
 /// <summary>Reads executable paths and versions without starting a configured program. The running program's own version is given.</summary>
 public sealed class DoctorMachine(IFileSystem files, string ownVersion) : IDoctorMachine
 {
-    private const UnixFileMode _executeBits = UnixFileMode.UserExecute | UnixFileMode.GroupExecute | UnixFileMode.OtherExecute;
-
     /// <inheritdoc />
     public string ProgramPath { get; } = Path.Combine(AppContext.BaseDirectory, InstallLocation.CommandLineName + (OperatingSystem.IsWindows() ? ".exe" : string.Empty));
 
@@ -60,6 +58,6 @@ public sealed class DoctorMachine(IFileSystem files, string ownVersion) : IDocto
     /// <inheritdoc />
     public bool IsExecutable(string path)
     {
-        return files.FileExists(path) && (OperatingSystem.IsWindows() || (File.GetUnixFileMode(path) & _executeBits) != 0);
+        return files.IsExecutable(path);
     }
 }

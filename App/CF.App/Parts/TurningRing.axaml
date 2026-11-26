@@ -10,12 +10,27 @@
        control's width and height. -->
   <Viewbox Stretch="Uniform">
     <Panel Name="Turner" Width="14" Height="14" Classes="turn" RenderTransform="rotate(0deg)">
-      <Ellipse Name="Track" Width="12" Height="12" Stroke="{DynamicResource line-strong}" StrokeThickness="2"/>
-      <Path Name="Arc" Data="M7 1A6 6 0 0 1 13 7" Stroke="{DynamicResource ink-3}" StrokeThickness="2" StrokeLineCap="Round"/>
+      <Ellipse Name="Track" Width="12" Height="12" StrokeThickness="2"/>
+      <Path Name="Arc" Data="M7 1A6 6 0 0 1 13 7" StrokeThickness="2" StrokeLineCap="Round"/>
     </Panel>
   </Viewbox>
 
   <UserControl.Styles>
+    <Style Selector="Ellipse#Track">
+      <Setter Property="Stroke" Value="{DynamicResource line-strong}"/>
+    </Style>
+    <Style Selector="Path#Arc">
+      <Setter Property="Stroke" Value="{DynamicResource ink-3}"/>
+    </Style>
+    <Style Selector=":is(UserControl).button-ring Path#Arc">
+      <Setter Property="Stroke" Value="{DynamicResource ink}"/>
+    </Style>
+    <Style Selector=":is(UserControl).button-ring.on-solid Path#Arc">
+      <Setter Property="Stroke" Value="{DynamicResource on-solid}"/>
+    </Style>
+    <Style Selector=":is(UserControl).button-ring.on-solid Ellipse#Track">
+      <Setter Property="Stroke" Value="{DynamicResource ink-disabled}"/>
+    </Style>
     <Style Selector="Panel.turn">
       <Style.Animations>
         <Animation Duration="0:0:0.8" IterationCount="INFINITE" Easing="LinearEasing">

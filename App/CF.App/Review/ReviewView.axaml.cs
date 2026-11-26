@@ -31,6 +31,8 @@ internal sealed partial class ReviewView : UserControl
         SidePanel.PointerWheelChanged += OnPanelWheel;
         EmptyBlock.SizeChanged += (_, _) => PlaceEmptyBlock();
         EmptyBlockBody.SizeChanged += (_, _) => PlaceEmptyBlock();
+        StagedHead.SizeChanged += (_, _) => PlaceStatusSlot();
+        StagedActions.SizeChanged += (_, _) => PlaceStatusSlot();
         Rows.AddHandler(KeyDownEvent, OnFileKeyDown, RoutingStrategies.Bubble);
         AddHandler(KeyDownEvent, OnEscape, RoutingStrategies.Bubble);
     }
@@ -54,10 +56,31 @@ internal sealed partial class ReviewView : UserControl
     }
 
     /// <summary>
+    /// The finding whose header or body holds the keyboard.
+    /// </summary>
+    private static FindingViewModel? FindingOf(object? source)
+    {
+        for(var visual = source as Visual; visual != null; visual = visual.GetVisualParent())
+        {
+            if(visual is StyledElement { DataContext: FindingViewModel finding })
+                return finding;
+        }
+
+        return null;
+    }
+
+    /// <summary>
     /// Escape ends a rule chosen (and closes the picker first, when it is open).
     /// </summary>
     private void OnEscape(object? sender, KeyEventArgs e)
     {
+        if(e.Key == Key.O && e.KeyModifiers == KeyModifiers.Control && FindingOf(e.Source) is { } finding && finding.OpenSourceCommand.CanExecute(null))
+        {
+            finding.OpenSourceCommand.Execute(null);
+            e.Handled = true;
+            return;
+        }
+
         if(e.Key == Key.Escape && _model != null && _model.EscapePressed())
             e.Handled = true;
     }
@@ -71,11 +94,15 @@ internal sealed partial class ReviewView : UserControl
             _model.OpenFileRequested -= OnOpenFileRequested;
             _model.OpenLineRequested -= OnOpenLineRequested;
             _model.ChooseRequested -= OnChooseRequested;
+            _model.CheckedAgain -= OnCheckedAgain;
         }
 
         _model = DataContext as ReviewViewModel;
         if(_model != null)
+        {
             _model.Clipboard = new TopLevelClipboard(this);
+            _model.EditorName ??= Parts.SourceFileLauncher.FindEditorName();
+        }
 
         if(_model != null)
         {
@@ -84,6 +111,7 @@ internal sealed partial class ReviewView : UserControl
             _model.OpenFileRequested += OnOpenFileRequested;
             _model.OpenLineRequested += OnOpenLineRequested;
             _model.ChooseRequested += OnChooseRequested;
+            _model.CheckedAgain += OnCheckedAgain;
             _ = _model.RefreshAsync();
         }
 
@@ -250,12 +278,63 @@ internal sealed partial class ReviewView : UserControl
     }
 
     /// <summary>
+    /// "Check again" read the index again: the button that was pressed may be gone, so the keyboard goes to the action that leads now.
+    /// </summary>
+    private const double _stagedTile = 58;
+
+    private void OnCheckedAgain(VerdictKind kind)
+    {
+        var target = StagedCheckAgainButton;
+        if(kind == VerdictKind.StagedReady)
+            target = StagedRunButton;
+        else if(kind == VerdictKind.StagedUnreadable)
+            target = TryAgainButton;
+
+        // by the time the focus runs another lookup may have replaced the answer: the target is only taken while that answer still stands
+        Avalonia.Threading.Dispatcher.UIThread.Post(() =>
+        {
+            if(_model?.Verdict.Kind == kind)
+                target.Focus(NavigationMethod.Tab);
+        }, Avalonia.Threading.DispatcherPriority.Loaded);
+    }
+
+    /// <summary>
     /// Puts the keyboard on the run button, the first stop that is the screen's own.
     /// </summary>
     public void FocusRunButton()
     {
-        var button = RunButton.IsEffectivelyVisible ? RunButton : BlockRunButton;
+        var button = new[] { RunButton, BlockRunButton, StagedRunButton }.FirstOrDefault(candidate => candidate.IsEffectivelyVisible) ?? BlockRunButton;
         button.Focus(NavigationMethod.Tab);
+    }
+
+    /// <summary>
+    /// The slot that answers Check again stands in the title row, 200 wide, left of the buttons. When the title, the buttons and the slot
+    /// do not fit the row together, the slot takes its own row under the title, so that nothing is cut and nothing moves.
+    /// </summary>
+    private void PlaceStatusSlot()
+    {
+        if(!IsLoaded || StagedHead.Bounds.Width <= 0)
+            return;
+
+        StagedActions.Measure(Size.Infinity);
+        StagedTitle.Measure(Size.Infinity);
+        var slot = StatusSlot.IsVisible ? StatusSlot.Width + 8 : 0;
+        var buttons = StagedActions.DesiredSize.Width - (StatusSlot.Parent == StagedActions ? slot : 0);
+        var need = _stagedTile + StagedTitle.DesiredSize.Width + buttons + slot;
+        var inline = need <= StagedHead.Bounds.Width;
+        if(inline && StatusSlot.Parent != StagedActions)
+        {
+            StatusRow.Child = null;
+            StatusRow.IsVisible = false;
+            StagedActions.Children.Insert(0, StatusSlot);
+        }
+        else if(!inline && StatusSlot.Parent == StagedActions)
+        {
+            StagedActions.Children.Remove(StatusSlot);
+            StatusRow.Child = StatusSlot;
+            StatusSlot.HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Left;
+            StatusRow.IsVisible = true;
+        }
     }
 
     /// <summary>

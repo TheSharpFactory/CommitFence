@@ -7,60 +7,72 @@
              ClipToBounds="False"
              x:DataType="local:ConditionViewModel">
 
-  <!-- One condition of the sentence, one piece that never breaks: two tokens joined (the property, then the comparison and its
-       value), 2 apart, with the corners between them 3; the remove button, 4 after; then "and" when another condition
-       follows. The require clause draws the same piece with no remove button. -->
-  <StackPanel Orientation="Horizontal" Spacing="4" Height="36">
+  <!-- One condition of the sentence: the property token, then the comparison and its value 2 after it with the corners between them 3,
+       the remove button 8 after the comparison and "and" when another condition follows. A condition is one row: when it is wider
+       than the row, the value shortens (see ShortValueText and ConditionFlow). A refused token has the outline and the block mark at its
+       start. The require clause draws the same piece with no remove button. A range is one comparison: "is between 1 and 5". -->
+  <local:ConditionFlow>
 
-    <StackPanel Orientation="Horizontal" Spacing="2">
+    <Panel VerticalAlignment="Top">
+      <Button Name="PropertyButton" Classes="token start" VerticalAlignment="Top" Classes.where="{Binding IsWhereClause}"
+              Classes.req="{Binding !IsWhereClause}" Classes.empty="{Binding IsEmpty}"
+              Classes.invalid="{Binding PropertyIsRefused}" Classes.open="{Binding PropertyPicker.IsOpen}"
+              Command="{Binding ChoosePropertyCommand}" ToolTip.Tip="{Binding PropertyTip}"
+              AutomationProperties.Name="{Binding PropertySpokenName}">
+        <StackPanel Orientation="Horizontal" Spacing="6">
+          <parts:EffectMark IsVisible="{Binding PropertyIsRefused}" Kind="Block" Width="16" Height="16" Margin="-2,0,0,0"
+                            Shape="{DynamicResource block}" Sign="{DynamicResource on-block}" VerticalAlignment="Center"/>
+          <TextBlock Classes="word" Theme="{StaticResource type-token}" Text="{Binding PropertyWords}"/>
+          <parts:Icon Data="{StaticResource i-down}" Width="13" Height="13" StrokeThickness="1.8"
+                      Stroke="{Binding $parent[Button].Foreground}" VerticalAlignment="Center"/>
+        </StackPanel>
+      </Button>
+      <Popup IsOpen="{Binding PropertyPicker.IsOpen, Mode=TwoWay}" PlacementTarget="{Binding #PropertyButton}"
+             Placement="BottomEdgeAlignedLeft" VerticalOffset="6" IsLightDismissEnabled="True" ShouldUseOverlayLayer="True" PlacementConstraintAdjustment="SlideX">
+        <local:PickerPanel DataContext="{Binding PropertyPicker}"/>
+      </Popup>
+    </Panel>
 
-      <Panel>
-        <Button Name="PropertyButton" Classes="token start" Classes.where="{Binding IsWhereClause}"
-                Classes.req="{Binding !IsWhereClause}" Classes.empty="{Binding IsEmpty}"
-                Classes.invalid="{Binding IsInvalid}" Classes.open="{Binding PropertyPicker.IsOpen}"
-                Command="{Binding ChoosePropertyCommand}" ToolTip.Tip="{Binding PropertyTip}"
-                AutomationProperties.Name="{Binding PropertySpokenName}">
-          <StackPanel Orientation="Horizontal" Spacing="6">
-            <TextBlock Classes="word" Theme="{StaticResource type-token}" Text="{Binding PropertyWords}"/>
-            <parts:Icon Data="{StaticResource i-down}" Width="13" Height="13" StrokeThickness="1.8"
-                        Stroke="{Binding $parent[Button].Foreground}" VerticalAlignment="Center"/>
-          </StackPanel>
-        </Button>
-        <Popup IsOpen="{Binding PropertyPicker.IsOpen, Mode=TwoWay}" PlacementTarget="{Binding #PropertyButton}"
-               Placement="BottomEdgeAlignedLeft" VerticalOffset="6" IsLightDismissEnabled="True" ShouldUseOverlayLayer="True" PlacementConstraintAdjustment="SlideX, FlipY">
-          <local:PickerPanel DataContext="{Binding PropertyPicker}"/>
-        </Popup>
-      </Panel>
+    <!-- in the order they are seen, so the keys visit the comparison before its remove button -->
+    <Grid ColumnDefinitions="*,Auto,Auto">
 
-      <Panel IsVisible="{Binding IsNotEmpty}">
+      <Panel Grid.Column="0" IsVisible="{Binding IsNotEmpty}" VerticalAlignment="Top">
         <Button Name="ComparisonButton" Classes="token end comparison" Classes.where="{Binding IsWhereClause}"
-                Classes.req="{Binding !IsWhereClause}" Classes.invalid="{Binding IsInvalid}"
-                Classes.open="{Binding ComparisonPicker.IsOpen}" Command="{Binding ChooseComparisonCommand}"
-                ToolTip.Tip="Comparison and value" AutomationProperties.Name="{Binding ComparisonSpokenName}">
-          <StackPanel Orientation="Horizontal" Spacing="6">
-            <TextBlock Classes="comparison-word" Theme="{StaticResource type-token}" Text="{Binding ComparisonWord}"/>
-            <TextBlock Theme="{StaticResource type-token}" Text="{Binding ValueText}"/>
-            <parts:Icon Data="{StaticResource i-down}" Width="13" Height="13" StrokeThickness="1.8"
-                        Stroke="{Binding $parent[Button].Foreground}" VerticalAlignment="Center"/>
-          </StackPanel>
+                Classes.req="{Binding !IsWhereClause}" Classes.invalid="{Binding ComparisonIsRefused}"
+                Classes.open="{Binding ComparisonPicker.IsOpen}" IsEnabled="{Binding CanEditComparison}" Command="{Binding ChooseComparisonCommand}"
+                HorizontalAlignment="Left" ToolTip.Tip="Comparison and value" ToolTip.ShowDelay="500" ToolTip.Placement="Top" ToolTip.VerticalOffset="-8" local:TipPlacement.AvoidsHead="True" AutomationProperties.Name="{Binding ComparisonSpokenName}"
+                AutomationProperties.HelpText="{Binding ConflictReason}">
+          <DockPanel>
+            <parts:Icon DockPanel.Dock="Right" Data="{StaticResource i-down}" Width="13" Height="13" StrokeThickness="1.8"
+                        Stroke="{Binding $parent[Button].Foreground}" VerticalAlignment="Center" Margin="6,0,0,0"/>
+            <parts:EffectMark DockPanel.Dock="Left" IsVisible="{Binding ComparisonIsRefused}" Kind="Block" Width="16" Height="16" Margin="-2,0,8,0"
+                              Shape="{DynamicResource block}" Sign="{DynamicResource on-block}" VerticalAlignment="Center"/>
+            <local:WordsAndValues Margin="0,-1" IsVisible="{Binding IsNotRange}">
+              <TextBlock Theme="{StaticResource type-token}" FontWeight="Normal" VerticalAlignment="Top" Text="{Binding ComparisonWord}"/>
+              <local:ShortValueText Name="Value" VerticalAlignment="Top" Values="{Binding Values}" IsList="{Binding IsList}" IsCode="{Binding ValueIsCode}"/>
+            </local:WordsAndValues>
+            <TextBlock IsVisible="{Binding IsRange}" Theme="{StaticResource type-token}" TextWrapping="NoWrap" VerticalAlignment="Top" Margin="0,-1">
+              <Run FontWeight="Normal" Text="is between "/><Run Text="{Binding RangeLow}"/><Run FontWeight="Normal" Text=" and "/><Run Text="{Binding RangeHigh}"/>
+            </TextBlock>
+          </DockPanel>
         </Button>
         <Popup IsOpen="{Binding ComparisonPicker.IsOpen, Mode=TwoWay}" PlacementTarget="{Binding #ComparisonButton}"
-               Placement="BottomEdgeAlignedLeft" VerticalOffset="6" IsLightDismissEnabled="True" ShouldUseOverlayLayer="True" PlacementConstraintAdjustment="SlideX, FlipY">
+               Placement="BottomEdgeAlignedLeft" VerticalOffset="6" IsLightDismissEnabled="True" ShouldUseOverlayLayer="True" PlacementConstraintAdjustment="SlideX">
           <local:ComparisonPanel DataContext="{Binding ComparisonPicker}"/>
         </Popup>
       </Panel>
 
-    </StackPanel>
+      <Button Grid.Column="1" Classes="remove boxed" VerticalAlignment="Bottom" Margin="6,0,0,0" IsVisible="{Binding CanRemove}"
+              Command="{Binding RemoveCommand}" ToolTip.Tip="{Binding RemoveTip}" AutomationProperties.Name="{Binding RemoveSpokenName}">
+        <parts:Icon Data="{StaticResource i-x}" Width="16" Height="16" StrokeThickness="1.8"
+                    Stroke="{Binding $parent[Button].Foreground}"/>
+      </Button>
 
-    <Button Classes="remove" IsVisible="{Binding CanRemove}" Command="{Binding RemoveCommand}"
-            ToolTip.Tip="Remove this condition" AutomationProperties.Name="{Binding RemoveSpokenName}">
-      <parts:Icon Data="{StaticResource i-x}" Width="14" Height="14" StrokeThickness="1.8"
-                  Stroke="{Binding $parent[Button].Foreground}"/>
-    </Button>
+      <TextBlock Grid.Column="2" IsVisible="{Binding ShowsAnd}" Theme="{StaticResource type-sentence}" Foreground="{DynamicResource ink-2}"
+                 VerticalAlignment="Bottom" Margin="6,0,0,0" Text="and"/>
 
-    <TextBlock IsVisible="{Binding ShowsAnd}" Theme="{StaticResource type-sentence}" Foreground="{DynamicResource ink-2}"
-               VerticalAlignment="Center" Text="and"/>
+    </Grid>
 
-  </StackPanel>
+  </local:ConditionFlow>
 
 </UserControl>

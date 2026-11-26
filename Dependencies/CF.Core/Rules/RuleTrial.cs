@@ -55,6 +55,12 @@ internal static class RuleTrial
     private static string Describe(RuleCondition condition)
     {
         var values = string.Join(", ", condition.ExpectedValues);
-        return condition.Comparison == Comparison.IsOneOf ? "one of " + values : values;
+        return condition.Comparison switch
+        {
+            Comparison.Is => values,
+            Comparison.IsOneOf => "one of " + values,
+            Comparison.IsNot or Comparison.AtMost or Comparison.AtLeast or Comparison.Matches => "that " + RuleSentence.Condition(condition),
+            _ => values
+        };
     }
 }

@@ -4,7 +4,7 @@ using Avalonia.Controls;
 using Avalonia.Controls.Documents;
 using Avalonia.Media;
 using Avalonia.Styling;
-using CF.App.Doctor;
+using CF.App.Parts;
 using CF.Core.Ports;
 
 namespace CF.App.Architecture;

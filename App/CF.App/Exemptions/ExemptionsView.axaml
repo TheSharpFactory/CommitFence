@@ -283,7 +283,7 @@
                       <parts:Icon Grid.Column="1" Data="{StaticResource i-file}" Width="16" Height="16" Stroke="{DynamicResource ink-3}"
                                   VerticalAlignment="Top" Margin="0,2,0,0"/>
                       <TextBlock Grid.Column="2" Theme="{StaticResource code}" TextWrapping="Wrap" VerticalAlignment="Center">
-                        <Run Foreground="{DynamicResource ink-2}" Text="{Binding Folders}"/><Run FontWeight="SemiBold" Foreground="{DynamicResource ink}" Text="{Binding Name}"/>
+                        <Run Foreground="{DynamicResource ink-2}" Text="{Binding Folders, Converter={x:Static parts:PathBreaks.Display}}"/><Run FontWeight="SemiBold" Foreground="{DynamicResource ink}" Text="{Binding Name, Converter={x:Static parts:PathBreaks.Display}}"/>
                       </TextBlock>
                       <StackPanel Grid.Column="3" Orientation="Horizontal" Spacing="16" VerticalAlignment="Center">
                         <StackPanel IsVisible="{Binding HasFindings}" Orientation="Horizontal" Spacing="5">

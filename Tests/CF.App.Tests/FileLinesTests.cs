@@ -37,4 +37,24 @@ public sealed class FileLinesTests
         Assert.Equal(rows[0].Line.Replace(" ", string.Empty, StringComparison.Ordinal), string.Concat(wrapped).Replace(" ", string.Empty, StringComparison.Ordinal));
         Assert.Equal("}", string.Concat((rows[1].Inlines ?? []).Select(inline => ((Run)inline).Text)));
     }
+
+    [AvaloniaFact]
+    public void AnOversizedCodeTokenWrapsBeforeThePreviewEdge()
+    {
+        var token = string.Concat(Enumerable.Repeat("long-path-segment-", 8)) + "end";
+        var lines = new FileLines
+        {
+            ItemsSource = new List<FileLineViewModel> { new FileLineViewModel { Number = 1, Text = token, IsPresent = true } },
+            NumberWidth = 44,
+            NumberGap = 14
+        };
+        using var host = new ViewHost(lines, 320, 300);
+        var row = Assert.Single(host.FindAll<HangingText>(_ => true));
+        var text = string.Concat((row.Inlines ?? []).Select(inline => inline is Run run ? run.Text : "\n"));
+
+        Assert.Contains('\n', text);
+        Assert.All(row.TextLayout.TextLines, line => Assert.True(line.Width <= row.Bounds.Width));
+        Assert.Equal(token, string.Concat(text.Split('\n').Select(part => part.TrimStart())));
+        Assert.Equal(token, row.Line);
+    }
 }

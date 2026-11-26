@@ -1,6 +1,7 @@
 using System.Collections.ObjectModel;
 using System.Globalization;
 using System.Runtime.CompilerServices;
+using CF.App.Rules.Page;
 using CF.Core.Changes;
 using CF.Core.Findings;
 using CF.Core.Fixes;
@@ -28,6 +29,9 @@ internal sealed partial class ReviewViewModel : ObservableObject
     private const int _reasonsFirst = 5;
     private const int _cleanPushFilesListed = 20;
     private const double _secondsWithDecimal = 10;
+    private const int _shortCommit = 7;
+    private const string _stagedNothingBlocks = "No blocking findings in the staged changes";
+    private const int _mostStagedFilesListed = 8;
     private const string _noFolderYet = "No folder reviewed yet";
     private const string _noFolderLead = "It is read as the last commit holds it, old findings included.";
 
@@ -38,23 +42,32 @@ internal sealed partial class ReviewViewModel : ObservableObject
     private readonly IReviewService _review;
     private readonly ReviewFixQueue? _fixes;
     private readonly ConditionalWeakTable<ReviewResult, ReviewFixSession> _fixSessions = new();
-    private readonly IRuleService _rules;
     private readonly IClock _clock;
     private readonly OpenedFolder _folder;
     private readonly Action<string> _showRule;
     private readonly List<string> _recent = new List<string>();
     private ReviewState? _changesState;
     private ReviewState? _folderState;
+    private ReviewState? _stagedState;
+    private string _stagedTreeAtRun = string.Empty;
+    private string _stagedBaseAtRun = string.Empty;
+    private string _stagedCommit = string.Empty;
+    private string _folderCommit = string.Empty;
+    private string _pushCommit = string.Empty;
     private ReviewResult? _result;
-    private Dictionary<string, RuleInfo> _ruleInfos = new Dictionary<string, RuleInfo>(StringComparer.Ordinal);
+    private Dictionary<Finding, RuleInfo> _ruleInfos = new Dictionary<Finding, RuleInfo>();
     private string _resultTarget = string.Empty;
     private string _resultLabel = string.Empty;
     private bool _startsOpen;
     private bool _running;
+    private bool _busyInEmptyBlock;
     private int _generation;
 
+    private bool BusyRunIsMain { get; set; }
+
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(ShowsEmptyBlock), nameof(ShowsRulesLine), nameof(ShowsBarRun), nameof(RunIsMain), nameof(RunIsSecond), nameof(CanCopyAll))]
+    [NotifyPropertyChangedFor(nameof(ShowsEmptyBlock), nameof(ShowsResultEmpty), nameof(ShowsHeroEmpty), nameof(ShowsRulesLine), nameof(ShowsReadyRules), nameof(ShowsBarRun), nameof(ShowsBlockRun), nameof(RunIsMain), nameof(RunIsSecond), nameof(CanCopyAll))]
+    [NotifyCanExecuteChangedFor(nameof(RunFromButtonCommand), nameof(RunCommand))]
     public partial VerdictViewModel Verdict { get; set; }
 
     private int _fixedFindings;
@@ -79,8 +92,16 @@ internal sealed partial class ReviewViewModel : ObservableObject
         }
     }
 
+    /// <summary>
+    /// The staged files are not the ones the review of the staged changes read: the run button says "Review now" and a line says so.
+    /// </summary>
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(RunText), nameof(CanRun), nameof(RunShowsIcon))]
+    [NotifyPropertyChangedFor(nameof(ResultMatches), nameof(RunText), nameof(RunName), nameof(RunIsMain), nameof(RunIsSecond), nameof(RunShowsIcon), nameof(ShowsStagedChanged))]
+    public partial bool StagedChanged { get; set; }
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(RunText), nameof(RunName), nameof(CanRun), nameof(RunShowsIcon), nameof(RunIsMain), nameof(RunIsSecond), nameof(ShowsEmptyBlock), nameof(ShowsResultEmpty), nameof(ShowsHeroEmpty), nameof(ShowsBarRun), nameof(ShowsBlockRun))]
+    [NotifyCanExecuteChangedFor(nameof(RunFromButtonCommand))]
     public partial bool IsBusy { get; set; }
 
     [ObservableProperty]
@@ -88,7 +109,7 @@ internal sealed partial class ReviewViewModel : ObservableObject
     public partial bool HasResult { get; set; }
 
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(HasBanner), nameof(ShowsEmptyBlock), nameof(ShowsRulesLine), nameof(ShowsBarRun))]
+    [NotifyPropertyChangedFor(nameof(HasBanner), nameof(ShowsEmptyBlock), nameof(ShowsResultEmpty), nameof(ShowsHeroEmpty), nameof(ShowsRulesLine), nameof(ShowsBarRun))]
     public partial string? BannerText { get; set; }
 
     [ObservableProperty]
@@ -119,7 +140,7 @@ internal sealed partial class ReviewViewModel : ObservableObject
     /// What a push would meet in numbers: the rules that are on, as the filter of Rules counts them. Not set while the rules are not read.
     /// </summary>
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(HasRulesLine), nameof(ShowsRulesLine), nameof(RulesBlockText), nameof(RulesWarnText), nameof(HasRulesBlock), nameof(HasRulesWarn), nameof(HasNoRuleOn))]
+    [NotifyPropertyChangedFor(nameof(HasRulesLine), nameof(ShowsRulesLine), nameof(RulesBlockText), nameof(RulesWarnText), nameof(HasRulesBlock), nameof(HasRulesWarn), nameof(HasNoRuleOn), nameof(ShowsReadyRules), nameof(ReadyRulesText))]
     public partial RulesOn? RulesCounts { get; set; }
 
     [ObservableProperty]
@@ -156,7 +177,7 @@ internal sealed partial class ReviewViewModel : ObservableObject
     public partial bool PanelShown { get; set; }
 
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(IsFolderChosen), nameof(HasPanel), nameof(HasRulePanel), nameof(RunText), nameof(RunIsMain), nameof(RunIsSecond), nameof(RunShowsIcon))]
+    [NotifyPropertyChangedFor(nameof(IsFolderChosen), nameof(HasPanel), nameof(HasRulePanel), nameof(RunText), nameof(RunName), nameof(RunIsMain), nameof(RunIsSecond), nameof(RunShowsIcon))]
     public partial ReviewChoiceViewModel SelectedChoice { get; set; }
 
     [ObservableProperty]
@@ -189,11 +210,10 @@ internal sealed partial class ReviewViewModel : ObservableObject
     [ObservableProperty]
     public partial IReadOnlyList<FolderPickerEntryViewModel> PickerEntries { get; set; } = new List<FolderPickerEntryViewModel>();
 
-    public ReviewViewModel(IReviewService review, IRuleService rules, IClock clock, OpenedFolder folder, Action<string> showRule, IFixService? fixes = null)
+    public ReviewViewModel(IReviewService review, IClock clock, OpenedFolder folder, Action<string> showRule, IFixService? fixes = null)
     {
         _review = review;
         _fixes = fixes == null ? null : new ReviewFixQueue(fixes);
-        _rules = rules;
         _clock = clock;
         _folder = folder;
         _showRule = showRule;
@@ -204,7 +224,8 @@ internal sealed partial class ReviewViewModel : ObservableObject
         Items.Add(_tail);
         Choices = new List<ReviewChoiceViewModel>
         {
-            new ReviewChoiceViewModel("The changes", "branch", true),
+            new ReviewChoiceViewModel("The push", "branch", true),
+            new ReviewChoiceViewModel("Staged changes", "staged", true),
             new ReviewChoiceViewModel("A folder", "folder", true)
         };
         SelectedChoice = Choices[0];
@@ -259,13 +280,14 @@ internal sealed partial class ReviewViewModel : ObservableObject
     public CopyButtonViewModel CopyAll { get; }
 
     /// <summary>
-    /// Whether the review as shown has findings to hand over.
+    /// Whether the review as shown has findings or coverage problems to hand over.
     /// </summary>
     public bool CanCopyAll
     {
         get
         {
-            return HasResult && FindingsShown().Count > 0;
+            return HasResult && _result != null && (FindingsShown().Count > 0 || _result.Outcome == ReviewOutcome.Incomplete
+                || _result.Coverage.Any(entry => entry.Status != CoverageStatus.Reviewed));
         }
     }
 
@@ -275,15 +297,33 @@ internal sealed partial class ReviewViewModel : ObservableObject
     {
         get
         {
+            return ReferenceEquals(SelectedChoice, Choices[2]);
+        }
+    }
+
+    public bool IsStagedChosen
+    {
+        get
+        {
             return ReferenceEquals(SelectedChoice, Choices[1]);
         }
+    }
+
+    /// <summary>
+    /// The editor that opens a file at a line, when the window found one: the words of the button on a finding's code.
+    /// </summary>
+    public string? EditorName { get; set; }
+
+    public bool ShowsStagedChanged
+    {
+        get { return IsStagedChosen && StagedChanged && HasResult; }
     }
 
     public bool CanRun
     {
         get
         {
-            return !IsBusy && _folder.InsideRepository;
+            return !IsBusy && _folder.InsideRepository && Verdict.Kind != VerdictKind.NothingStaged;
         }
     }
 
@@ -294,7 +334,7 @@ internal sealed partial class ReviewViewModel : ObservableObject
     {
         get
         {
-            return HasResult && (!IsFolderChosen || string.Equals(_resultTarget, FolderPath, StringComparison.Ordinal));
+            return HasResult && !(IsStagedChosen && StagedChanged) && (!IsFolderChosen || string.Equals(_resultTarget, FolderPath, StringComparison.Ordinal));
         }
     }
 
@@ -308,6 +348,8 @@ internal sealed partial class ReviewViewModel : ObservableObject
             return ResultMatches ? "Review again" : "Review now";
         }
     }
+
+    public string RunName { get { return IsBusy ? "Reviewing, busy" : RunText; } }
 
     /// <summary>
     /// "Review now" keeps its shield; "Review again", the second button, has its words alone.
@@ -327,7 +369,7 @@ internal sealed partial class ReviewViewModel : ObservableObject
     {
         get
         {
-            return !ResultMatches || Verdict.IsIncomplete;
+            return IsBusy ? BusyRunIsMain : !ResultMatches || Verdict.IsIncomplete;
         }
     }
 
@@ -346,7 +388,8 @@ internal sealed partial class ReviewViewModel : ObservableObject
     {
         get
         {
-            return Verdict.Kind is VerdictKind.NoReview or VerdictKind.NoPush or VerdictKind.NoRepository && !HasBanner;
+            return IsBusy && _busyInEmptyBlock
+                || Verdict.Kind is VerdictKind.NoReview or VerdictKind.NoPush or VerdictKind.NoRepository or VerdictKind.StagedReady or VerdictKind.StagedUnreadable or VerdictKind.NothingStaged && !HasBanner;
         }
     }
 
@@ -357,9 +400,13 @@ internal sealed partial class ReviewViewModel : ObservableObject
     {
         get
         {
-            return !(ShowsEmptyBlock && Verdict.Kind == VerdictKind.NoReview);
+            return !(IsBusy && _busyInEmptyBlock)
+                && !(ShowsEmptyBlock && Verdict.Kind is VerdictKind.NoReview or VerdictKind.StagedReady or VerdictKind.NothingStaged)
+                && !Verdict.ShowsTryAgain;
         }
     }
+
+    public bool ShowsBlockRun { get { return Verdict.HasButton || (IsBusy && _busyInEmptyBlock); } }
 
     public bool HasReasons
     {
@@ -416,8 +463,48 @@ internal sealed partial class ReviewViewModel : ObservableObject
     {
         get
         {
-            return ShowsEmptyBlock && Verdict.Kind == VerdictKind.NoReview && RulesCounts != null;
+            return ShowsEmptyBlock && Verdict.Kind is VerdictKind.NoReview && RulesCounts != null;
         }
+    }
+
+    /// <summary>
+    /// The rules line of the head of a staged result before a review, neutral: how many rules are on and how they act on a push.
+    /// </summary>
+    public bool ShowsReadyRules
+    {
+        get { return Verdict.Kind == VerdictKind.StagedReady && RulesCounts != null; }
+    }
+
+    public string ReadyRulesText
+    {
+        get
+        {
+            if(RulesCounts == null || (RulesCounts.Blocks == 0 && RulesCounts.Warns == 0))
+                return "No rule is on";
+
+            var total = RulesCounts.Blocks + RulesCounts.Warns;
+            var parts = new List<string>();
+            if(RulesCounts.Blocks > 0)
+                parts.Add(RulesCounts.Blocks == 1 ? "1 blocks a push" : $"{RulesCounts.Blocks} block a push");
+
+            if(RulesCounts.Warns > 0)
+                parts.Add(RulesCounts.Warns == 1 ? "1 only warns" : $"{RulesCounts.Warns} only warn");
+
+            return $"{total} {(total == 1 ? "rule" : "rules")} on: {string.Join(", ", parts)}";
+        }
+    }
+
+    /// <summary>
+    /// A state before a review of the staged changes takes the head of a result in the main column; the others take the block in the middle.
+    /// </summary>
+    public bool ShowsResultEmpty
+    {
+        get { return ShowsEmptyBlock && Verdict.ShowsResultHead; }
+    }
+
+    public bool ShowsHeroEmpty
+    {
+        get { return ShowsEmptyBlock && !Verdict.ShowsResultHead; }
     }
 
     public bool HasRulesLine
@@ -610,19 +697,168 @@ internal sealed partial class ReviewViewModel : ObservableObject
     /// </summary>
     public async Task RefreshAsync()
     {
-        if(_running || IsFolderChosen || HasResult || !_folder.InsideRepository)
-            return;
+        CheckNote = string.Empty;
+        await LookAgainAsync();
+    }
+
+    /// <summary>
+    /// Does what RefreshAsync says and answers what kind of verdict this lookup put on the screen, or nothing when it put none (it
+    /// was superseded by another lookup, or there was nothing to change).
+    /// </summary>
+    private async Task<VerdictKind?> LookAgainAsync()
+    {
+        if(_running || IsFolderChosen || !_folder.InsideRepository)
+            return null;
+
+        if(IsStagedChosen)
+            return await RefreshStagedAsync();
+
+        if(HasResult)
+            return null;
 
         var generation = ++_generation;
         var answer = await Task.Run(() => _review.FindPushScope(_folder.FolderPath));
-        if(generation == _generation && !_running && !IsFolderChosen && !HasResult)
-            Verdict = answer.HasPush ? Starting() : NoPush(answer);
+        if(generation != _generation || _running || IsFolderChosen || HasResult)
+            return null;
+
+        Verdict = answer.HasPush ? Starting() : NoPush(answer);
+        return Verdict.Kind;
     }
 
-    /// <summary>Whether one of the two saved review results contains this judgment.</summary>
+    /// <summary>
+    /// Looks at the index while the staged changes are chosen: before a review it says how many files are staged, or that nothing is;
+    /// after one it notices that the staged files are not the ones the review read.
+    /// </summary>
+    private async Task<VerdictKind?> RefreshStagedAsync()
+    {
+        var generation = ++_generation;
+        var answer = await Task.Run(() => _review.FindStaged(_folder.FolderPath));
+        if(generation != _generation || _running || !IsStagedChosen)
+            return null;
+
+        if(HasResult)
+        {
+            StagedChanged = answer.Reason.Length == 0 && (answer.IndexTree != _stagedTreeAtRun || answer.BaseTree != _stagedBaseAtRun);
+            return null;
+        }
+
+        Verdict = StagedBlank(answer);
+        return Verdict.Kind;
+    }
+
+    private static VerdictViewModel StagedBlank(StagedAnswer answer)
+    {
+        if(answer.Reason.Length > 0)
+        {
+            return new VerdictViewModel(VerdictKind.StagedUnreadable, "Staged changes cannot be read", string.Empty, new List<CountPieceViewModel>(), new List<FactViewModel>())
+            {
+                ShowsTryAgain = true,
+                ProblemFirst = answer.Reason.TrimEnd().EndsWith('.') ? answer.Reason.TrimEnd() : answer.Reason.TrimEnd() + ".",
+                ProblemRest = "Try again; if it fails again, Doctor checks git on this machine."
+            };
+        }
+
+        var commitFact = answer.HasCommit ? new FactViewModel("commit", "On top of commit ", answer.HeadCommit) : new FactViewModel("commit", "For the first commit");
+        if(answer.NothingStaged)
+        {
+            var none = answer.HasCommit ? "No file has changed since the last commit." : "No changes are staged for the first commit.";
+            var content = answer.UnstagedCount == 0 ? none : answer.UnstagedCount == 1 ? "1 file changed, none staged" : $"{answer.UnstagedCount} files changed, none staged";
+            var rows = answer.UnstagedFiles.Select(file => new ListedFile(new PathFileLine(file.Path), file.IsNew ? "new" : "changed")).ToList();
+            var more = answer.UnstagedCount - rows.Count;
+            return new VerdictViewModel(VerdictKind.NothingStaged, "Nothing is staged", "Stage files with git add and they show here, to review before you commit.", new List<CountPieceViewModel>(),
+                new List<FactViewModel> { new FactViewModel("commit", commitFact.Text, commitFact.Code), new FactViewModel("file", content) })
+            {
+                LeadCode = "git add",
+                ContentLine = content,
+                FileRows = rows,
+                FileListHeading = rows.Count > 0 ? $"{answer.UnstagedCount} changed, none staged" : string.Empty,
+                MoreFiles = more > 0 ? $"and {more} more" : string.Empty
+            };
+        }
+
+        var count = answer.Staged.Count;
+        var sizes = answer.Sizes.ToDictionary(size => size.Path, size => size.Lines, StringComparer.Ordinal);
+        var knowsLines = sizes.Count == count;
+        var total = sizes.Values.Sum();
+        var files = count == 1 ? "1 file" : $"{count} files";
+        var filesFact = knowsLines ? $"{files}, {total} {(total == 1 ? "line" : "lines")}" : files;
+        var listed = answer.Staged.Take(_mostStagedFilesListed).Select(path => new ListedFile(new PathFileLine(path), sizes.TryGetValue(path, out var lines) ? $"{lines} {(lines == 1 ? "line" : "lines")}" : string.Empty)).ToList();
+        return new VerdictViewModel(VerdictKind.StagedReady, count == 1 ? "1 file staged" : $"{count} files staged", "Not reviewed yet. Review them to see what the next commit would meet.", new List<CountPieceViewModel>(),
+            new List<FactViewModel> { commitFact, new FactViewModel("file", filesFact) })
+        {
+            StagedFiles = answer.Staged.Take(_mostStagedFilesListed).Select(path => new PathFileLine(path)).ToList(),
+            FileRows = listed,
+            FileListHeading = $"{count} staged, not reviewed",
+            MoreFiles = count > _mostStagedFilesListed ? $"and {count - _mostStagedFilesListed} more" : string.Empty
+        };
+    }
+
+    /// <summary>
+    /// What "Check again" found when the index is still empty: said once to a screen reader, and shown beside the button. Empty at
+    /// every other time: any ordinary refresh and any change of scope clears it.
+    /// </summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasCheckNote))]
+    public partial string CheckNote { get; set; } = string.Empty;
+
+    public bool HasCheckNote
+    {
+        get { return CheckNote.Length > 0; }
+    }
+
+    /// <summary>
+    /// Raised when "Check again" has read the index again: the action that now leads has the keyboard, since the button that was
+    /// pressed may be gone.
+    /// </summary>
+    public event Action<VerdictKind>? CheckedAgain;
+
+    /// <summary>
+    /// Looks at the index again, from the button of the block that says nothing is staged (or "Try again" when it could not be read),
+    /// and says what it found: still nothing staged, files that can be reviewed now ("Review now"), or why the index could not be read.
+    /// </summary>
+    [RelayCommand]
+    private async Task CheckAgainAsync()
+    {
+        var before = Verdict.Kind;
+        CheckNote = string.Empty;
+        IsChecking = true;
+        VerdictKind? applied;
+        try
+        {
+            applied = await LookAgainAsync();
+            if(applied == VerdictKind.NothingStaged)
+                CheckNote = $"Still nothing staged, {_clock.Now.ToLocalTime().ToString("HH:mm", CultureInfo.InvariantCulture)}.";
+        }
+        finally
+        {
+            IsChecking = false;
+        }
+
+        // only the check whose answer is on the screen moves the keyboard; one that was superseded or changed nothing leaves it where it is,
+        // and the answer that changes nothing is announced where it stands
+        if(applied != null && (before != VerdictKind.NothingStaged || applied != VerdictKind.NothingStaged))
+            CheckedAgain?.Invoke(applied.Value);
+    }
+
+    /// <summary>
+    /// Whether the index is being read again, from "Check again" or "Try again": the button keeps its place and says so.
+    /// </summary>
+    [ObservableProperty]
+    public partial bool IsChecking { get; private set; }
+
+    /// <summary>
+    /// "Open Doctor", beside "Try again" when the index could not be read.
+    /// </summary>
+    [RelayCommand]
+    private void OpenDoctorFromReview()
+    {
+        OpenDoctorRequested?.Invoke();
+    }
+
+    /// <summary>Whether one of the saved review results contains this judgment.</summary>
     public bool HoldsStructureJudgment(StructureJudgment judgment)
     {
-        return !IsBusy && (MatchesJudgment(_result, judgment) || MatchesJudgment(_changesState?.Result, judgment) || MatchesJudgment(_folderState?.Result, judgment));
+        return !IsBusy && (MatchesJudgment(_result, judgment) || MatchesJudgment(_changesState?.Result, judgment) || MatchesJudgment(_stagedState?.Result, judgment) || MatchesJudgment(_folderState?.Result, judgment));
     }
 
     public bool ShowStructureJudgment(StructureJudgment judgment)
@@ -631,7 +867,12 @@ internal sealed partial class ReviewViewModel : ObservableObject
             return false;
 
         if(!MatchesJudgment(_result, judgment))
-            SelectedChoice = MatchesJudgment(_changesState?.Result, judgment) ? Choices[0] : Choices[1];
+        {
+            if(MatchesJudgment(_changesState?.Result, judgment))
+                SelectedChoice = Choices[0];
+            else
+                SelectedChoice = MatchesJudgment(_stagedState?.Result, judgment) ? Choices[1] : Choices[2];
+        }
 
         return true;
     }
@@ -660,15 +901,20 @@ internal sealed partial class ReviewViewModel : ObservableObject
             return;
 
         var saved = Capture();
-        if(ReferenceEquals(oldValue, Choices[1]))
+        if(ReferenceEquals(oldValue, Choices[2]))
             _folderState = saved;
+        else if(ReferenceEquals(oldValue, Choices[1]))
+            _stagedState = saved;
         else
             _changesState = saved;
 
         PickerOpen = false;
-        Restore(ReferenceEquals(newValue, Choices[1]) ? _folderState : _changesState, ReferenceEquals(newValue, Choices[1]));
+        CheckNote = string.Empty;
+        var kind = KindOf(newValue);
+        Restore(kind == ReviewKind.Folder ? _folderState : kind == ReviewKind.Staged ? _stagedState : _changesState, kind);
         NotifyRunButton();
-        if(!ReferenceEquals(newValue, Choices[1]))
+        OnPropertyChanged(nameof(ShowsStagedChanged));
+        if(kind != ReviewKind.Folder)
             _ = RefreshAsync();
     }
 
@@ -687,17 +933,32 @@ internal sealed partial class ReviewViewModel : ObservableObject
     {
         OnPropertyChanged(nameof(ResultMatches));
         OnPropertyChanged(nameof(RunText));
+        OnPropertyChanged(nameof(RunName));
         OnPropertyChanged(nameof(RunIsMain));
         OnPropertyChanged(nameof(RunIsSecond));
         OnPropertyChanged(nameof(RunShowsIcon));
     }
 
+    private bool CanUseRunButton()
+    {
+        return IsBusy || CanRun;
+    }
+
+    [RelayCommand(CanExecute = nameof(CanUseRunButton))]
+    private void RunFromButton()
+    {
+        if(CanRun)
+            RunCommand.Execute(null);
+    }
+
     [RelayCommand(CanExecute = nameof(CanRun))]
     private async Task RunAsync()
     {
-        if(_running)
+        if(_running || !CanRun)
             return;
 
+        _busyInEmptyBlock = ShowsEmptyBlock && Verdict.HasButton;
+        BusyRunIsMain = _busyInEmptyBlock || RunIsMain;
         _running = true;
         _fixedFindings = 0;
         AppliedFixes = 0;
@@ -705,14 +966,14 @@ internal sealed partial class ReviewViewModel : ObservableObject
         IsBusy = true;
         RunCommand.NotifyCanExecuteChanged();
         var before = Verdict;
-        var isFolder = IsFolderChosen;
+        var kind = KindOf(SelectedChoice);
         var target = FolderPath;
         BannerText = null;
         PickerOpen = false;
         Verdict = VerdictViewModel.Running();
         try
         {
-            var ran = await Task.Run(() => Execute(isFolder, target));
+            var ran = await Task.Run(() => Execute(kind, target));
             Show(ran, before, target);
         }
         finally
@@ -864,12 +1125,12 @@ internal sealed partial class ReviewViewModel : ObservableObject
         };
     }
 
-    private void Restore(ReviewState? state, bool isFolder)
+    private void Restore(ReviewState? state, ReviewKind kind)
     {
         BannerText = null;
         if(state == null)
         {
-            Blank(isFolder);
+            Blank(kind);
             return;
         }
 
@@ -897,9 +1158,16 @@ internal sealed partial class ReviewViewModel : ObservableObject
         OnPropertyChanged(nameof(CanCopyAll));
     }
 
-    private void Blank(bool isFolder)
+    private void Blank(ReviewKind kind)
     {
-        Verdict = isFolder ? NoFolderYet() : Starting();
+        Verdict = kind switch
+        {
+            ReviewKind.Folder => NoFolderYet(),
+            ReviewKind.Staged => VerdictViewModel.Blank(VerdictKind.NoReview, "No review yet", "Review the staged changes to see what the next commit would meet."),
+            ReviewKind.Push => Starting(),
+            _ => Starting()
+        };
+
         HasResult = false;
         FileGroups = new List<FileGroupViewModel>();
         PanelFiles = new List<PanelFileViewModel>();
@@ -914,7 +1182,7 @@ internal sealed partial class ReviewViewModel : ObservableObject
         FolderCleanLead = string.Empty;
         FolderCleanNames = string.Empty;
         _result = null;
-        _ruleInfos = new Dictionary<string, RuleInfo>(StringComparer.Ordinal);
+        _ruleInfos = new Dictionary<Finding, RuleInfo>();
         _resultTarget = string.Empty;
         _resultLabel = string.Empty;
         SetReasons(new List<ReasonViewModel>(), string.Empty, false);
@@ -955,11 +1223,23 @@ internal sealed partial class ReviewViewModel : ObservableObject
         OnPropertyChanged(nameof(ReasonsShown));
     }
 
-    private Ran Execute(bool isFolder, string target)
+    private ReviewKind KindOf(ReviewChoiceViewModel choice)
     {
+        if(ReferenceEquals(choice, Choices[2]))
+            return ReviewKind.Folder;
+
+        return ReferenceEquals(choice, Choices[1]) ? ReviewKind.Staged : ReviewKind.Push;
+    }
+
+    private Ran Execute(ReviewKind kind, string target)
+    {
+        if(kind == ReviewKind.Staged)
+            return ExecuteStaged();
+
+        var isFolder = kind == ReviewKind.Folder;
         var answer = isFolder ? null : _review.FindPushScope(_folder.FolderPath);
         if(answer != null && answer.Scope == null)
-            return new Ran(answer, null, null, new Dictionary<string, RuleInfo>(StringComparer.Ordinal));
+            return new Ran(answer, null, null, new Dictionary<Finding, RuleInfo>());
 
         var scope = answer?.Scope?.WithSource(ReviewSource.App) ?? ReviewScope.ForWholeFolder(target);
 
@@ -971,55 +1251,57 @@ internal sealed partial class ReviewViewModel : ObservableObject
         catch(SettingsException exception)
         {
             var shown = SettingsFileName.Default + " (in the tree under review)";
-            return new Ran(answer, null, SettingsFileName.FormatError(shown, exception), new Dictionary<string, RuleInfo>(StringComparer.Ordinal));
+            return new Ran(answer, null, SettingsFileName.FormatError(shown, exception), new Dictionary<Finding, RuleInfo>());
         }
         catch(ReviewTargetException exception)
         {
-            return new Ran(answer, null, exception.Message, new Dictionary<string, RuleInfo>(StringComparer.Ordinal));
+            return new Ran(answer, null, exception.Message, new Dictionary<Finding, RuleInfo>());
         }
     }
 
-    private Dictionary<string, RuleInfo> RulesBehind(ReviewResult result)
+    private Ran ExecuteStaged()
     {
-        var infos = new Dictionary<string, RuleInfo>(StringComparer.Ordinal);
-        var team = ReadTeamRules();
-        var file = ReadFileRules();
-        foreach(var finding in result.Findings.Where(finding => !infos.ContainsKey(finding.RuleId)))
+        var staged = _review.FindStaged(_folder.FolderPath);
+        try
         {
-            var isTeam = finding.Source is FindingSource.CodeRule or FindingSource.StructureRule;
-            if(isTeam && team.TryGetValue(finding.RuleId, out var definition))
-                infos[finding.RuleId] = new RuleInfo(finding.Source, definition.Title, true, SentencePieceViewModel.Of(definition), PromptRule.Of(definition));
-            else if(!isTeam && file.TryGetValue(finding.RuleId, out var fileRule))
-                infos[finding.RuleId] = new RuleInfo(finding.Source, fileRule.Title ?? string.Empty, true, null, PromptRule.Of(fileRule), fileRule);
+            var result = _review.ReviewChanges(_folder.FolderPath, ReviewScope.ForStaged().WithSource(ReviewSource.App), null);
+            return new Ran(null, result, null, RulesBehind(result)) { Staged = staged };
+        }
+        catch(SettingsException exception)
+        {
+            var shown = SettingsFileName.Default + " (in the tree under review)";
+            return new Ran(null, null, SettingsFileName.FormatError(shown, exception), new Dictionary<Finding, RuleInfo>());
+        }
+        catch(ReviewTargetException exception)
+        {
+            return new Ran(null, null, exception.Message, new Dictionary<Finding, RuleInfo>());
+        }
+    }
+
+    /// <summary>
+    /// The short id of the commit a review named when it took its snapshot; empty when the repository has no commit.
+    /// </summary>
+    private static string ShortCommit(ReviewResult result)
+    {
+        var commit = result.CommitReviewed;
+        return commit.Length > _shortCommit ? commit[.._shortCommit] : commit;
+    }
+
+    private static Dictionary<Finding, RuleInfo> RulesBehind(ReviewResult result)
+    {
+        var infos = new Dictionary<Finding, RuleInfo>();
+        foreach(var finding in result.Findings)
+        {
+            var rule = result.RuleOf(finding);
+            if(rule?.Team is { } definition)
+                infos[finding] = new RuleInfo(finding.Source, definition.Title, true, SentencePieceViewModel.Of(definition), PromptRule.Of(definition), null, definition.Why);
+            else if(rule?.File is { } fileRule)
+                infos[finding] = new RuleInfo(finding.Source, fileRule.Title ?? string.Empty, true, null, PromptRule.Of(fileRule), fileRule);
             else
-                infos[finding.RuleId] = new RuleInfo(finding.Source, string.Empty, false, null);
+                infos[finding] = new RuleInfo(finding.Source, string.Empty, false, null);
         }
 
         return infos;
-    }
-
-    private Dictionary<string, CF.Core.Rules.RuleDefinition> ReadTeamRules()
-    {
-        try
-        {
-            return _rules.ListRules(_folder.SettingsPath).ToDictionary(rule => rule.Id, StringComparer.Ordinal);
-        }
-        catch(SettingsException)
-        {
-            return new Dictionary<string, CF.Core.Rules.RuleDefinition>(StringComparer.Ordinal);
-        }
-    }
-
-    private Dictionary<string, CF.Core.Code.FileRule> ReadFileRules()
-    {
-        try
-        {
-            return _rules.ListFileRules(_folder.SettingsPath).SelectMany(listing => listing.Rules).GroupBy(rule => rule.Id, StringComparer.Ordinal).ToDictionary(group => group.Key, group => group.First(), StringComparer.Ordinal);
-        }
-        catch(Exception exception) when(exception is SettingsException || exception is CF.Core.Rules.RuleChangeException)
-        {
-            return new Dictionary<string, CF.Core.Code.FileRule>(StringComparer.Ordinal);
-        }
     }
 
     private void Show(Ran ran, VerdictViewModel before, string target)
@@ -1033,26 +1315,40 @@ internal sealed partial class ReviewViewModel : ObservableObject
 
         if(ran.Result == null)
         {
-            Verdict = ran.Scope == null ? before : NoPush(ran.Scope);
+            if(ran.Scope == null)
+            {
+                Verdict = before;
+                return;
+            }
+
+            // no push this time: the result of an earlier run is gone, as on a first run
+            Blank(ReviewKind.Push);
+            BlockingCount = 0;
+            Verdict = NoPush(ran.Scope);
             return;
         }
 
-        if(ran.Scope == null)
+        if(KindOf(SelectedChoice) == ReviewKind.Staged)
+            ShowStagedResult(ran.Result, ran.Rules, ran.Staged);
+        else if(ran.Scope == null)
             ShowFolderResult(ran.Result, ran.Rules, target);
         else
-            ShowResult(ran.Result, ran.Rules);
+            ShowResult(ran.Result, ran.Rules, ran.Scope);
     }
 
-    private void ShowResult(ReviewResult result, Dictionary<string, RuleInfo> rules)
+    private void ShowResult(ReviewResult result, Dictionary<Finding, RuleInfo> rules, PushScopeAnswer scope)
     {
         _result = result;
         _ruleInfos = rules;
+        var refs = scope.Scope?.PushedRefs.Refs;
+        var commit = refs is { Count: > 0 } ? refs[0].LocalObject : string.Empty;
+        _pushCommit = commit.Length > _shortCommit ? commit[.._shortCommit] : commit;
         _startsOpen = result.Findings.Count <= _startOpenUpTo;
-        var groups = BuildGroups(result, rules, null, false);
+        var groups = BuildGroups(result, rules, null, ReviewKind.Push);
         SetFiles(groups);
-        BuildPanel(result, groups);
+        BuildPanel(result, groups, ReviewKind.Push);
         BuildReasons(result);
-        BuildCleanPush(result);
+        BuildCleanPush(result, ReviewKind.Push);
         FilesLine = groups.Count == 1 ? "1 file with findings" : $"{groups.Count} files with findings, most findings first";
         Verdict = Describe(result, groups.Count);
         BlockingCount = result.Findings.Count(finding => finding.Severity == Severity.Block);
@@ -1060,10 +1356,55 @@ internal sealed partial class ReviewViewModel : ObservableObject
         UpdateOpenAllText();
     }
 
-    private void ShowFolderResult(ReviewResult result, Dictionary<string, RuleInfo> rules, string target)
+    private void ShowStagedResult(ReviewResult result, Dictionary<Finding, RuleInfo> rules, StagedAnswer? staged)
     {
         _result = result;
         _ruleInfos = rules;
+        _stagedTreeAtRun = result.TreeReviewed;
+        _stagedBaseAtRun = result.BaseTreeReviewed;
+        _stagedCommit = ShortCommit(result);
+        StagedChanged = false;
+        _startsOpen = result.Findings.Count <= _startOpenUpTo;
+        var groups = BuildGroups(result, rules, null, ReviewKind.Staged);
+        SetFiles(groups);
+        BuildPanel(result, groups, ReviewKind.Staged);
+        BuildReasons(result);
+        BuildCleanPush(result, ReviewKind.Staged);
+        FilesLine = groups.Count == 1 ? "1 file with findings" : $"{groups.Count} files with findings, most findings first";
+        Verdict = DescribeStaged(result, groups.Count, staged);
+        BlockingCount = result.Findings.Count(finding => finding.Severity == Severity.Block);
+        HasResult = true;
+        UpdateOpenAllText();
+        NotifyRunButton();
+        OnPropertyChanged(nameof(ShowsStagedChanged));
+    }
+
+    /// <summary>
+    /// Where the lines a finding shows come from: the commit of a push, the index, or the last commit of a folder.
+    /// </summary>
+    private CodeOrigin OriginOf(ReviewResult result, ReviewKind kind)
+    {
+        var commit = kind switch
+        {
+            ReviewKind.Push => _pushCommit,
+            ReviewKind.Folder => _folderCommit,
+            ReviewKind.Staged => _stagedCommit,
+            _ => string.Empty
+        };
+
+        return new CodeOrigin(kind, commit, result.Repository?.WorkFolder ?? _folder.FolderPath, () => EditorName, OpenSourceAt);
+    }
+
+    private void OpenSourceAt(string path, int line)
+    {
+        OpenLineRequested?.Invoke(path, line);
+    }
+
+    private void ShowFolderResult(ReviewResult result, Dictionary<Finding, RuleInfo> rules, string target)
+    {
+        _result = result;
+        _ruleInfos = rules;
+        _folderCommit = ShortCommit(result);
         _resultTarget = target;
         _resultLabel = LabelOf(target);
         if(target.Length > 0)
@@ -1099,13 +1440,13 @@ internal sealed partial class ReviewViewModel : ObservableObject
         UpdateOpenAllText();
     }
 
-    private List<FileGroupViewModel> BuildGroups(ReviewResult result, Dictionary<string, RuleInfo> rules, string? onlyRule, bool isFolder)
+    private List<FileGroupViewModel> BuildGroups(ReviewResult result, Dictionary<Finding, RuleInfo> rules, string? onlyRule, ReviewKind kind)
     {
         var groups = new List<FileGroupViewModel>();
         foreach(var byFile in result.Findings.GroupBy(finding => finding.File ?? "(no file)", StringComparer.Ordinal))
         {
             var models = byFile.Where(finding => onlyRule == null || finding.RuleId == onlyRule)
-                .Select(finding => FindingModel(result, finding, byFile, rules[finding.RuleId], isFolder)).ToList();
+                .Select(finding => FindingModel(result, finding, byFile, rules[finding], kind)).ToList();
             if(models.Count > 0)
                 groups.Add(new FileGroupViewModel(byFile.Key, models, _startsOpen));
         }
@@ -1113,7 +1454,7 @@ internal sealed partial class ReviewViewModel : ObservableObject
         return groups.OrderByDescending(group => group.Total).ThenBy(group => group.Path, StringComparer.Ordinal).ToList();
     }
 
-    private FindingViewModel FindingModel(ReviewResult result, Finding finding, IEnumerable<Finding> fileFindings, RuleInfo rule, bool isFolder)
+    private FindingViewModel FindingModel(ReviewResult result, Finding finding, IEnumerable<Finding> fileFindings, RuleInfo rule, ReviewKind kind)
     {
         var session = _fixSessions.GetOrCreateValue(result);
         if(session.Models.TryGetValue(finding, out var model))
@@ -1127,8 +1468,12 @@ internal sealed partial class ReviewViewModel : ObservableObject
             prepare = () => session.PrepareAsync(_fixes, request);
         }
 
-        model = new FindingViewModel(finding, fileFindings, rule, ContentOf(result, finding), false,
-            _showRule, isFolder, () => Clipboard, OpenConfigLine, _fixes, prepare);
+        model = new FindingViewModel(finding, fileFindings, rule, result.SourceOf(finding), false,
+            _showRule, kind != ReviewKind.Push, () => Clipboard, OpenConfigLine, _fixes, prepare)
+        {
+            IsStagedReview = kind == ReviewKind.Staged,
+            Origin = OriginOf(result, kind)
+        };
         session.Models.Add(finding, model);
         session.UpdateFinding(finding, model);
         model.FixFinished += (completed, fix) =>
@@ -1180,16 +1525,11 @@ internal sealed partial class ReviewViewModel : ObservableObject
 
     private string BuildAllPrompt()
     {
-        var rules = _ruleInfos.Where(entry => entry.Value.Prompt != null).ToDictionary(entry => entry.Key, entry => entry.Value.Prompt!, StringComparer.Ordinal);
-        return AgentPrompt.ForReview(FindingsShown(), _result?.Sources ?? new Dictionary<string, string>(), rules, _result?.Outcome == ReviewOutcome.Incomplete);
+        return AgentPrompt.ForReview(FindingsShown(), finding => _result?.SourceOf(finding),
+            finding => _ruleInfos.GetValueOrDefault(finding)?.Prompt, _result?.Outcome == ReviewOutcome.Incomplete, _result?.Coverage);
     }
 
-    private static string? ContentOf(ReviewResult result, Finding finding)
-    {
-        return finding.File != null && result.Sources.TryGetValue(finding.File, out var content) ? content : null;
-    }
-
-    private void BuildPanel(ReviewResult result, List<FileGroupViewModel> groups)
+    private void BuildPanel(ReviewResult result, List<FileGroupViewModel> groups, ReviewKind kind)
     {
         var files = result.Coverage.Where(entry => entry.Kind == CoverageKind.File).GroupBy(entry => entry.What, StringComparer.Ordinal).ToList();
         var byPath = groups.ToDictionary(group => group.Path, StringComparer.Ordinal);
@@ -1209,7 +1549,7 @@ internal sealed partial class ReviewViewModel : ObservableObject
 
         PanelFiles = rows;
         CleanFilesText = collapse ? $"{clean.Count} files have no findings." : string.Empty;
-        PanelHead = $"{files.Count} in this push, {groups.Count} with findings";
+        PanelHead = kind == ReviewKind.Staged ? $"{files.Count} staged, {groups.Count} with findings" : $"{files.Count} in this push, {groups.Count} with findings";
     }
 
     /// <summary>
@@ -1227,7 +1567,7 @@ internal sealed partial class ReviewViewModel : ObservableObject
     /// <summary>
     /// A clean push has no panel: it names the same files, so the main column lists them, each with its tick.
     /// </summary>
-    private void BuildCleanPush(ReviewResult result)
+    private void BuildCleanPush(ReviewResult result, ReviewKind kind)
     {
         if(result.Outcome != ReviewOutcome.Clean)
         {
@@ -1237,6 +1577,8 @@ internal sealed partial class ReviewViewModel : ObservableObject
 
         var files = result.Coverage.Where(entry => entry.Kind == CoverageKind.File).Select(entry => entry.What).Distinct(StringComparer.Ordinal).Order(StringComparer.Ordinal).ToList();
         var line = files.Count == 1 ? "1 file reviewed, without findings" : $"{files.Count} files reviewed, none with findings";
+        if(kind == ReviewKind.Staged)
+            line = files.Count == 1 ? "1 file staged, without findings" : $"{files.Count} files staged, none with findings";
         var more = files.Count > _cleanPushFilesListed ? $"and {files.Count - _cleanPushFilesListed} more, none with findings." : string.Empty;
         SetCleanPush(files.Take(_cleanPushFilesListed).ToList(), files.Count == 0 ? string.Empty : line, more);
         PanelFiles = new List<PanelFileViewModel>();
@@ -1244,7 +1586,7 @@ internal sealed partial class ReviewViewModel : ObservableObject
         PanelHead = string.Empty;
     }
 
-    private void BuildRuleRows(ReviewResult result, Dictionary<string, RuleInfo> rules)
+    private void BuildRuleRows(ReviewResult result, Dictionary<Finding, RuleInfo> rules)
     {
         var counts = result.CountByRule();
         var most = counts.Count == 0 ? 1 : counts.Max(count => count.Count);
@@ -1253,7 +1595,8 @@ internal sealed partial class ReviewViewModel : ObservableObject
         foreach(var count in counts)
         {
             var isBlock = result.Findings.Any(finding => finding.RuleId == count.RuleId && finding.Severity == Severity.Block);
-            var title = rules.TryGetValue(count.RuleId, out var info) && info.Title.Length > 0 ? info.Title : count.RuleId;
+            var title = rules.Where(entry => entry.Key.RuleId == count.RuleId).Select(entry => entry.Value.Title)
+                .FirstOrDefault(text => text.Length > 0) ?? count.RuleId;
             rows.Add(new RuleRowViewModel(count.RuleId, title, count.Count, isBlock, (double)count.Count / most, hasBars, ChooseRule));
         }
 
@@ -1297,7 +1640,7 @@ internal sealed partial class ReviewViewModel : ObservableObject
             row.IsSteppedBack = ChosenRule != null && !row.IsChosen;
         }
 
-        var groups = BuildGroups(_result, _ruleInfos, ChosenRule, true);
+        var groups = BuildGroups(_result, _ruleInfos, ChosenRule, ReviewKind.Folder);
         SetFiles(groups);
         var total = _result.Findings.Count;
         ShowAllText = $"Show all {total}";
@@ -1393,6 +1736,48 @@ internal sealed partial class ReviewViewModel : ObservableObject
     }
 
     /// <summary>
+    /// The verdict of a review of the staged changes: it counts what the next commit would meet and refuses nothing. The line under
+    /// the facts says when a staged file also has changes that are not staged.
+    /// </summary>
+    private VerdictViewModel DescribeStaged(ReviewResult result, int filesShown, StagedAnswer? staged)
+    {
+        var findings = result.Findings;
+        var block = findings.Count(finding => finding.Severity == Severity.Block);
+        var warn = findings.Count - block;
+        var facts = Facts(result, filesShown, null, _clock.Now, ReviewKind.Staged, _stagedCommit);
+        var unstaged = staged?.StagedFileHasUnstagedChanges ?? false;
+        var unstagedLine = UnstagedLine(staged?.UnstagedCount ?? 0);
+        var counts = new List<CountPieceViewModel>();
+        if(result.Outcome == ReviewOutcome.Incomplete)
+        {
+            counts.Add(new CountPieceViewModel("The review could not finish. Fix what is listed below, then review again.", CountPieceKind.Plain));
+            return new VerdictViewModel(VerdictKind.Incomplete, "Review incomplete", string.Empty, counts, facts) { LeavesOutUncommitted = unstaged, LeavesOutText = unstagedLine, LeavesOutQuiet = true };
+        }
+
+        if(findings.Count == 0)
+        {
+            counts.Add(new CountPieceViewModel("No findings", CountPieceKind.Allow));
+            return new VerdictViewModel(VerdictKind.StagedClean, _stagedNothingBlocks, string.Empty, counts, facts) { LeavesOutUncommitted = unstaged, LeavesOutText = unstagedLine, LeavesOutQuiet = true };
+        }
+
+        if(block > 0)
+            counts.Add(new CountPieceViewModel(block == 1 ? "1 finding would block it" : $"{block} findings would block it", CountPieceKind.Block));
+
+        if(block > 0)
+            AddWarnings(counts, warn, "would only warn", "would only warn");
+        else
+            counts.Add(new CountPieceViewModel($"{warn} {(warn == 1 ? "finding" : "findings")} would only warn", CountPieceKind.Warn));
+
+        var heading = block == 0 ? _stagedNothingBlocks : block == 1 ? "1 blocking finding in the staged changes" : $"{block} blocking findings in the staged changes";
+        return new VerdictViewModel(VerdictKind.StagedFindings, heading, string.Empty, counts, facts) { HasBlocking = block > 0, LeavesOutUncommitted = unstaged, LeavesOutText = unstagedLine, LeavesOutQuiet = true };
+    }
+
+    private static string UnstagedLine(int files)
+    {
+        return files <= 1 ? "Changes in 1 file are not staged, so they are not part of this review." : $"Changes in {files} files are not staged, so they are not part of this review.";
+    }
+
+    /// <summary>
     /// The verdict of a folder review: it counts what was already in the code and refuses nothing. With a rule chosen it counts that
     /// rule's findings alone and carries the filter piece.
     /// </summary>
@@ -1401,10 +1786,10 @@ internal sealed partial class ReviewViewModel : ObservableObject
         var findings = ChosenRule == null ? result.Findings : result.Findings.Where(finding => finding.RuleId == ChosenRule).ToList();
         var block = findings.Count(finding => finding.Severity == Severity.Block);
         var warn = findings.Count - block;
-        var facts = Facts(result, filesShown, ChosenRule == null ? null : filesShown, _clock.Now, true);
+        var facts = Facts(result, filesShown, ChosenRule == null ? null : filesShown, _clock.Now, ReviewKind.Folder);
         var tail = "in " + _resultLabel;
         var counts = new List<CountPieceViewModel>();
-        if(result.Outcome == ReviewOutcome.Incomplete && findings.Count == 0)
+        if(result.Outcome == ReviewOutcome.Incomplete)
         {
             counts.Add(new CountPieceViewModel("The review could not finish. Fix what is listed below, then review again.", CountPieceKind.Plain));
             return new VerdictViewModel(VerdictKind.Incomplete, "Review incomplete", string.Empty, counts, facts) { LeavesOutUncommitted = result.LeavesOutUncommittedWork };
@@ -1435,12 +1820,16 @@ internal sealed partial class ReviewViewModel : ObservableObject
     /// and how long it took and when it ended. The number of commits, the number of lines and whether it was a full or a quick
     /// review are not in what the body returns.
     /// </summary>
-    private static List<FactViewModel> Facts(ReviewResult result, int filesWithFindings, int? filesOfRule, DateTimeOffset now, bool isFolder = false)
+    private static List<FactViewModel> Facts(ReviewResult result, int filesWithFindings, int? filesOfRule, DateTimeOffset now, ReviewKind kind = ReviewKind.Push, string headCommit = "")
     {
+        var isFolder = kind == ReviewKind.Folder;
         var facts = new List<FactViewModel>();
+        if(kind == ReviewKind.Staged)
+            facts.Add(headCommit.Length > 0 ? new FactViewModel("commit", "On top of commit ", headCommit) : new FactViewModel("commit", "The first commit"));
+
         var files = result.Coverage.Where(entry => entry.Kind == CoverageKind.File).Select(entry => entry.What).Distinct(StringComparer.Ordinal).Count();
         if(isFolder)
-            facts.Add(new FactViewModel("branch", "As of the last commit"));
+            facts.Add(new FactViewModel("commit", "As of the last commit"));
 
         if(files > 0)
         {
@@ -1461,5 +1850,9 @@ internal sealed partial class ReviewViewModel : ObservableObject
         return seconds < _secondsWithDecimal ? seconds.ToString("0.0", CultureInfo.InvariantCulture) + " s" : Math.Round(seconds).ToString("0", CultureInfo.InvariantCulture) + " s";
     }
 
-    private sealed record Ran(PushScopeAnswer? Scope, ReviewResult? Result, string? Problem, Dictionary<string, RuleInfo> Rules);
+    private sealed record Ran(PushScopeAnswer? Scope, ReviewResult? Result, string? Problem, Dictionary<Finding, RuleInfo> Rules)
+    {
+        /// <summary>What the index held just before a review of the staged changes ran.</summary>
+        public StagedAnswer? Staged { get; init; }
+    }
 }

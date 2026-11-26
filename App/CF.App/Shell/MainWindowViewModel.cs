@@ -1,3 +1,4 @@
+using System.ComponentModel;
 using CF.App.Architecture;
 using CF.App.Dashboard;
 using CF.App.Doctor;
@@ -25,14 +26,17 @@ internal sealed partial class MainWindowViewModel : ObservableObject, IDisposabl
     [NotifyPropertyChangedFor(nameof(RailIndex), nameof(ShowsRules), nameof(ShowsReview), nameof(ShowsDashboard), nameof(ShowsExemptions), nameof(ShowsArchitecture), nameof(ShowsSettings), nameof(ShowsDoctor), nameof(CurrentModel))]
     public partial Screen CurrentScreen { get; set; } = Screen.Rules;
 
+    private readonly IFolderService _folders;
+
     public MainWindowViewModel(CommitFenceServices services, string folder, string installFolder)
     {
-        var opened = services.Folders.Open(folder);
+        _folders = services.Folders;
+        var opened = _folders.Open(folder);
         Folder = opened;
         VersionText = services.ProductInfo.Name + " " + services.ProductInfo.Version;
         var catalog = new RuleCatalog(services.Rules.ListCatalogs(null, null));
-        Rules = new RulesViewModel(services.Rules, opened, catalog, new SettingsFileWatcher(opened.SettingsPath), new SettingsFileWatcher(Path.Combine(Path.GetDirectoryName(opened.SettingsPath) ?? string.Empty, ".editorconfig")));
-        Review = new ReviewViewModel(services.Review, services.Rules, services.Clock, opened, OpenRule, services.Fixes);
+        Rules = new RulesViewModel(services.Rules, opened, catalog, new SettingsFileWatcher(opened.SettingsPath), new SettingsFileWatcher(Path.Combine(Path.GetDirectoryName(opened.SettingsPath) ?? string.Empty, ".editorconfig")), services.Setup, services.Clock) { PathFiles = services.LanguageReports };
+        Review = new ReviewViewModel(services.Review, services.Clock, opened, OpenRule, services.Fixes);
         Updates = new UpdatesViewModel(services.Updater, services.UpdateChecks, services.Clock, opened.FolderPath);
         Dashboard = new DashboardViewModel(services.Stats, opened, OpenDashboardRule, ReviewFromDashboard);
         Exemptions = new ExemptionsViewModel(services.Exemptions, services.Rules, opened, OpenRule, NarrowRule);
@@ -43,14 +47,15 @@ internal sealed partial class MainWindowViewModel : ObservableObject, IDisposabl
                     ShowReview();
             });
         Settings = new SettingsViewModel(services, opened, Updates, installFolder);
-        Doctor = new DoctorViewModel(services.Doctor, services.Clock, opened);
+        Doctor = new DoctorViewModel(services.Doctor, services.Clock, opened, services.Setup);
         Updates.WhatsNewRequested += ShowVersionNotes;
         Rules.FileRulesArrived += ShowRulesLine;
         Review.OpenDoctorRequested += ShowDoctor;
+        Review.PropertyChanged += OnReviewChanged;
         ShowRulesLine();
     }
 
-    public OpenedFolder Folder { get; }
+    public OpenedFolder Folder { get; private set; }
 
     public ReviewViewModel Review { get; }
 
@@ -202,8 +207,30 @@ internal sealed partial class MainWindowViewModel : ObservableObject, IDisposabl
         }
     }
 
+    /// <summary>
+    /// Reads the repository and its branch again, so the label follows a checkout made outside the app. Called when the window is
+    /// activated and when a review starts.
+    /// </summary>
+    public void RefreshFolder()
+    {
+        Folder = _folders.Open(Folder.FolderPath);
+        OnPropertyChanged(nameof(RepositoryName));
+        OnPropertyChanged(nameof(BranchText));
+        OnPropertyChanged(nameof(HasBranch));
+        OnPropertyChanged(nameof(RepositorySpokenName));
+    }
+
+    private void OnReviewChanged(object? sender, PropertyChangedEventArgs e)
+    {
+        if(e.PropertyName == nameof(ReviewViewModel.IsBusy) && Review.IsBusy)
+            RefreshFolder();
+    }
+
     partial void OnCurrentScreenChanged(Screen value)
     {
+        if(value != Screen.Rules)
+            Rules.Left();
+
         if(value == Screen.Dashboard)
             Dashboard.AgainCommand.Execute(null);
 

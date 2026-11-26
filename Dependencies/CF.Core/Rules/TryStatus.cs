@@ -19,5 +19,10 @@ public enum TryStatus
     /// <summary>
     /// The code does not parse, so nothing can be said about its artifacts.
     /// </summary>
-    DoesNotParse
+    DoesNotParse,
+
+    /// <summary>
+    /// The rule reads the file's name, which is missing from the sample.
+    /// </summary>
+    NeedsFileName
 }

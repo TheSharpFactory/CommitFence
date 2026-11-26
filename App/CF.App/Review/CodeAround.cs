@@ -11,14 +11,25 @@ internal static class CodeAround
     private const int _linesAround = 3;
     private const string _tab = "    ";
 
-    public static IReadOnlyList<CodeLineViewModel> Cut(string content, int line, bool isBlock)
+    /// <param name="content">The text of the file as the review read it.</param>
+    /// <param name="line">The line of the finding.</param>
+    /// <param name="isBlock">Whether the finding blocks.</param>
+    /// <param name="diskNumber">The number each line has on the copy on disk, or nothing for a line that is no longer there; given
+    /// only when the code was found on another line there and the box shows two number columns.</param>
+    /// <param name="numberHead">The word over the first number column, which a screen reader says before the number.</param>
+    public static IReadOnlyList<CodeLineViewModel> Cut(string content, int line, bool isBlock, Func<int, int?>? diskNumber = null, string numberHead = "")
     {
         var cut = Excerpt.Around(content, line, _linesAround);
         if(cut.Count == 0)
             return new List<CodeLineViewModel>();
 
         var tokens = CSharpTokens.Scan(content);
-        return cut.Select(excerpt => new CodeLineViewModel(excerpt.Number, Segments(content, excerpt.Start, excerpt.End, tokens), excerpt.Number == line, isBlock)).ToList();
+        return cut.Select(excerpt => new CodeLineViewModel(excerpt.Number, Segments(content, excerpt.Start, excerpt.End, tokens), excerpt.Number == line, isBlock)
+        {
+            TwoNumbers = diskNumber != null,
+            DiskNumber = diskNumber?.Invoke(excerpt.Number),
+            NumberHead = numberHead
+        }).ToList();
     }
 
     public static List<CodeSegment> Segments(string content, int start, int end, IReadOnlyList<CodeToken> tokens)

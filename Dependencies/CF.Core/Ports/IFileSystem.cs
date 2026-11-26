@@ -10,6 +10,15 @@ public interface IFileSystem
     /// </summary>
     bool FileExists(string path);
 
+    /// <summary>Whether a folder exists at this path.</summary>
+    bool FolderExists(string path);
+
+    /// <summary>Whether the file exists and the platform treats it as executable.</summary>
+    bool IsExecutable(string path)
+    {
+        return FileExists(path);
+    }
+
     /// <summary>
     /// The whole text of a file.
     /// </summary>
@@ -36,6 +45,18 @@ public interface IFileSystem
 
     /// <summary>Creates a new file with exactly these bytes, under the same rules as the text overload.</summary>
     void WriteNewFile(string path, ReadOnlySpan<byte> content)
+    {
+        throw new NotSupportedException();
+    }
+
+    /// <summary>Whether the path is a symbolic link or other reparse point.</summary>
+    bool IsLink(string path)
+    {
+        return false;
+    }
+
+    /// <summary>Writes an executable shell hook, checking the original contents and preserving its other mode bits.</summary>
+    void WriteHook(string path, byte[]? original, byte[] content)
     {
         throw new NotSupportedException();
     }

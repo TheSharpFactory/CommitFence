@@ -49,6 +49,30 @@ public sealed class WholeTargetTests
         }
     }
 
+    [Fact]
+    public void ReviewNamesTheCommitItReadWhenTheLastCommitMovesDuringIt()
+    {
+        using(var harness = new ReviewHarness())
+        {
+            harness.Fake.AddCommit("first", _headFiles);
+            harness.Fake.AddCommit("second", _headFiles, "first");
+            var languages = new List<ILanguage> { new TestLanguage(new FakeToolchain()) };
+            var resolver = new ChangeResolver(harness.Fake, languages);
+            foreach(var scope in new[] { ReviewScope.ForStaged(), ReviewScope.ForWholeFolder(string.Empty) })
+            {
+                harness.Fake.Name("HEAD", "first");
+                harness.Fake.AfterHeadRead = () => harness.Fake.Name("HEAD", "second");
+                harness.Fake.StagedTree = FakeGit.TreeIdOf("first");
+                var readsBefore = harness.Fake.HeadReads;
+
+                var changeSet = Assert.Single(resolver.Resolve(harness.Fake.Repository, scope));
+
+                Assert.Equal(FakeGit.IdOf("first"), changeSet.Commit);
+                Assert.Equal(1, harness.Fake.HeadReads - readsBefore);
+            }
+        }
+    }
+
     [Theory]
     [InlineData("OutsideTheRepository", ExitCode.BadSettingsOrUsage)]
     [InlineData("AbsentFromTheCommit", ExitCode.BadSettingsOrUsage)]

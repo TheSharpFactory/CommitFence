@@ -23,4 +23,10 @@ public sealed class SetupReport
     /// True when a step could not be done.
     /// </summary>
     public bool Failed { get; }
+
+    /// <summary>Whether this operation created the repository's settings file.</summary>
+    public bool SettingsCreated { get; init; }
+
+    /// <summary>The root of the work tree where this operation wrote a file.</summary>
+    public string? WorktreeRoot { get; init; }
 }

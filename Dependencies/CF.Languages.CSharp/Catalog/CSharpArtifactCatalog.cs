@@ -8,6 +8,7 @@ namespace CF.Languages.CSharp.Catalog;
 /// </summary>
 internal sealed class CSharpArtifactCatalog : IArtifactCatalog
 {
+    private const string _fileRuleVersion = "1.0.0.6";
     private static readonly string[] _noValues = Array.Empty<string>();
     private static readonly string[] _declaredAccesses = { "public", "internal", "protected", "private", "protected internal", "private protected" };
     private static readonly string[] _writtenAccesses = { "none", "public", "internal", "protected", "private", "protected internal", "private protected" };
@@ -21,7 +22,8 @@ internal sealed class CSharpArtifactCatalog : IArtifactCatalog
             CreateIfStatement(),
             CreateMethod(),
             CreateClass(),
-            CreateUsage()
+            CreateUsage(),
+            CreateFile()
         };
     }
 
@@ -62,6 +64,7 @@ internal sealed class CSharpArtifactCatalog : IArtifactCatalog
             Syntax(CSharpNames.ContainingTypeWrittenAccess, PropertyValueType.Text, "The access keyword written on that type, or none.", _writtenAccesses),
             Meaning(CSharpNames.ContainingTypeDeclaredAccess, PropertyValueType.Text, "The declared access of that type, as the compiler says (every part of a partial type taken together), or none.", _containingDeclaredAccesses),
             Syntax(CSharpNames.ParameterCount, PropertyValueType.Number, "How many parameters the method has.", _noValues),
+            NewProperty(CSharpNames.NestingDepth, PropertyValueType.Number, "The deepest nesting of statement bodies, ignoring lambdas and local functions. For example, a return alone has depth 0, and an if inside a while has depth 2."),
             Syntax(CSharpNames.Statements, PropertyValueType.Number, "How many statements are directly in the body; an expression body counts one, a method without a body none.", _noValues),
             Syntax(CSharpNames.Lines, PropertyValueType.Number, "How many lines the method takes, attributes included, documentation comment not.", _noValues),
             Syntax(CSharpNames.FitsOnOneLine, PropertyValueType.Boolean, "Whether the whole method sits on one line.", _noValues),
@@ -81,6 +84,8 @@ internal sealed class CSharpArtifactCatalog : IArtifactCatalog
             Syntax(CSharpNames.Modifiers, PropertyValueType.Text, "Every modifier keyword written, in the order written, separated by a space.", _noValues),
             Meaning(CSharpNames.DeclaredAccess, PropertyValueType.Text, "The access the class really has, as the compiler says: the language's default applied when none is written, and every part of a partial class taken together.", _declaredAccesses),
             Syntax(CSharpNames.ContainingType, PropertyValueType.Text, "The kind of type the class is immediately declared in, or none for a class that is not nested.", _containingTypeKinds),
+            NewProperty(CSharpNames.IsNested, PropertyValueType.Boolean, "Whether the class is declared inside another type."),
+            new PropertyDescriptor(CSharpNames.IsNamedLikeFile, PropertyKind.Syntax, PropertyValueType.Boolean, "Whether the class name, without type parameters, equals the entire file name with its .cs extension removed.", _noValues) { RuleVersion = _fileRuleVersion, ReadsFileName = true },
             Syntax(CSharpNames.IsPartial, PropertyValueType.Boolean, "Whether this part of the class is written partial.", _noValues),
             Syntax(CSharpNames.Lines, PropertyValueType.Number, "How many lines the class takes, attributes included, documentation comment not.", _noValues),
             Syntax(CSharpNames.FitsOnOneLine, PropertyValueType.Boolean, "Whether the whole class sits on one line.", _noValues),
@@ -101,6 +106,22 @@ internal sealed class CSharpArtifactCatalog : IArtifactCatalog
         };
 
         return new ArtifactType(CSharpNames.Usage, "A place where code refers to a type or to a member of a type, as the compiler resolved the name. Only known from the build.", properties, true);
+    }
+
+    private static ArtifactType CreateFile()
+    {
+        var properties = new List<PropertyDescriptor>
+        {
+            new PropertyDescriptor(CSharpNames.Name, PropertyKind.Syntax, PropertyValueType.Text, "The file name, including its extension and without its directory.", _noValues) { ReadsFileName = true },
+            Syntax(CSharpNames.TypesInFile, PropertyValueType.Number, "How many top-level classes, records, structs, interfaces, enums and delegates this file declares.", _noValues)
+        };
+
+        return new ArtifactType(CSharpNames.File, "A C# source file. A file rule applies when the file is added or renamed, or when any line in it changes.", properties) { RuleVersion = _fileRuleVersion };
+    }
+
+    private static PropertyDescriptor NewProperty(string name, PropertyValueType type, string description)
+    {
+        return new PropertyDescriptor(name, PropertyKind.Syntax, type, description, _noValues) { RuleVersion = _fileRuleVersion };
     }
 
     private static PropertyDescriptor Syntax(string name, PropertyValueType valueType, string description, string[] allowedValues)

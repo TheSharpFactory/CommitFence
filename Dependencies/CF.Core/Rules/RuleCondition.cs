@@ -10,11 +10,12 @@ public sealed class RuleCondition
     /// <summary>
     /// Creates a condition.
     /// </summary>
-    public RuleCondition(string propertyName, Comparison comparison, IReadOnlyList<PropertyValue> expectedValues)
+    public RuleCondition(string propertyName, Comparison comparison, IReadOnlyList<PropertyValue> expectedValues, bool isList = false)
     {
         PropertyName = propertyName;
         Comparison = comparison;
         ExpectedValues = expectedValues;
+        IsList = isList || comparison == Comparison.IsOneOf || expectedValues.Count > 1;
     }
 
     /// <summary>
@@ -32,17 +33,22 @@ public sealed class RuleCondition
     /// </summary>
     public IReadOnlyList<PropertyValue> ExpectedValues { get; }
 
+    /// <summary>Whether the expected values are written as a list, even when there is only one.</summary>
+    public bool IsList { get; }
+
     /// <summary>
     /// Whether the value of a property satisfies the condition.
     /// </summary>
     public bool IsMetBy(PropertyValue actual)
     {
-        foreach(var expected in ExpectedValues)
+        return Comparison switch
         {
-            if(expected.Equals(actual))
-                return true;
-        }
-
-        return false;
+            Comparison.Is or Comparison.IsOneOf => ExpectedValues.Contains(actual),
+            Comparison.IsNot => !ExpectedValues.Contains(actual),
+            Comparison.AtMost => actual.Type == PropertyValueType.Number && actual.Number <= ExpectedValues[0].Number,
+            Comparison.AtLeast => actual.Type == PropertyValueType.Number && actual.Number >= ExpectedValues[0].Number,
+            Comparison.Matches => actual.Type == PropertyValueType.Text && RuleWildcard.Matches(actual.Text, ExpectedValues[0].Text),
+            _ => false
+        };
     }
 }

@@ -37,14 +37,26 @@ internal sealed class HookProgramDoctorCheck(IDoctorGit git, IFileSystem files, 
         var path = SettingsFileName.PathIn(repositoryFolder);
         try
         {
-            var requires = files.FileExists(path) ? settings.Read(path).Requires : null;
+            var text = files.FileExists(path) ? settings.ReadText(path) : null;
+            var requires = text == null ? null : SettingsReader.ReadRequires(text);
             var found = new DoctorText(CodeText(HookLine.PathSetting), " is ", CodeText(programPath), ", version ", CodeText(version),
                 requires == null ? ". The repository accepts any version." : ". The repository asks for ",
                 requires == null ? "" : CodeText(requires), requires == null ? "" : " or later.");
             if(VersionRequirement.Refusal(requires, version) != null)
                 return Fail(found, new DoctorText("Update ", CodeText("CommitFence"), ", then run ", CodeText("commitfence install"), " from the updated copy."), DoctorImpact.Program);
 
-            return Pass(found);
+            if(text == null)
+                return Pass(found);
+
+            var higher = settings.HigherFeatureVersion(settings.Parse(text));
+            if(higher == null)
+                return Pass(found);
+
+            var actions = new List<DoctorAction> { new DoctorAction(DoctorActionKind.OpenFile, "Open commitfence.json", path, null) };
+            return Fail(new DoctorText(CodeText(SettingsFileName.Default), " uses rule features that require CommitFence ", CodeText(higher),
+                requires == null ? ". The file has no requires setting." : $". The file requires only {requires}."),
+                new DoctorText("Set the minimum version in ", CodeText(SettingsFileName.Default), " to ", CodeText($"\"requires\": \"{higher}\""), "."),
+                DoctorImpact.Program, actions);
         }
         catch(SettingsException exception)
         {

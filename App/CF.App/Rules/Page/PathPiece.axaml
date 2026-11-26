@@ -1,0 +1,49 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:local="using:CF.App.Rules.Page"
+             xmlns:parts="using:CF.App.Parts"
+             x:Class="CF.App.Rules.Page.PathPiece"
+             x:ClassModifier="internal"
+             ClipToBounds="False"
+             x:DataType="local:PathPieceViewModel">
+
+  <!-- One path of the within clause: the token in the For clause's colours, its remove button 4 after, then "or" when another path
+       follows. The piece is never wider than the line it stands in: a pattern longer than its room is cut in the middle with an
+       ellipsis (see ShortValueText) and its whole is in the tooltip and the picker. A refused path has the outline and the block mark
+       at its start. A new path is an empty token that says "type a path". -->
+  <DockPanel MinHeight="36" LastChildFill="True">
+
+    <TextBlock DockPanel.Dock="Right" IsVisible="{Binding ShowsOr}" Theme="{StaticResource type-sentence}" Foreground="{DynamicResource ink-2}"
+               VerticalAlignment="Bottom" Margin="4,0,0,0" Text="or"/>
+
+    <Button DockPanel.Dock="Right" Classes="remove boxed" VerticalAlignment="Bottom" Margin="2,0,0,0" Command="{Binding RemoveCommand}"
+            ToolTip.Tip="Remove this path" AutomationProperties.Name="{Binding RemoveSpokenName}">
+      <parts:Icon Data="{StaticResource i-x}" Width="16" Height="16" StrokeThickness="1.8"
+                  Stroke="{Binding $parent[Button].Foreground}"/>
+    </Button>
+
+    <Panel>
+      <Button Name="PathButton" Classes="token for" Classes.empty="{Binding IsNew}" Classes.invalid="{Binding ShowsRefused}"
+              Classes.open="{Binding IsOpen}" VerticalAlignment="Top" HorizontalAlignment="Left" Command="{Binding OpenPickerCommand}"
+              ToolTip.Tip="Files the rule applies to" ToolTip.ShowDelay="500" ToolTip.Placement="Top" ToolTip.VerticalOffset="-8" local:TipPlacement.AvoidsHead="True" AutomationProperties.Name="{Binding SpokenName}"
+              AutomationProperties.HelpText="{Binding InvalidReasonSpoken}">
+        <DockPanel>
+          <parts:Icon DockPanel.Dock="Right" Data="{StaticResource i-down}" Width="13" Height="13" StrokeThickness="1.8"
+                      Stroke="{Binding $parent[Button].Foreground}" VerticalAlignment="Center" Margin="6,0,0,0"/>
+          <parts:EffectMark DockPanel.Dock="Left" IsVisible="{Binding ShowsRefused}" Kind="Block" Width="16" Height="16" Margin="-2,0,8,0"
+                            Shape="{DynamicResource block}" Sign="{DynamicResource on-block}" VerticalAlignment="Center"/>
+          <local:ShortValueText Name="Value" Classes="path" VerticalAlignment="Top" Margin="0,-1" IsVisible="{Binding !IsNew}" Values="{Binding PatternValues}"/>
+          <TextBlock Classes="word" Theme="{StaticResource type-token}" VerticalAlignment="Top" Margin="0,-1" IsVisible="{Binding IsNew}"
+                     Text="{Binding TokenText}"/>
+        </DockPanel>
+      </Button>
+      <Popup IsOpen="{Binding IsOpen, Mode=TwoWay}" PlacementTarget="{Binding #PathButton}"
+             Placement="BottomEdgeAlignedLeft" VerticalOffset="6" IsLightDismissEnabled="True"
+             ShouldUseOverlayLayer="True" PlacementConstraintAdjustment="SlideX">
+        <local:PathPanel/>
+      </Popup>
+    </Panel>
+
+  </DockPanel>
+
+</UserControl>

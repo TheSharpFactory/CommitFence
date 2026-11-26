@@ -13,11 +13,13 @@ internal sealed class RulesRunner
 {
     private readonly IRuleService _ruleService;
     private readonly CommandEnvironment _environment;
+    private readonly Func<string> _defaultSettingsPath;
 
-    public RulesRunner(IRuleService ruleService, CommandEnvironment environment)
+    public RulesRunner(IRuleService ruleService, CommandEnvironment environment, Func<string> defaultSettingsPath)
     {
         _ruleService = ruleService;
         _environment = environment;
+        _defaultSettingsPath = defaultSettingsPath;
     }
 
     public ExitCode Run(string[] args)
@@ -26,7 +28,7 @@ internal sealed class RulesRunner
         if(arguments.Error != null)
             return Fail(arguments.Error + Environment.NewLine + UsageText.Text);
 
-        var settingsPath = Path.GetFullPath(arguments.SettingsPath ?? SettingsFileName.Default, _environment.CurrentFolder);
+        var settingsPath = arguments.SettingsPath == null ? _defaultSettingsPath() : Path.GetFullPath(arguments.SettingsPath, _environment.CurrentFolder);
         try
         {
             return RunSubcommand(arguments, settingsPath);

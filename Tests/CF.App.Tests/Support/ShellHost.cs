@@ -14,16 +14,19 @@ internal sealed class ShellHost : IDisposable
 {
     private readonly TestFolder _folder = new TestFolder();
 
-    public ShellHost(string settings = SettingsText.Four, IReadOnlyList<FileRule>? fileRules = null, string repositoryName = "invoicing", IFixService? fixes = null, string? parentFolder = null)
+    public ShellHost(string? settings = SettingsText.Four, IReadOnlyList<FileRule>? fileRules = null, string repositoryName = "invoicing", IFixService? fixes = null, string? parentFolder = null, ISetupService? setup = null)
     {
         RepositoryPath = Path.Combine(parentFolder ?? _folder.Path, repositoryName);
         Directory.CreateDirectory(RepositoryPath);
-        File.WriteAllText(Path.Combine(RepositoryPath, "commitfence.json"), settings);
+        if(settings != null)
+            File.WriteAllText(Path.Combine(RepositoryPath, "commitfence.json"), settings);
+
         Rules = new RuleServiceDouble(Path.Combine(_folder.Path, "data"));
         if(fileRules != null)
             Rules.FileListings = new List<FileRuleListing> { new FileRuleListing("csharp", ".editorconfig", fileRules, new List<string>()) };
 
-        Services = new CommitFenceServices(new ProductInfoService(), Clock, new List<ILanguage>(), Rules, Review, null!, new FixedFolderService(Samples.Folder(RepositoryPath, name: repositoryName)), Updater, Record, Doctor, SettingsService, Structure, Languages, Machine, Exemptions, Stats, fixes);
+        Review.UseRules(Rules, RepositoryPath);
+        Services = new CommitFenceServices(new ProductInfoService(), Clock, new List<ILanguage>(), Rules, Review, setup!, new FixedFolderService(Samples.Folder(RepositoryPath, name: repositoryName)), Updater, Record, Doctor, SettingsService, Structure, Languages, Machine, Exemptions, Stats, fixes);
         Model = new MainWindowViewModel(Services, RepositoryPath, Samples.InstallFolder);
     }
 

@@ -3,12 +3,115 @@
              xmlns:local="using:CF.App.Rules"
              xmlns:parts="using:CF.App.Parts"
              xmlns:review="using:CF.App.Review"
+             xmlns:doctor="using:CF.App.Doctor"
              x:Class="CF.App.Rules.RulesView"
              x:ClassModifier="internal"
              x:DataType="local:RulesViewModel">
 
   <!-- Rules: the list column, then the page. Two panes from a window 1304 wide, one pane under it,
        where the page comes over the list. -->
+  <UserControl.Resources>
+    <DataTemplate x:Key="SetupPage" x:DataType="local:RulesViewModel">
+      <StackPanel MaxWidth="600" HorizontalAlignment="Stretch">
+        <Grid Height="48" ColumnDefinitions="Auto,*,Auto" ColumnSpacing="10">
+          <Border Background="{DynamicResource hover}" CornerRadius="7" Height="24" Padding="7,0,9,0">
+            <StackPanel Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
+              <parts:Icon Data="{StaticResource i-set}" Width="12" Height="12" Stroke="{DynamicResource ink-2}"/>
+              <TextBlock Theme="{StaticResource type-label}" FontWeight="SemiBold" Foreground="{DynamicResource ink-2}" Text="Setup"/>
+            </StackPanel>
+          </Border>
+          <TextBlock Grid.Column="1" Theme="{StaticResource code-strong}" VerticalAlignment="Center"
+                     Text="{Binding SetupRepository}" TextTrimming="CharacterEllipsis"/>
+          <StackPanel Grid.Column="2" IsVisible="{Binding !IsStarting}" Orientation="Horizontal" Spacing="8"
+                      Margin="0,0,4,0" VerticalAlignment="Center">
+            <parts:Icon IsVisible="{Binding ShowsPendingSetupState}" Data="{StaticResource i-circle}" Width="14" Height="14"
+                        Stroke="{DynamicResource ink-3}" VerticalAlignment="Center"/>
+            <parts:Icon IsVisible="{Binding !NeedsSetup}" Data="{StaticResource i-check}" Width="14" Height="14"
+                        Stroke="{DynamicResource req-ink}" VerticalAlignment="Center"/>
+            <Ellipse IsVisible="{Binding ShowsFailedSetupState}" Width="8" Height="8" Fill="{DynamicResource block}" VerticalAlignment="Center"/>
+            <TextBlock Classes="setup-state" Classes.failed="{Binding ShowsFailedSetupState}"
+                       Theme="{StaticResource type-body}" FontWeight="Medium" Text="{Binding SetupState}"/>
+          </StackPanel>
+        </Grid>
+        <TextBlock Theme="{StaticResource type-title}" Margin="0,8,0,0" TextWrapping="Wrap" Text="{Binding SetupHeading}"/>
+        <Grid Height="20" Margin="0,2,0,0" ColumnDefinitions="Auto,*" ColumnSpacing="8">
+          <parts:Icon Data="{StaticResource i-file}" Width="14" Height="14" Stroke="{DynamicResource ink-3}" VerticalAlignment="Center"/>
+          <TextBlock Grid.Column="1" Theme="{StaticResource type-body}" Foreground="{DynamicResource ink-2}" TextTrimming="CharacterEllipsis"
+                     Text="{Binding SetupReservedLine}"/>
+        </Grid>
+        <TextBlock IsVisible="{Binding NeedsSetup}" Theme="{StaticResource type-body}" Foreground="{DynamicResource ink-2}"
+                   Margin="0,14,0,0" TextWrapping="Wrap"
+                   Text="Starting here writes commitfence.json with no rules yet. Nothing else in the repository changes."/>
+        <Grid IsVisible="{Binding !NeedsSetup}" Margin="0,16,0,0" ColumnDefinitions="Auto,*" ColumnSpacing="10">
+          <Border Width="20" Height="20" CornerRadius="6" VerticalAlignment="Top" Background="{DynamicResource req-ink}">
+            <parts:Icon Data="{StaticResource i-check}" Width="12" Height="12" StrokeThickness="2.8" Stroke="{DynamicResource page}"
+                        HorizontalAlignment="Center" VerticalAlignment="Center"/>
+          </Border>
+          <TextBlock Grid.Column="1" Theme="{StaticResource type-body}" TextWrapping="Wrap"
+                     AutomationProperties.Name="{Binding SetupConfirmation}" AutomationProperties.LiveSetting="Polite">
+            <Run Text="{Binding SetupConfirmation}" FontWeight="SemiBold"/><Run Text="{Binding SetupWhen}" Foreground="{DynamicResource ink-2}"/>
+          </TextBlock>
+        </Grid>
+        <Border Margin="0,20,0,0" BorderBrush="{DynamicResource line}" BorderThickness="1"
+                CornerRadius="16" ClipToBounds="True" AutomationProperties.Name="commitfence.json: {, &quot;rules&quot;: [], }">
+          <StackPanel>
+            <Border MinHeight="40" Padding="16,6" Background="{DynamicResource well}" BorderBrush="{DynamicResource line}" BorderThickness="0,0,0,1">
+              <Grid ColumnDefinitions="Auto,Auto,*,Auto" ColumnSpacing="8" VerticalAlignment="Center">
+                <parts:Icon Data="{StaticResource i-file}" Width="16" Height="16" Stroke="{DynamicResource ink-2}" VerticalAlignment="Center"/>
+                <TextBlock Grid.Column="1" Theme="{StaticResource code-strong}" Text="commitfence.json" VerticalAlignment="Center"/>
+                <TextBlock Grid.Column="2" Theme="{StaticResource type-meta}" Foreground="{DynamicResource ink-2}" VerticalAlignment="Center"
+                           Text="{Binding SettingsLocation}" TextWrapping="Wrap"/>
+                <Button Grid.Column="3" Classes="cf outlined small" IsVisible="{Binding !NeedsSetup}"
+                        Command="{Binding OpenSettingsFileCommand}" AutomationProperties.Name="Open file">
+                  <StackPanel Orientation="Horizontal" Spacing="6">
+                    <parts:Icon Data="{StaticResource i-open}" Width="14" Height="14" Stroke="{Binding $parent[Button].Foreground}"/>
+                    <TextBlock Theme="{StaticResource type-meta-strong}" Text="Open file"/>
+                  </StackPanel>
+                </Button>
+                <Panel Grid.Column="3" IsVisible="{Binding SetupError, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
+                  <review:CopyButton IsCompact="True" DataContext="{Binding CopyStarter}"/>
+                </Panel>
+              </Grid>
+            </Border>
+            <parts:FileLines Margin="0,8" ItemsSource="{Binding StarterLines}" NumberWidth="30" NumberGap="14"/>
+          </StackPanel>
+        </Border>
+        <Grid IsVisible="{Binding SetupError, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"
+              ColumnDefinitions="Auto,*" ColumnSpacing="8" Margin="0,16,0,0">
+          <parts:EffectMark Kind="Block" Width="14" Height="14" VerticalAlignment="Top" Margin="0,3,0,0"
+                            Shape="{DynamicResource block}" Sign="{DynamicResource on-block}"/>
+          <doctor:DoctorTextBlock Grid.Column="1" Classes="error" Theme="{StaticResource type-body}"
+                                  Foreground="{DynamicResource block-ink}" Parts="{Binding SetupErrorParts}"
+                                  FailureDetail="{Binding SetupErrorDetail}" AutomationProperties.LiveSetting="Polite"/>
+        </Grid>
+        <parts:BusyButton IsVisible="{Binding NeedsSetup}" Classes="cf main" Width="232" HorizontalAlignment="Left" Margin="0,16,0,0"
+                          IsBusy="{Binding IsStarting}" Command="{Binding StartSettingsCommand}" AutomationProperties.Name="{Binding StartName}">
+          <StackPanel Orientation="Horizontal" Spacing="8">
+            <parts:Icon IsVisible="{Binding ShowsStartIcon}" Data="{StaticResource i-plus}" Width="16" Height="16"
+                        Stroke="{Binding $parent[Button].Foreground}"/>
+            <parts:Icon IsVisible="{Binding ShowsFailedSetupState}" Data="{StaticResource i-refresh}" Width="16" Height="16"
+                        Stroke="{Binding $parent[Button].Foreground}"/>
+            <parts:TurningRing Classes="button-ring on-solid" VerticalAlignment="Center" IsVisible="{Binding IsStarting}"/>
+            <TextBlock Theme="{StaticResource type-body-strong}" Text="{Binding StartLabel}"/>
+          </StackPanel>
+        </parts:BusyButton>
+        <Panel IsVisible="{Binding !NeedsSetup}" Margin="0,20,0,0">
+          <parts:SetupNextStepView DataContext="{Binding CommitSettings}"/>
+        </Panel>
+        <StackPanel IsVisible="{Binding !NeedsSetup}" Margin="0,28,0,0">
+          <TextBlock Theme="{StaticResource type-h2}" Text="No rules yet"/>
+          <TextBlock Theme="{StaticResource type-body}" Foreground="{DynamicResource ink-2}" MaxWidth="600" HorizontalAlignment="Left"
+                     Margin="0,8,0,12" TextWrapping="Wrap"
+                     Text="A rule is a sentence. Write the first one with New rule, at the top of the list. One reads like this:"/>
+          <Border Background="{DynamicResource well}" CornerRadius="16" Padding="20,16,20,10" Margin="0,4,0,0"
+                  AutomationProperties.Name="{Binding SpecimenSpokenName}">
+            <review:SentencePieces Pieces="{Binding Specimen}" IsHitTestVisible="False"/>
+          </Border>
+        </StackPanel>
+      </StackPanel>
+    </DataTemplate>
+  </UserControl.Resources>
+
   <UserControl.DataTemplates>
     <DataTemplate DataType="local:GroupHeadingViewModel" x:DataType="local:GroupHeadingViewModel">
       <Border Height="44" BorderBrush="{DynamicResource line}" BorderThickness="0,0,0,1" Padding="4,0"
@@ -47,6 +150,15 @@
   </UserControl.DataTemplates>
 
   <UserControl.Styles>
+    <Style Selector="TextBlock.setup-state">
+      <Setter Property="Foreground" Value="{DynamicResource ink-2}"/>
+    </Style>
+    <Style Selector="TextBlock.setup-state.failed">
+      <Setter Property="Foreground" Value="{DynamicResource block-ink}"/>
+    </Style>
+    <Style Selector="Grid#Head TextBlock#MessageText">
+      <Setter Property="MaxWidth" Value="{Binding $parent[Grid].Bounds.Width}"/>
+    </Style>
     <Style Selector="Grid#RowRoot">
       <Setter Property="Margin" Value="12"/>
     </Style>
@@ -117,7 +229,12 @@
     </Style>
     <Style Selector="ListBox.rules ListBoxItem.note">
       <Setter Property="Focusable" Value="False"/>
+    </Style>
+    <Style Selector="ListBox.rules ListBoxItem.note:not(.setup)">
       <Setter Property="IsHitTestVisible" Value="False"/>
+    </Style>
+    <Style Selector="Button.rulehead">
+      <Setter Property="HorizontalAlignment" Value="Right"/>
     </Style>
 
     <!-- In one pane the rows are never wider than the list of two panes plus the arrow, sit in the middle of the pane, and none
@@ -267,9 +384,10 @@
         </Border>
 
         <!-- The head: the name of the screen and New rule. -->
-        <Grid Grid.Row="3" MaxWidth="684" Margin="16,4,16,12" ColumnDefinitions="*,Auto">
+        <Grid Grid.Row="3" MaxWidth="684" Margin="16,4,16,12" ColumnDefinitions="Auto,*">
           <TextBlock Theme="{StaticResource type-h1}" Text="Rules" VerticalAlignment="Center"/>
-          <Button Grid.Column="1" Classes="cf main" Command="{Binding NewRuleFromHeadCommand}"
+          <Button Name="NewRuleButton" Grid.Column="1" Classes="cf rulehead" Classes.main="{Binding !NeedsSetup}" Classes.outlined="{Binding NeedsSetup}"
+                  Command="{Binding NewRuleFromHeadCommand}"
                   AutomationProperties.Name="New rule">
             <StackPanel Orientation="Horizontal" Spacing="8">
               <parts:Icon Data="{StaticResource i-plus}" Width="16" Height="16"
@@ -346,6 +464,19 @@
                                Foreground="{DynamicResource ink-2}" Text="{Binding Text}"/>
                     <TextBlock IsVisible="{Binding FollowsFilter}" Theme="{StaticResource type-meta}"
                                Foreground="{DynamicResource ink-2}" Text="{Binding Text}"/>
+                    <Panel IsVisible="{Binding OffersSetup}">
+                      <Panel IsVisible="{Binding Setup.IsOnePane}">
+                        <ContentControl IsVisible="{Binding Setup.ShowsSetup}" Content="{Binding Setup}" ContentTemplate="{StaticResource SetupPage}"/>
+                        <TextBlock IsVisible="{Binding !Setup.ShowsSetup}" Theme="{StaticResource type-body}"
+                                   Foreground="{DynamicResource ink-2}" Text="No custom rules yet."/>
+                      </Panel>
+                      <Panel IsVisible="{Binding !Setup.IsOnePane}">
+                        <TextBlock IsVisible="{Binding Setup.NeedsSetup}" Theme="{StaticResource type-body}"
+                                   Foreground="{DynamicResource ink-2}" Text="{Binding Text}"/>
+                        <TextBlock IsVisible="{Binding !Setup.NeedsSetup}" Theme="{StaticResource type-body}"
+                                   Foreground="{DynamicResource ink-2}" Text="No custom rules yet."/>
+                      </Panel>
+                    </Panel>
                   </Panel>
                 </Border>
               </DataTemplate>
@@ -549,24 +680,30 @@
     <Border Name="PagePane" Grid.Column="1" Background="{DynamicResource page}">
       <Panel Margin="0,36,0,0">
         <Panel Name="PageHost"/>
-        <!-- No row to open: the empty block, its middle at 40 percent of the pane's height. -->
-        <StackPanel Name="NoRuleBlock" IsVisible="{Binding ShowsNoRuleBlock}" MaxWidth="520" HorizontalAlignment="Center" VerticalAlignment="Top"
-                    Margin="32,32,32,0">
-          <TextBlock Theme="{StaticResource type-title}" TextAlignment="Center" TextWrapping="Wrap" Text="{Binding NoRuleHeading}"/>
-          <TextBlock Theme="{StaticResource type-lead}" Foreground="{DynamicResource ink-2}" TextAlignment="Center" TextWrapping="Wrap" Margin="0,8,0,0"
-                     Text="{Binding NoRuleLead}"/>
-          <Border Background="{DynamicResource well}" CornerRadius="16" Padding="20,16" HorizontalAlignment="Center" Margin="0,16,0,0"
-                  AutomationProperties.Name="{Binding SpecimenSpokenName}">
-            <review:SentencePieces Pieces="{Binding Specimen}" IsHitTestVisible="False"/>
-          </Border>
-          <Button Classes="cf outlined" HorizontalAlignment="Center" Margin="0,24,0,0" IsVisible="{Binding HasNoRules}"
-                  Command="{Binding NewRuleFromHeadCommand}" AutomationProperties.Name="New rule">
-            <StackPanel Orientation="Horizontal" Spacing="8">
-              <parts:Icon Data="{StaticResource i-plus}" Width="16" Height="16" Stroke="{Binding $parent[Button].Foreground}"/>
-              <TextBlock Theme="{StaticResource type-body-strong}" Text="New rule"/>
-            </StackPanel>
-          </Button>
-        </StackPanel>
+        <Panel IsVisible="{Binding ShowsNoRuleBlock}">
+          <ScrollViewer IsVisible="{Binding ShowsSetup}" Padding="32,4,32,32" HorizontalScrollBarVisibility="Disabled">
+            <Grid>
+              <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" MaxWidth="600"/>
+                <ColumnDefinition Width="Auto"/>
+              </Grid.ColumnDefinitions>
+              <ContentControl Content="{Binding}" ContentTemplate="{StaticResource SetupPage}" HorizontalContentAlignment="Stretch"/>
+            </Grid>
+          </ScrollViewer>
+          <!-- The list has no rule to open. -->
+          <StackPanel Name="NoRuleBlock" IsVisible="{Binding !ShowsSetup}" MaxWidth="520" HorizontalAlignment="Center" VerticalAlignment="Top"
+                      Margin="32,32,32,0">
+            <TextBlock Theme="{StaticResource type-title}" TextAlignment="Center" TextWrapping="Wrap" Text="{Binding NoRuleHeading}"/>
+            <TextBlock Theme="{StaticResource type-lead}" Foreground="{DynamicResource ink-2}" TextAlignment="Center" TextWrapping="Wrap" Margin="0,8,0,0"
+                       Text="{Binding NoRuleLead}"/>
+            <Border Background="{DynamicResource well}" CornerRadius="16" Padding="20,16" HorizontalAlignment="Center" Margin="0,16,0,0"
+                    AutomationProperties.Name="{Binding SpecimenSpokenName}">
+              <review:SentencePieces Pieces="{Binding Specimen}" IsHitTestVisible="False"/>
+            </Border>
+            <TextBlock Theme="{StaticResource type-body}" Foreground="{DynamicResource ink-2}" TextAlignment="Center" TextWrapping="Wrap"
+                       Margin="0,24,0,0" IsVisible="{Binding ShowsEmptyRules}" Text="Write it with New rule, at the top of the list."/>
+          </StackPanel>
+        </Panel>
       </Panel>
     </Border>
 

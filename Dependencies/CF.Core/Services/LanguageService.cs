@@ -1,5 +1,6 @@
 using CF.Core.Code;
 using CF.Core.Ports;
+using CF.Core.Structure;
 
 namespace CF.Core.Services;
 
@@ -21,6 +22,18 @@ public sealed class LanguageService : ILanguageService
     {
         var paths = PathsOfLastCommit(folder);
         return _languages.Select(language => new LanguageReport(language.Name, language.FileEndings, paths?.Count(language.OwnsFile), language.FullReviewNote)).ToList();
+    }
+
+    /// <inheritdoc />
+    public PathMatches? FindFiles(string folder, string languageId, string pattern)
+    {
+        var language = _languages.FirstOrDefault(candidate => candidate.Id == languageId);
+        var paths = language == null ? null : PathsOfLastCommit(folder);
+        if(paths == null)
+            return null;
+
+        var patterns = new List<string> { pattern };
+        return new PathMatches(paths.Where(path => language!.OwnsFile(path) && PathFilter.Matches(patterns, path)).ToList());
     }
 
     /// <summary>

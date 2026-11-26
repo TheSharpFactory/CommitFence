@@ -9,12 +9,12 @@ namespace CF.Core.Review;
 /// </summary>
 internal sealed class ReadSource
 {
-    public ReadSource(ILanguage language, CodeFile file, IReadOnlyList<ReadWay> ways, IReadOnlyList<LineRange> changedLines)
+    public ReadSource(ILanguage language, CodeFile file, IReadOnlyList<ReadWay> ways, ChangedFile change)
     {
         Language = language;
         File = file;
         Ways = ways;
-        ChangedLines = changedLines;
+        Change = change;
     }
 
     public ILanguage Language { get; }
@@ -23,5 +23,5 @@ internal sealed class ReadSource
 
     public IReadOnlyList<ReadWay> Ways { get; }
 
-    public IReadOnlyList<LineRange> ChangedLines { get; }
+    public ChangedFile Change { get; }
 }

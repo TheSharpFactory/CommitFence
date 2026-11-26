@@ -6,7 +6,7 @@ namespace CF.Core.Changes;
 /// </summary>
 public sealed class ChangeSet
 {
-    private ChangeSet(string label, string beforeTree, string tree, IReadOnlyList<ChangedFile> files, IReadOnlyList<string> ruleFilesChanged, string note, string? wholeFolder, bool hasUncommittedWork = false)
+    private ChangeSet(string label, string beforeTree, string tree, IReadOnlyList<ChangedFile> files, IReadOnlyList<string> ruleFilesChanged, string note, string? wholeFolder, bool hasUncommittedWork = false, string commit = "")
     {
         Label = label;
         BeforeTree = beforeTree;
@@ -16,6 +16,7 @@ public sealed class ChangeSet
         Note = note;
         WholeFolder = wholeFolder;
         HasUncommittedWork = hasUncommittedWork;
+        Commit = commit;
     }
 
     /// <summary>
@@ -67,6 +68,12 @@ public sealed class ChangeSet
     public string? WholeFolder { get; }
 
     /// <summary>
+    /// The full id of the last commit as it was when this change set was taken, for a staged review (the commit the index is
+    /// compared with) and a whole review (the commit read); empty for the others and when the repository has no commit.
+    /// </summary>
+    public string Commit { get; }
+
+    /// <summary>
     /// Whether the working folder holds changes that are not committed and so are not part of this review.
     /// </summary>
     public bool HasUncommittedWork { get; }
@@ -94,7 +101,7 @@ public sealed class ChangeSet
     /// </summary>
     public ChangeSet WithNote(string sentence)
     {
-        return new ChangeSet(Label, BeforeTree, Tree, Files, RuleFilesChanged, Note + " " + sentence, WholeFolder, HasUncommittedWork);
+        return new ChangeSet(Label, BeforeTree, Tree, Files, RuleFilesChanged, Note + " " + sentence, WholeFolder, HasUncommittedWork, Commit);
     }
 
     /// <summary>
@@ -102,7 +109,15 @@ public sealed class ChangeSet
     /// </summary>
     public ChangeSet WithUncommittedWork(string sentence)
     {
-        return new ChangeSet(Label, BeforeTree, Tree, Files, RuleFilesChanged, Note + " " + sentence, WholeFolder, true);
+        return new ChangeSet(Label, BeforeTree, Tree, Files, RuleFilesChanged, Note + " " + sentence, WholeFolder, true, Commit);
+    }
+
+    /// <summary>
+    /// The same change set, naming the commit it was taken against.
+    /// </summary>
+    public ChangeSet WithCommit(string commit)
+    {
+        return new ChangeSet(Label, BeforeTree, Tree, Files, RuleFilesChanged, Note, WholeFolder, HasUncommittedWork, commit);
     }
 
     /// <summary>

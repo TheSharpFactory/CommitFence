@@ -73,6 +73,11 @@
     <Setter Property="Background" Value="{DynamicResource forbid}"/>
     <Setter Property="Foreground" Value="{DynamicResource forbid-ink}"/>
   </Style>
+  <!-- A token whose words may wrap: it grows a line of 36 at a time, and its sign follows the last line. -->
+  <Style Selector="Button.token.wraps">
+    <Setter Property="Height" Value="NaN"/>
+    <Setter Property="MinHeight" Value="36"/>
+  </Style>
   <Style Selector="Button.token.start">
     <Setter Property="CornerRadius" Value="10,3,3,10"/>
   </Style>
@@ -138,6 +143,38 @@
   </Style>
   <Style Selector="Button.remove:focus-visible /template/ Border#Ring">
     <Setter Property="IsVisible" Value="True"/>
+  </Style>
+
+  <!-- The remove button of the rule page: the target is 36 by 36; the box that shows is 32 by 32, radius 9, centred, with
+       an edge of 1 in line-strong at rest and the sign in ink-2. Under the pointer the box fills with line and keeps its edge;
+       pressed it fills with line-strong and has no edge; the sign is ink in both. The keyboard rings the box with a line of 2
+       inside it. The sign is 16. -->
+  <Style Selector="Button.remove.boxed">
+    <Setter Property="Width" Value="36"/>
+    <Setter Property="Foreground" Value="{DynamicResource ink-2}"/>
+    <Setter Property="Template">
+      <ControlTemplate>
+        <Panel Background="Transparent">
+          <Border Name="Surface" Width="32" Height="32" CornerRadius="9" Background="Transparent" BorderThickness="1"
+                  BorderBrush="{DynamicResource line-strong}" HorizontalAlignment="Center" VerticalAlignment="Center">
+            <ContentPresenter Name="ContentHost" Content="{TemplateBinding Content}" HorizontalContentAlignment="Center"
+                              VerticalContentAlignment="Center" Foreground="{TemplateBinding Foreground}"/>
+          </Border>
+          <Border Name="Ring" Width="32" Height="32" IsVisible="False" IsHitTestVisible="False" CornerRadius="9" BorderThickness="2"
+                  BorderBrush="{DynamicResource focus}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+        </Panel>
+      </ControlTemplate>
+    </Setter>
+  </Style>
+  <Style Selector="Button.remove.boxed:pointerover /template/ Border#Surface">
+    <Setter Property="Background" Value="{DynamicResource line}"/>
+  </Style>
+  <Style Selector="Button.remove.boxed:pressed /template/ Border#Surface">
+    <Setter Property="Background" Value="{DynamicResource line-strong}"/>
+    <Setter Property="BorderBrush" Value="Transparent"/>
+  </Style>
+  <Style Selector="Button.remove.boxed:pressed">
+    <Setter Property="Foreground" Value="{DynamicResource ink}"/>
   </Style>
 
   <!-- The word require or forbid: a plain word of the sentence that opens a picker. 36 high, radius 10, padding 0 6 0 8. -->
@@ -217,6 +254,46 @@
   </Style>
   <Style Selector="ListBox.segmented.large ListBoxItem:selected TextBlock.segment">
     <Setter Property="FontWeight" Value="SemiBold"/>
+  </Style>
+
+  <!-- The field of a picker: an edge of 2 in focus, radius 8 (in block when what is typed is refused). In a value list each row is a
+       field of its own: an edge of 1 in line-strong, 2 in focus when the keyboard is in it. -->
+  <Style Selector="Border.valuefield">
+    <Setter Property="BorderBrush" Value="{DynamicResource focus}"/>
+  </Style>
+  <Style Selector="Border.valuefield.row">
+    <Setter Property="BorderThickness" Value="1"/>
+    <Setter Property="BorderBrush" Value="{DynamicResource line-strong}"/>
+  </Style>
+  <Style Selector="Border.valuefield.row:focus-within">
+    <Setter Property="BorderThickness" Value="2"/>
+    <Setter Property="Padding" Value="7,0"/>
+    <Setter Property="BorderBrush" Value="{DynamicResource focus}"/>
+  </Style>
+  <Style Selector="Border.valuefield.refused">
+    <Setter Property="BorderThickness" Value="2"/>
+    <Setter Property="BorderBrush" Value="{DynamicResource block}"/>
+  </Style>
+  <Style Selector="Border.valuefield.row.refused">
+    <Setter Property="Padding" Value="7,0"/>
+  </Style>
+
+  <!-- A text field of the rule page (the message and the reason): the page, an edge of 1 in line-strong, radius 10, padding 7 12;
+       under the pointer the edge is ink-3; focused it is 2 in focus and the padding shrinks by 1 so nothing moves. -->
+  <Style Selector="Border.textfield">
+    <Setter Property="Background" Value="{DynamicResource page}"/>
+    <Setter Property="BorderBrush" Value="{DynamicResource line-strong}"/>
+    <Setter Property="BorderThickness" Value="1"/>
+    <Setter Property="CornerRadius" Value="10"/>
+    <Setter Property="Padding" Value="12,7"/>
+  </Style>
+  <Style Selector="Border.textfield:pointerover">
+    <Setter Property="BorderBrush" Value="{DynamicResource ink-3}"/>
+  </Style>
+  <Style Selector="Border.textfield:focus-within">
+    <Setter Property="BorderBrush" Value="{DynamicResource focus}"/>
+    <Setter Property="BorderThickness" Value="2"/>
+    <Setter Property="Padding" Value="11,6"/>
   </Style>
 
   <!-- A picker: the page, an edge of line-strong, radius 12, padding 6, the popup's shadow. An entry is 36 high,

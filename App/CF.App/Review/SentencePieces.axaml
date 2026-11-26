@@ -27,6 +27,14 @@
     <Style Selector="Border.token.for TextBlock">
       <Setter Property="Foreground" Value="{DynamicResource for-ink}"/>
     </Style>
+    <Style Selector="Border.token.path">
+      <Setter Property="Background" Value="{DynamicResource for}"/>
+      <Setter Property="Padding" Value="8,0,8,0"/>
+    </Style>
+    <Style Selector="Border.token.path TextBlock">
+      <Setter Property="Foreground" Value="{DynamicResource for-ink}"/>
+      <Setter Property="FontFamily" Value="{StaticResource code-font}"/>
+    </Style>
     <Style Selector="Border.token.where">
       <Setter Property="Background" Value="{DynamicResource where}"/>
     </Style>
@@ -53,6 +61,9 @@
           <TextBlock Theme="{StaticResource type-body}" Foreground="{DynamicResource ink-2}"
                      VerticalAlignment="Center" Text="{Binding Lead}"/>
           <Border Classes="token for" IsVisible="{Binding IsFor}">
+            <TextBlock Theme="{StaticResource type-body-strong}" VerticalAlignment="Center" Text="{Binding Text}"/>
+          </Border>
+          <Border Classes="token path" IsVisible="{Binding IsPath}">
             <TextBlock Theme="{StaticResource type-body-strong}" VerticalAlignment="Center" Text="{Binding Text}"/>
           </Border>
           <StackPanel Orientation="Horizontal" Spacing="2" IsVisible="{Binding IsCondition}">

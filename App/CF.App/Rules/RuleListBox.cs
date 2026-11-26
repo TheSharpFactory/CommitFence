@@ -136,12 +136,14 @@ internal sealed class RuleListBox : ListBox
     {
         e.Container.Classes.Set("heading", e.Container.DataContext is GroupHeadingViewModel);
         e.Container.Classes.Set("note", e.Container.DataContext is GroupNoteViewModel);
+        e.Container.Classes.Set("setup", e.Container.DataContext is GroupNoteViewModel { OffersSetup: true });
     }
 
     private static void OnContainerClearing(object? sender, ContainerClearingEventArgs e)
     {
         e.Container.Classes.Set("heading", false);
         e.Container.Classes.Set("note", false);
+        e.Container.Classes.Set("setup", false);
         e.Container.Classes.Set("ring", false);
     }
 
@@ -286,7 +288,7 @@ internal sealed class RuleListBox : ListBox
     {
         _keyboardActive = false;
         var container = (e.Source as Visual)?.FindAncestorOfType<ListBoxItem>(true);
-        if(container?.DataContext is RuleListItemViewModel item)
+        if(container?.DataContext is RuleListItemViewModel item and not GroupNoteViewModel { OffersSetup: true })
         {
             SelectedItem = item;
             container.Focus(NavigationMethod.Pointer);

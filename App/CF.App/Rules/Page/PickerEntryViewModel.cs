@@ -14,6 +14,9 @@ internal sealed partial class PickerEntryViewModel : PickerItemViewModel
     [ObservableProperty]
     public partial bool IsHighlighted { get; set; }
 
+    [ObservableProperty]
+    public partial string Name { get; set; }
+
     public PickerEntryViewModel(string key, string name, string kindText, string group, bool isCurrent, bool isDisabled)
     {
         Key = key;
@@ -28,8 +31,6 @@ internal sealed partial class PickerEntryViewModel : PickerItemViewModel
     /// What the entry stands for in the rule: a property name, an artifact type, a language, require or forbid.
     /// </summary>
     public string Key { get; }
-
-    public string Name { get; }
 
     /// <summary>
     /// The kind of value ("number", "true or false"), or the note under require and forbid.

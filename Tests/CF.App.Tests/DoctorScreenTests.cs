@@ -21,6 +21,39 @@ public sealed class DoctorScreenTests
     private readonly FixedClock _clock = new FixedClock(Samples.Now);
 
     [AvaloniaFact]
+    public async Task LefthookHasOneCheckAgainAndRefreshesTheResult()
+    {
+        using var shell = new ShellHost();
+        shell.Doctor.Answer = folder => FakeDoctorService.HookSetupReport(folder, added: false, managed: true);
+        using var host = new ViewHost(new MainWindow { DataContext = shell.Model, Width = 1440, Height = 900 });
+        var doctor = shell.Model.Doctor;
+        shell.Model.CurrentScreen = Screen.Doctor;
+        await Signals.Until(doctor, () => !doctor.IsRunning);
+        host.Pump();
+
+        var row = doctor.Groups[0].Checks[0];
+        Assert.True(row.ShowsManualMark);
+        Assert.True(doctor.IsLeftToYou);
+        Assert.Equal("1 check is left to you", doctor.Heading);
+        var opened = new List<string>();
+        doctor.OpenFolderRequested += opened.Add;
+        Assert.Single(row.Actions, action => action.Label == "Open the repository folder").OpenCommand.Execute(null);
+        Assert.Equal(shell.RepositoryPath, Assert.Single(opened));
+        var again = Assert.Single(host.FindAll<Button>(button => button.IsEffectivelyVisible
+            && Avalonia.Automation.AutomationProperties.GetName(button) == "Check again"));
+        Assert.Equal("CheckAgainButton", again.Name);
+        shell.Doctor.Answer = folder => FakeDoctorService.HookSetupReport(folder, added: true);
+        Assert.True(again.Focus(NavigationMethod.Tab));
+        host.Press(PhysicalKey.Enter);
+        await Signals.Until(doctor, () => !doctor.IsRunning);
+        host.Pump();
+
+        Assert.Equal(2, shell.Doctor.Folders.Count);
+        Assert.True(doctor.Groups[0].Checks[0].ShowsPass);
+        Assert.True(host.HasFocusWithin(host.Find<Button>(button => button.Name == "CheckAgainButton")!));
+    }
+
+    [AvaloniaFact]
     public async Task FailingCheckIsOpenWithItsFixItsLinesAndItsButtons()
     {
         _doctor.Answer = _ => FakeDoctorService.Report(hookFails: true);

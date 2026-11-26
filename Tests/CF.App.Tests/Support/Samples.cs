@@ -38,9 +38,14 @@ internal static class Samples
         return new Coverage(file, CoverageStatus.Failed, reason);
     }
 
-    public static ReviewResult Result(ReviewOutcome outcome, IReadOnlyList<Finding>? findings = null, IReadOnlyList<Coverage>? coverage = null, IReadOnlyDictionary<string, string>? sources = null)
+    public static ReviewResult Result(ReviewOutcome outcome, IReadOnlyList<Finding>? findings = null, IReadOnlyList<Coverage>? coverage = null, IReadOnlyDictionary<string, string>? sources = null, string treeReviewed = "", string baseTreeReviewed = "", string commitReviewed = "")
     {
-        return new ReviewResult(outcome, findings ?? new List<Finding>(), coverage ?? new List<Coverage>(), new List<string>(), string.Empty, TimeSpan.FromSeconds(1.5), sources ?? new Dictionary<string, string>());
+        return new ReviewResult(outcome, findings ?? new List<Finding>(), coverage ?? new List<Coverage>(), new List<string>(), string.Empty, TimeSpan.FromSeconds(1.5), sources ?? new Dictionary<string, string>())
+        {
+            TreeReviewed = treeReviewed,
+            BaseTreeReviewed = baseTreeReviewed,
+            CommitReviewed = commitReviewed
+        };
     }
 
     public static OpenedFolder Folder(string path, bool insideRepository = true, string name = "invoicing")

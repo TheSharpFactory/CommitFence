@@ -15,15 +15,18 @@ internal sealed partial class FileLines : UserControl
     public static readonly StyledProperty<double> NumberWidthProperty = AvaloniaProperty.Register<FileLines, double>(nameof(NumberWidth), 52);
 
     public static readonly StyledProperty<double> NumberGapProperty = AvaloniaProperty.Register<FileLines, double>(nameof(NumberGap), 16);
+    public static readonly StyledProperty<double> SignWidthProperty = AvaloniaProperty.Register<FileLines, double>(nameof(SignWidth));
 
     public static readonly StyledProperty<bool> BandsCurrentProperty = AvaloniaProperty.Register<FileLines, bool>(nameof(BandsCurrent), true);
 
     public static readonly StyledProperty<Thickness> GapMarginProperty = AvaloniaProperty.Register<FileLines, Thickness>(nameof(GapMargin), new Thickness(16, 0, 0, 0));
+    public static readonly StyledProperty<Thickness> NumberMarginProperty = AvaloniaProperty.Register<FileLines, Thickness>(nameof(NumberMargin));
 
     static FileLines()
     {
         ItemsSourceProperty.Changed.AddClassHandler<FileLines>((lines, _) => lines.Rows.ItemsSource = lines.ItemsSource);
         NumberGapProperty.Changed.AddClassHandler<FileLines>((lines, _) => lines.SetValue(GapMarginProperty, new Thickness(lines.NumberGap, 0, 0, 0)));
+        SignWidthProperty.Changed.AddClassHandler<FileLines>((lines, _) => lines.SetValue(NumberMarginProperty, lines.SignWidth > 0 ? new Thickness(0, 0, 14, 0) : default));
     }
 
     public FileLines()
@@ -76,6 +79,13 @@ internal sealed partial class FileLines : UserControl
         }
     }
 
+    /// <summary>The width of the added-line sign column. Zero when the excerpt has no sign column.</summary>
+    public double SignWidth
+    {
+        get { return GetValue(SignWidthProperty); }
+        set { SetValue(SignWidthProperty, value); }
+    }
+
     /// <summary>
     /// Whether the line in force takes the background of hover over its whole row, wrapped rows too. The bar and the weight mark it
     /// either way.
@@ -102,4 +112,6 @@ internal sealed partial class FileLines : UserControl
             return GetValue(GapMarginProperty);
         }
     }
+
+    public Thickness NumberMargin { get { return GetValue(NumberMarginProperty); } }
 }

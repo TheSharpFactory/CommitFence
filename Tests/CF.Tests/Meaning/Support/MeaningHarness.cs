@@ -197,6 +197,7 @@ internal sealed class MeaningHarness
         var file = new CodeFile(path, _csharp.Id, text);
         var ways = new List<ReadWay> { new ReadWay(new List<FileReading>(), _csharp.Reader.Read(file)) };
 
-        return new ReadSource(_csharp, file, ways, new List<LineRange> { LineRange.ForWholeFile() });
+        var change = new ChangedFile(file.Path, file.Language, ChangeStatus.Added, [LineRange.ForWholeFile()]);
+        return new ReadSource(_csharp, file, ways, change);
     }
 }

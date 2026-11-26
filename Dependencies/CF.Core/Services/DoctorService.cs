@@ -42,14 +42,15 @@ public sealed class DoctorService : IDoctorService
         var machine = new DoctorMachineFacts(program, version, gitVersion, checks.Select(check => check.SdkVersion).FirstOrDefault(sdk => sdk != null), ReadDataFolder());
         var checkedAt = _clock.Now;
         var failed = checks.Where(check => check.Outcome == DoctorOutcome.Fails).ToList();
+        var beforeCommit = checks.Exists(check => check.Title == PrePushDoctorCheck.PreCommitTitle);
         var heading = failed.Count switch
         {
-            0 when checks.All(check => check.Outcome == DoctorOutcome.Passes) => "Ready for pushes",
+            0 when checks.All(check => check.Outcome == DoctorOutcome.Passes) => beforeCommit ? "Ready for commits" : "Ready for pushes",
             0 => "Checks could not finish",
             1 => "1 check fails",
             _ => $"{failed.Count} checks fail"
         };
-        return new DoctorReport(checks, machine, checkedAt, checkedAt >= startTime ? checkedAt - startTime : TimeSpan.Zero, heading, Verdict(failed, checks.All(check => check.Outcome == DoctorOutcome.Passes)));
+        return new DoctorReport(checks, machine, checkedAt, checkedAt >= startTime ? checkedAt - startTime : TimeSpan.Zero, heading, Verdict(failed, checks.All(check => check.Outcome == DoctorOutcome.Passes), beforeCommit));
     }
 
     private string? ReadDataFolder()
@@ -120,8 +121,14 @@ public sealed class DoctorService : IDoctorService
         return results;
     }
 
-    private static DoctorText Verdict(List<DoctorCheckResult> failed, bool ready)
+    private static DoctorText Verdict(List<DoctorCheckResult> failed, bool ready, bool beforeCommit)
     {
+        if(beforeCommit)
+        {
+            return ready ? new DoctorText("Every check passes. Staged changes are reviewed before they are committed.")
+                : new DoctorText("Check the results below to see whether this machine can review staged changes before a commit.");
+        }
+
         if(failed.Count == 0)
         {
             return ready ? new DoctorText("Every check passes. A push from this machine is reviewed before it leaves.")

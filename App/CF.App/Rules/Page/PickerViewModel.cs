@@ -36,6 +36,11 @@ internal sealed partial class PickerViewModel : ObservableObject
     /// </summary>
     public event Action<PickerEntryViewModel>? Chosen;
 
+    /// <summary>
+    /// Raised when the picker is closed with Esc: nothing was chosen.
+    /// </summary>
+    public event Action? Dismissed;
+
     public ObservableCollection<PickerItemViewModel> Items { get; } = new ObservableCollection<PickerItemViewModel>();
 
     public string SpokenName { get; }
@@ -70,6 +75,15 @@ internal sealed partial class PickerViewModel : ObservableObject
     public void Close()
     {
         IsOpen = false;
+    }
+
+    /// <summary>
+    /// Closes with Esc: nothing is chosen, and whoever opened the picker is told.
+    /// </summary>
+    public void Escape()
+    {
+        IsOpen = false;
+        Dismissed?.Invoke();
     }
 
     /// <summary>

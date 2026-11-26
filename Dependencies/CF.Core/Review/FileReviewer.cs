@@ -31,10 +31,10 @@ public sealed class FileReviewer
     /// Reviews the file.
     /// </summary>
     /// <remarks>
-    /// The readings are the ways a build compiles it; with none, the file is read as it is written. Returns what was
-    /// read, for the rules that need meaning, or nothing when the file was not read.
+    /// The readings are the ways a build compiles it; with none, the file is read as it is written. Returns the
+    /// changed source for the rules that need meaning when the review has a change and the file was read.
     /// </remarks>
-    internal ReadSource? Review(FileToReview file, IReadOnlyList<RuleDefinition> rules, ReviewRun run, IReadOnlyList<LineRange>? changedLines, IReadOnlyList<FileReading> readings)
+    internal ReadSource? Review(FileToReview file, IReadOnlyList<RuleDefinition> rules, ReviewRun run, ChangedFile? change, IReadOnlyList<FileReading> readings)
     {
         var path = file.ReportedPath.Replace('\\', '/');
         var language = _languages.FirstOrDefault(candidate => candidate.OwnsFile(path));
@@ -49,16 +49,16 @@ public sealed class FileReviewer
             return null;
 
         var codeFile = new CodeFile(path, language.Id, content);
-        run.RememberSource(language, codeFile, changedLines);
+        run.RememberSource(language, codeFile, change?.ChangedLines);
         var ways = readings.Count > 0 ? ReadingRules.Read(language, codeFile, readings, run) : ReadAsWritten(language, codeFile, run);
         if(ways == null)
             return null;
 
         var findings = ReadingRules.Evaluate(rules, language, ways);
-        run.AddFindings(changedLines == null ? findings : ReachFilter.Keep(findings, changedLines));
+        run.AddFindings(change == null ? findings : ReachFilter.Keep(findings, change));
         AddCoverage(language, codeFile, readings, run);
 
-        return new ReadSource(language, codeFile, ways, changedLines ?? new List<LineRange>());
+        return change == null ? null : new ReadSource(language, codeFile, ways, change);
     }
 
     /// <summary>

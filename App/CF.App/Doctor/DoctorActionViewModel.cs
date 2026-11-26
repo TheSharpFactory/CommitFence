@@ -14,16 +14,22 @@ internal sealed partial class DoctorActionViewModel : ObservableObject
     private readonly DoctorAction _action;
     private readonly Action<DoctorAction> _open;
 
-    public DoctorActionViewModel(DoctorAction action, bool isPrimary, Action<DoctorAction> open, Func<ITextClipboard?> clipboard)
+    public DoctorActionViewModel(DoctorAction action, bool isPrimary, Action<DoctorAction> open, Func<ITextClipboard?> clipboard,
+        string? copyName = null, bool isQuiet = false)
     {
         _action = action;
         _open = open;
         IsPrimary = isPrimary;
+        IsQuiet = isQuiet;
         if(action.Kind == DoctorActionKind.CopyText)
-            Copy = new CopyButtonViewModel(action.Label, () => action.Value, clipboard, isPrimary);
+            Copy = new CopyButtonViewModel(action.Label, () => action.Value, clipboard, isPrimary, copyName);
     }
 
     public bool IsPrimary { get; }
+
+    public bool IsQuiet { get; }
+
+    public bool IsSecondary { get { return !IsPrimary && !IsQuiet; } }
 
     public string Label
     {
@@ -50,9 +56,14 @@ internal sealed partial class DoctorActionViewModel : ObservableObject
         get { return Copy == null; }
     }
 
-    [RelayCommand]
+    [ObservableProperty]
+    [NotifyCanExecuteChangedFor(nameof(OpenCommand))]
+    public partial bool IsAvailable { get; set; } = true;
+
+    [RelayCommand(CanExecute = nameof(IsAvailable))]
     private void Open()
     {
-        _open(_action);
+        if(IsAvailable)
+            _open(_action);
     }
 }

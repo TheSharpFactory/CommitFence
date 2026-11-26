@@ -48,7 +48,7 @@ internal sealed class WholeFolderResolver
         var label = "the whole of " + (target.Folder.Length == 0 ? "the repository" : target.Folder);
         var changeSet = _builder.BuildWhole(label, commit, tree, target.Paths, target.Folder);
 
-        return NoteUncommittedWork(changeSet, target.Folder);
+        return NoteUncommittedWork(changeSet, target.Folder).WithCommit(commit);
     }
 
     /// <summary>

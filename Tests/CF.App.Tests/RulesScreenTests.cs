@@ -17,6 +17,9 @@ namespace CF.App.Tests;
 /// </summary>
 public sealed class RulesScreenTests
 {
+    private static readonly string[] _boundWords = { "is at least" };
+    private static readonly string[] _parameterBounds = { "parameterCount is at least 1", "parameterCount is at most 5" };
+
     [AvaloniaFact]
     public async Task MixedRuleListIntersectsSearchAndEffect()
     {
@@ -86,6 +89,31 @@ public sealed class RulesScreenTests
         Assert.False(row.IsOn);
         Assert.False(page.IsDirty);
         Assert.Equal(othersBefore, Others(host, "TEAM002"));
+    }
+
+    [AvaloniaFact]
+    public async Task EditingTheTitleKeepsComparisonsThePickerDoesNotOffer()
+    {
+        const string settings = """
+            {"rules":[{"id":"R","language":"csharp","for":"method","severity":"warn","title":"Original title",
+                "where":{"name":{"not":["Run"]}},
+                "require":{"parameterCount":{"atLeast":1,"atMost":5}}}]}
+            """;
+        using var host = new RulesHost(settings);
+        await host.Loaded;
+        var page = host.Open("R");
+
+        Assert.Equal("is none of", Assert.Single(page.WhereFlow.OfType<ConditionViewModel>()).ComparisonWord);
+        Assert.Equal(_boundWords, page.RequireFlow.Select(condition => condition.ComparisonWord));
+        Assert.True(Assert.Single(page.RequireFlow).IsRange);
+        page.Title = "New title";
+        Assert.True(page.SaveCommand.CanExecute(null));
+        page.SaveCommand.Execute(null);
+
+        var rule = Assert.Single(host.StoredRules());
+        Assert.Equal("New title", rule.Title);
+        Assert.Equal("name is none of Run", RuleSentence.Condition(Assert.Single(rule.Where)));
+        Assert.Equal(_parameterBounds, rule.Require.Select(RuleSentence.Condition));
     }
 
     [AvaloniaFact]
@@ -224,12 +252,11 @@ public sealed class RulesScreenTests
 
         Assert.True(page.HasInvalidCondition);
         Assert.Contains("statements in body", page.InvalidText, StringComparison.Ordinal);
-        Assert.True(page.SaveCommand.CanExecute(null));
+        Assert.False(page.SaveCommand.CanExecute(null));
+        Assert.Equal("Fix the sentence to save it.", page.SaveTip);
 
         page.SaveCommand.Execute(null);
 
-        Assert.True(page.HasError);
-        Assert.NotNull(page.ErrorText);
         Assert.True(page.IsDirty);
         Assert.Equal("method", page.ArtifactName);
         Assert.Equal(before, host.SettingsBytes());
@@ -397,6 +424,72 @@ public sealed class RulesScreenTests
         Assert.Empty(model.Items.OfType<FileRuleRowViewModel>());
         Assert.Null(model.SelectedFileRule);
         Assert.IsType<TeamRuleRowViewModel>(model.SelectedItem);
+    }
+
+    [AvaloniaTheory]
+    [InlineData("quiet", "Blocks:error|Warns:warning|Off:suggestion, silent, none")]
+    [InlineData("standard", "Blocks:error|Warns:warning, suggestion|Off:silent, none")]
+    [InlineData("strict", "Blocks:error, warning|Warns:suggestion|Off:silent, none")]
+    public async Task FileRulePageTableFollowsTheStrictnessInForce(string strictness, string expectedRows)
+    {
+        var settings = SettingsText.Four.Replace("\"rules\": [", $"\"strictness\": \"{strictness}\",\n    \"rules\": [", StringComparison.Ordinal);
+        var severity = strictness == "strict" ? Severity.Block : Severity.Warn;
+        var rule = RulesHost.FileRule("CA1000", "Do not declare static members on generic types", FileRuleState.On, severity, 4, "warning");
+        using var host = new RulesHost(settings, new[] { rule });
+        await host.Loaded;
+
+        host.Model.SelectedItem = Assert.Single(host.Model.Items.OfType<FileRuleRowViewModel>());
+
+        var rows = host.Model.FilePage.Settings;
+        Assert.Equal(expectedRows, string.Join("|", rows.Select(row => $"{row.EffectWord}:{row.Words}")));
+        Assert.Contains("warning", Assert.Single(rows, row => row.IsCurrent).Words, StringComparison.Ordinal);
+    }
+
+    [AvaloniaFact]
+    public async Task NewAndDuplicateGoOnWhenARuleIdHasAVeryLongNumber()
+    {
+        var settings = SettingsText.Four.Replace("TEAM004", "TEAM99999999999999999999", StringComparison.Ordinal);
+        using var host = new RulesHost(settings);
+        await host.Loaded;
+
+        host.Model.NewRule();
+        Assert.Equal("TEAM004", host.Model.CurrentPage?.Id);
+
+        host.Open("TEAM001").DuplicateRuleCommand.Execute(null);
+        Assert.Equal("TEAM004", host.Model.CurrentPage?.Id);
+    }
+
+    [AvaloniaFact]
+    public async Task NewNeverProposesAnIdThatExistsWhateverItsLength()
+    {
+        var settings = SettingsText.Four.Replace("TEAM004", "TEAM999999999999999", StringComparison.Ordinal).Replace("TEAM003", "TEAM1000000000000000", StringComparison.Ordinal);
+        using var host = new RulesHost(settings);
+        await host.Loaded;
+
+        host.Model.NewRule();
+
+        Assert.Equal("TEAM1000000000000001", host.Model.CurrentPage?.Id);
+    }
+
+    [AvaloniaFact]
+    public async Task DuplicateKeepsANewRuleThatWasBegun()
+    {
+        using var host = new RulesHost();
+        await host.Loaded;
+        host.Model.NewRule();
+        var begun = host.Model.CurrentPage!;
+        begun.Title = "Half written";
+
+        host.Open("TEAM001").DuplicateRuleCommand.Execute(null);
+
+        Assert.Same(begun, host.Model.CurrentPage);
+        Assert.Equal(RulesViewModel.UnfinishedDraftText, host.Model.BannerText);
+
+        host.Model.DiscardDraft();
+        host.Open("TEAM001").DuplicateRuleCommand.Execute(null);
+
+        Assert.Equal("Copy of " + host.StoredRules().Single(rule => rule.Id == "TEAM001").Title, host.Model.CurrentPage?.Title);
+        Assert.Null(host.Model.BannerText);
     }
 
     [AvaloniaFact]

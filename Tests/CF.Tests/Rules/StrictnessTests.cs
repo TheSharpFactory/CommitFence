@@ -90,7 +90,8 @@ public sealed class StrictnessTests
                 File.WriteAllText(Path.Combine(Path.GetDirectoryName(path)!, SettingsFileName.Default), newer);
             }
         });
-        using var fixture = new RulesFixture(Settings(_custom), fileSystem: files);
+        using var sdk = new FakeSdk();
+        using var fixture = new RulesFixture(Settings(_custom), sdk.Runner(true), fileSystem: files);
         fixture.Write("Program.cs", "class Program { }");
         fixture.Write(".editorconfig", "[*.cs]\ndotnet_diagnostic.CA1000.severity = warning\ndotnet_diagnostic.CA1001.severity = suggestion\ndotnet_diagnostic.CA1002.severity = error\n");
 

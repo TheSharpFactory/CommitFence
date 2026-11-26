@@ -9,6 +9,7 @@ namespace CF.Adapters.Machine;
 public sealed class SystemFileSystem : IFileSystem
 {
     private const int _maxLinkDepth = 16;
+    private const UnixFileMode _executeBits = UnixFileMode.UserExecute | UnixFileMode.GroupExecute | UnixFileMode.OtherExecute;
 
     private static readonly UTF8Encoding _utf8WithoutMark = new UTF8Encoding(false);
 
@@ -16,6 +17,18 @@ public sealed class SystemFileSystem : IFileSystem
     public bool FileExists(string path)
     {
         return File.Exists(path);
+    }
+
+    /// <inheritdoc />
+    public bool FolderExists(string path)
+    {
+        return Directory.Exists(path);
+    }
+
+    /// <inheritdoc />
+    public bool IsExecutable(string path)
+    {
+        return FileExists(path) && (OperatingSystem.IsWindows() || (File.GetUnixFileMode(path) & _executeBits) != 0);
     }
 
     /// <inheritdoc />
@@ -56,6 +69,51 @@ public sealed class SystemFileSystem : IFileSystem
             stream.Dispose();
             File.Delete(path);
             throw;
+        }
+    }
+
+    /// <inheritdoc />
+    public bool IsLink(string path)
+    {
+        try
+        {
+            return File.GetAttributes(path).HasFlag(FileAttributes.ReparsePoint);
+        }
+        catch(IOException)
+        {
+            return false;
+        }
+    }
+
+    /// <inheritdoc />
+    public void WriteHook(string path, byte[]? original, byte[] content)
+    {
+        var temporary = path + "." + Guid.NewGuid().ToString("N") + ".tmp";
+        WriteNewFile(temporary, content);
+        try
+        {
+            if(original != null)
+            {
+                if(IsLink(path) || !File.ReadAllBytes(path).AsSpan().SequenceEqual(original))
+                    throw new IOException("the hook changed after it was read");
+
+                if(File.GetAttributes(path).HasFlag(FileAttributes.ReadOnly))
+                    throw new UnauthorizedAccessException("the file is read-only");
+            }
+
+            if(!OperatingSystem.IsWindows())
+            {
+                var mode = original == null
+                    ? File.GetUnixFileMode(temporary) | _executeBits
+                    : File.GetUnixFileMode(path) | UnixFileMode.UserExecute;
+                File.SetUnixFileMode(temporary, mode);
+            }
+
+            File.Move(temporary, path, original != null);
+        }
+        finally
+        {
+            DeleteFile(temporary);
         }
     }
 

@@ -54,20 +54,37 @@ public static class AgentPrompt
     /// <param name="isIncomplete">Whether the review could not check everything.</param>
     public static string ForReview(IReadOnlyList<Finding> findings, IReadOnlyDictionary<string, string> sources, IReadOnlyDictionary<string, PromptRule> rules, bool isIncomplete)
     {
+        return ForReview(findings, finding => finding.File == null ? null : sources.GetValueOrDefault(finding.File),
+            finding => rules.GetValueOrDefault(finding.RuleId), isIncomplete);
+    }
+
+    /// <summary>Writes the findings with the rule and source that each finding was judged with.</summary>
+    public static string ForReview(IReadOnlyList<Finding> findings, Func<Finding, string?> sourceOf, Func<Finding, PromptRule?> ruleOf, bool isIncomplete, IReadOnlyList<Coverage>? coverage = null)
+    {
+        var problems = coverage?.Where(entry => entry.Status != CoverageStatus.Reviewed).ToList() ?? [];
         if(findings.Count == 0)
-            return isIncomplete ? _nothingButIncomplete : _nothing;
+            return AddCoverage(new StringBuilder(isIncomplete || problems.Count > 0 ? _nothingButIncomplete : _nothing), problems);
 
         var builder = new StringBuilder();
         builder.Append(Opening(findings)).Append("\n\n");
         for(var index = 0; index < findings.Count; index++)
         {
             var finding = findings[index];
-            rules.TryGetValue(finding.RuleId, out var rule);
-            var source = finding.File != null && sources.TryGetValue(finding.File, out var text) ? text : null;
-            builder.Append($"{index + 1} of {findings.Count}\n").Append(Block(finding, rule, source)).Append("\n\n");
+            builder.Append($"{index + 1} of {findings.Count}\n").Append(Block(finding, ruleOf(finding), sourceOf(finding))).Append("\n\n");
         }
 
-        return builder.Append(_closing).ToString();
+        return AddCoverage(builder.Append(_closing), problems);
+    }
+
+    private static string AddCoverage(StringBuilder builder, List<Coverage> problems)
+    {
+        if(problems.Count > 0)
+        {
+            builder.Append("\n\nWhat could not be checked:\n");
+            builder.AppendJoin('\n', problems.Select(entry => $"- {entry.What}: {entry.Reason}"));
+        }
+
+        return builder.ToString();
     }
 
     private static string Opening(IReadOnlyList<Finding> findings)

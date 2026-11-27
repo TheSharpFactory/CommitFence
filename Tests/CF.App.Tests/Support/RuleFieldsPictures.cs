@@ -1,15 +1,19 @@
 using Avalonia;
 using Avalonia.Controls;
+using Avalonia.Headless;
 using Avalonia.Input;
 using Avalonia.Styling;
+using Avalonia.VisualTree;
 using CF.App.Review;
 using CF.App.Rules;
 using CF.App.Rules.Page;
 using CF.App.Shell;
 using CF.Core.Changes;
+using CF.Core.Code;
 using CF.Core.Findings;
 using CF.Core.Review;
 using CF.Core.Rules;
+using Xunit;
 
 namespace CF.App.Tests.Support;
 
@@ -43,6 +47,23 @@ internal static class RuleFieldsPictures
         }
         """;
 
+    private static readonly string _rulesDesign = _rule.Replace(
+        "\"id\": \"TEAM005\"", """
+        "id": "TEAM002", "language": "csharp", "for": "method", "severity": "warn",
+        "title": "Methods are documented", "require": { "documentationPresent": true }
+        },
+        {
+            "id": "TEAM003", "language": "csharp", "for": "class", "severity": "block", "enabled": false,
+            "title": "Classes are documented", "require": { "documentationPresent": true }
+        },
+        {
+            "id": "TEAM004", "language": "csharp", "for": "class", "severity": "warn",
+            "title": "No partial classes", "where": { "isPartial": true }, "forbid": true
+        },
+        {
+            "id": "TEAM005"
+        """, StringComparison.Ordinal);
+
     private const string _fileRule = """
         {
             "rules": [
@@ -66,6 +87,161 @@ internal static class RuleFieldsPictures
     {
         await SaveRulesAsync(folder, theme);
         await SaveReviewAsync(folder, theme);
+    }
+
+    public static async Task SaveRound67RulesAsync(string folder)
+    {
+        var formatting = RulesHost.ScopedRule();
+        var exceptions = formatting.Exceptions;
+        var method = RulesHost.FileRule("CA1822", "Mark members as static", FileRuleState.On, Severity.Warn, 8, "warning");
+        var configureAwait = RulesHost.FileRule("CA2007", "Consider calling ConfigureAwait", FileRuleState.On, Severity.Warn, 9, "warning");
+        var fileRules = new List<FileRule>
+        {
+            new FileRule(formatting.Id, formatting.Title, formatting.File, formatting.Language, formatting.Main,
+                [exceptions[0] with { Line = 22, Setting = "warning" },
+                    exceptions[1] with { Line = 30, Pattern = "src/Generated/**" },
+                    exceptions[2] with { Line = 34, Pattern = "**/*.Designer.cs" }]),
+            RulesHost.FileRule("CA1000", "Do not declare static members on generic types", FileRuleState.On, Severity.Block, 4),
+            new FileRule(method.Id, method.Title, method.File, method.Language, method.Main,
+                [new FileRulePlace("src/Production/**", "error", FileRuleState.On, Severity.Block, 18, [], _ => true)]),
+            new FileRule(configureAwait.Id, configureAwait.Title, configureAwait.File, configureAwait.Language, configureAwait.Main,
+                [new FileRulePlace("src/Payments/**", "warning", FileRuleState.On, Severity.Warn, 26, [], _ => true)]),
+            RulesHost.FileRule("IDE0005", "Remove unnecessary usings", FileRuleState.Off, null, 12, "none")
+        };
+        using var shell = new ShellHost(_rulesDesign, fileRules);
+        shell.Languages.Tracked = _payments;
+        var rules = shell.Model.Rules;
+        var arrived = Signals.FileRulesArrived(rules);
+        using var host = new ViewHost(new MainWindow { DataContext = shell.Model, Width = 1440, Height = 900, RequestedThemeVariant = ThemeVariant.Dark });
+        await arrived;
+        shell.Model.ShowRules();
+        rules.SelectedItem = rules.Items.OfType<TeamRuleRowViewModel>().Single(row => row.Id == "TEAM005");
+        host.Pump();
+        var page = rules.CurrentPage!;
+        shell.Clock.Now = new DateTimeOffset(2026, 11, 24, 10, 38, 0, TimeSpan.Zero);
+        var message = page.Message;
+        page.Message += "!";
+        page.SaveCommand.Execute(null);
+        page.Message = message;
+        page.SaveCommand.Execute(null);
+        host.Pump();
+
+        host.Save(folder, "rules-idsaved-dark-1440.png");
+        var rename = host.Find<Button>(button => button.Classes.Contains("rename") && button.IsEffectivelyVisible)!;
+        ToolTip.SetShowDelay(rename, 0);
+        rename.Focus(NavigationMethod.Tab);
+        host.Pump();
+        Assert.True(ToolTip.GetIsOpen(rename));
+        host.Press(PhysicalKey.Escape);
+        Assert.False(ToolTip.GetIsOpen(rename));
+        Assert.True(rename.IsFocused);
+
+        host.Window.FocusManager?.Focus(null);
+        var more = host.Find<Button>(button => button.Name == "MoreButton" && button.IsEffectivelyVisible)!;
+        Hover(host, more);
+        page.OpenMoreCommand.Execute(null);
+        host.Pump();
+        var duplicate = host.Find<Button>(button => button.Name == "DuplicateEntry" && button.IsEffectivelyVisible)!;
+        var removeEntry = host.Find<Button>(button => button.Name == "RemoveEntry" && button.IsEffectivelyVisible)!;
+        Assert.False(duplicate.IsPointerOver);
+        Assert.False(removeEntry.IsPointerOver);
+        host.Save(folder, "rules-menu-dark-1440.png");
+        page.IsMoreOpen = false;
+        host.Pump();
+        Assert.True(more.Focus(NavigationMethod.Tab));
+        host.Press(PhysicalKey.Enter);
+        Assert.False(duplicate.IsFocused);
+        Assert.False(removeEntry.IsFocused);
+        host.Press(PhysicalKey.ArrowDown);
+        Assert.True(duplicate.IsFocused);
+        host.Press(PhysicalKey.ArrowDown);
+        Assert.True(host.Find<Button>(button => button.Name == "RemoveEntry" && button.IsEffectivelyVisible)!.IsFocused);
+        host.Press(PhysicalKey.ArrowUp);
+        Assert.True(duplicate.IsFocused);
+        host.Press(PhysicalKey.Escape);
+        Assert.True(more.IsFocused);
+
+        host.Window.FocusManager?.Focus(null);
+        var list = host.Find<RuleListBox>(candidate => candidate.IsEffectivelyVisible)!;
+        var listScroll = list.GetVisualDescendants().OfType<ScrollViewer>().First();
+        listScroll.Offset = new Vector(0, listScroll.Extent.Height - listScroll.Viewport.Height);
+        host.Pump();
+        var line = host.Find<Button>(button => button.Name == "PlaceLine" && button.IsEffectivelyVisible
+            && button.DataContext is FileRowPlace { IsEverywhereElse: true, LineText: "line 14" })!;
+        ToolTip.SetShowDelay(line, 0);
+        Hover(host, line);
+        Assert.True(ToolTip.GetIsOpen(line));
+        host.Save(folder, "rules-tipline-dark-1440.png");
+        ToolTip.SetIsOpen(line, false);
+        host.Save(folder, "rules-places-dark-1440.png");
+        var sameEffect = rules.Items.OfType<FileRuleRowViewModel>().Single(row => row.Id == configureAwait.Id);
+        Assert.Equal("Warns", sameEffect.EffectWord);
+        Assert.Equal(2, sameEffect.VisiblePlaces.Count);
+        host.Window.MouseMove(default, RawInputModifiers.None);
+        host.Pump();
+        host.Save(folder, "rules-sameeffect-dark-1440.png");
+
+        foreach(var filter in rules.Filters.Skip(1))
+        {
+            rules.SelectedFilter = filter;
+            listScroll.Offset = default;
+            host.Pump();
+            Assert.Same(page, rules.CurrentPage);
+            var suffix = filter.Filter.ToString().ToLowerInvariant();
+            host.Save(folder, $"rules-places{suffix}-dark-1440.png");
+        }
+
+        rules.SelectedFilter = rules.Filters[0];
+        rules.SelectedItem = rules.Items.OfType<TeamRuleRowViewModel>().Single(row => row.Id == "TEAM005");
+        host.Pump();
+        listScroll.Offset = new Vector(0, listScroll.Extent.Height - listScroll.Viewport.Height);
+        host.Pump();
+        var formattingRow = rules.Items.OfType<FileRuleRowViewModel>().Single(row => row.Id == formatting.Id);
+        var first = host.Find<Button>(button => button.Name == "PlaceLine" && ReferenceEquals(button.DataContext, formattingRow.VisiblePlaces[0]))!;
+        ToolTip.SetShowDelay(first, 0);
+        formattingRow.MoveRight();
+        formattingRow.IsRingVisible = true;
+        host.Pump();
+        Assert.True(ToolTip.GetIsOpen(first));
+        host.Save(folder, "rules-placesfocus-dark-1440.png");
+        formattingRow.IsRingVisible = false;
+        formattingRow.ResetPart();
+
+        listScroll.Offset = default;
+        rules.DuplicateRule(page.Id);
+        var draft = rules.CurrentPage!;
+        draft.Title = page.Title;
+        host.Pump();
+        host.Type("SEC-004");
+        host.Save(folder, "rules-newid-dark-1440.png");
+
+        draft.Id = "TEAM005";
+        host.Save(folder, "rules-idtaken-dark-1440.png");
+        host.Window.FocusManager?.Focus(null);
+        draft.Id = "";
+        host.Save(folder, "rules-idempty-dark-1440.png");
+        host.Find<TextBox>(box => box.Name == "IdBox" && box.IsEffectivelyVisible)!.Focus(NavigationMethod.Tab);
+        draft.Id = "SEC 004";
+        host.Save(folder, "rules-idspace-dark-1440.png");
+
+        draft.DiscardCommand.Execute(null);
+        host.Pump();
+        Assert.Same(page, rules.CurrentPage);
+        var path = page.Paths[1];
+        path.Open();
+        host.Pump();
+        path.FieldText = "C:\\invoicing\\src\\Payments";
+        listScroll.Offset = default;
+        host.Pump();
+        host.Save(folder, "rules-pathbad-dark-1440.png");
+        path.Cancel();
+    }
+
+    private static void Hover(ViewHost host, Control control)
+    {
+        var pointer = control.TranslatePoint(new Rect(control.Bounds.Size).Center, host.Window)!.Value;
+        host.Window.MouseMove(pointer, RawInputModifiers.None);
+        host.Pump();
     }
 
     private static async Task SaveRulesAsync(string folder, string theme)
@@ -162,10 +338,12 @@ internal static class RuleFieldsPictures
         host.Window.FocusManager?.Focus(null);
         ScrollToTop(host);
         var shortened = host.Find<Button>(button => button.Classes.Contains("comparison") && button.IsEffectivelyVisible && ReferenceEquals(button.DataContext, where[0]))!;
-        ToolTip.SetIsOpen(shortened, true);
+        ToolTip.SetShowDelay(shortened, 0);
+        var pointer = shortened.TranslatePoint(new Rect(shortened.Bounds.Size).Center, host.Window)!.Value;
+        host.Window.MouseMove(pointer, RawInputModifiers.None);
         host.Pump();
         host.Save(folder, $"rules-short-tooltip-{theme}-1440.png");
-        ToolTip.SetIsOpen(shortened, false);
+        host.Window.MouseMove(default, RawInputModifiers.None);
         host.Pump();
 
         // a range is one token: "is between 1 and 5"; the head says Unsaved while it is scrolled under

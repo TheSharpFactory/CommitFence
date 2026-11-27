@@ -24,7 +24,7 @@ internal sealed class RuleEditor
     /// </summary>
     public static void CheckNewId(string id)
     {
-        if(id.Length == 0 || !id.All(letter => char.IsAsciiLetterOrDigit(letter) || letter is '-' or '_' or '.'))
+        if(RuleId.NewRuleProblem(id, []) != null)
             throw new RuleChangeException($"'{id}' is not a rule id. An id is letters, digits, '-', '_' and '.', with no space.");
     }
 

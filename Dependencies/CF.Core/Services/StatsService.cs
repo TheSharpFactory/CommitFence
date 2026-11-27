@@ -42,7 +42,12 @@ public sealed class StatsService(IGit git, IClock clock, IReviewHistory history,
 
         return new StatsReport(days, oldest, stored.UnreadableLines, StatsTimings.From(recent.Select(review =>
             (new StatsReviewTime(review.EndedAt, review.Record.DurationMilliseconds, review.Record.FilesReviewed), review.Record.Full)).ToList()),
-            broken, never, active.Count, stored.ReadError);
+            broken, never, active.Count, stored.ReadError)
+        {
+            Sources = recent.GroupBy(review => review.Record.Source).OrderBy(group => group.Key)
+                .Select(group => new StatsSourceCount(group.Key, group.Count(), group.Count(review => review.Record.Outcome == RecordedReviewOutcome.Blocked)))
+                .ToList()
+        };
     }
 
     private static List<StatsDay> DaysFrom(DateOnly first, List<LocalReview> recent)

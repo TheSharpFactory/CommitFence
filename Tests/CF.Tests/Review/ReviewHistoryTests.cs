@@ -67,6 +67,36 @@ public sealed class ReviewHistoryTests
     }
 
     [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void FixLeavesHistoryAloneAndStatsShowsWhereReviewsCameFrom(bool apply)
+    {
+        using var harness = new ReviewHarness();
+        var history = new MemoryHistory();
+        harness.History = history;
+        var scope = PreparePush(harness, true);
+        harness.Fake.Name("refs/remotes/origin/main", "before");
+        var review = harness.Service();
+        review.ReviewChanges(harness.RepositoryFolder, scope, null);
+        review.ReviewChanges(harness.RepositoryFolder, scope.WithSource(ReviewSource.CommandLine), null);
+        review.ReviewChanges(harness.RepositoryFolder, scope.WithSource(ReviewSource.App), null);
+        using var output = new StringWriter();
+        using var error = new StringWriter();
+        var environment = new CommandEnvironment(harness.RepositoryFolder, "/program", "/program/commitfence", TextReader.Null, output, error, false);
+        var data = new FixedDataFolder(Path.Combine(harness.Scratch, "data"));
+        var rules = new RuleService(harness.FileSystem, new FileSettingsLock(data), harness.Languages);
+        var stats = new StatsService(harness.Git, harness.Clock, history, rules);
+        var runner = new CommandRunner(null!, null!, review, null!, null!, environment, stats: stats);
+
+        Assert.Equal(ExitCode.Blocked, runner.Run(apply ? ["fix", "UNKNOWN", _file, "--apply"] : ["fix", "UNKNOWN", _file]));
+        Assert.DoesNotContain("there is nothing to push", error.ToString(), StringComparison.Ordinal);
+        Assert.Equal(3, history.Appends);
+        Assert.Equal(ExitCode.Passed, runner.Run(["stats"]));
+        Assert.Contains("3 reviews in 30 days\nFrom the hook: 1 review, 1 blocked. From the command line: 1. From Review: 1.",
+            output.ToString().ReplaceLineEndings("\n"), StringComparison.Ordinal);
+    }
+
+    [Theory]
     [InlineData(true, ExitCode.Blocked)]
     [InlineData(false, ExitCode.Passed)]
     public void HistoryFailureLeavesThePushAndItsPrintedReportAlone(bool blocked, ExitCode exitCode)
@@ -204,7 +234,7 @@ public sealed class ReviewHistoryTests
             return;
         }
 
-        Assert.Contains("5 reviews in 30 days\n1 blocked, 1 incomplete, 3 allowed\n12 s typical, 48 s slowest", text, StringComparison.Ordinal);
+        Assert.Contains("5 reviews in 30 days\nFrom the hook: 5 reviews, 1 blocked.\n1 blocked, 1 incomplete, 3 allowed\n12 s typical, 48 s slowest", text, StringComparison.Ordinal);
         Assert.Contains("Today, 24 Nov: 4 reviews, 1 blocked, 1 incomplete, 2 allowed", text, StringComparison.Ordinal);
         Assert.Contains("Most broken\n4 rules had findings", text, StringComparison.Ordinal);
         Assert.Contains("REMOVED01: 2", text, StringComparison.Ordinal);

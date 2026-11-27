@@ -16,15 +16,17 @@ internal sealed class ReviewArgumentsReader
     private const string _allOption = "--all";
     private const string _headOption = "--head";
     private const string _formatOption = "--format";
+    private const string _outputOption = "--output";
     private const string _textFormat = "text";
     private const string _promptFormat = "prompt";
+    private const string _sarifFormat = "sarif";
     private const string _prePushHook = "pre-push";
     private const string _defaultHead = "HEAD";
     private const int _hookValueCount = 3;
 
     private static readonly string[] _forms = { _filesOption, _stagedOption, _hookOption, _pushOption, _baseOption, _allOption };
 
-    private static readonly string[] _optionsWithValue = { _settingsOption, _baseOption, _headOption, _formatOption };
+    private static readonly string[] _optionsWithValue = { _settingsOption, _baseOption, _headOption, _formatOption, _outputOption };
 
     private readonly string[] _args;
     private readonly bool _allowPushHead;
@@ -50,6 +52,8 @@ internal sealed class ReviewArgumentsReader
         if(decided.Arguments != null)
         {
             decided.Arguments.AsPrompt = given.Values.TryGetValue(_formatOption, out var format) && format == _promptFormat;
+            decided.Arguments.AsSarif = format == _sarifFormat;
+            decided.Arguments.OutputPath = given.Values.GetValueOrDefault(_outputOption);
             decided.Arguments.Quick = given.PreCommit || given.Options.Contains(_quickOption);
         }
 
@@ -109,8 +113,8 @@ internal sealed class ReviewArgumentsReader
 
     private ReviewArgumentsResult Decide(GivenArguments given)
     {
-        if(given.Values.TryGetValue(_formatOption, out var format) && format != _textFormat && format != _promptFormat)
-            return ReviewArgumentsResult.Wrong($"--format knows two words: {_textFormat}, the default, and {_promptFormat}; '{format}' is not one of them.");
+        if(given.Values.TryGetValue(_formatOption, out var format) && format != _textFormat && format != _promptFormat && format != _sarifFormat)
+            return ReviewArgumentsResult.Wrong($"--format knows three words: {_textFormat}, the default, {_promptFormat} and {_sarifFormat}; '{format}' is not one of them.");
 
         var besideAll = FindWhatStandsBesideAll(given);
         if(besideAll != null)

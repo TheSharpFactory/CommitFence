@@ -13,16 +13,8 @@
        that can take the keyboard draws its ring in its own template, with the radius of the control. -->
   <Style Selector=":is(Control)">
     <Setter Property="FocusAdorner" Value="{x:Null}"/>
-  </Style>
-
-  <!-- Every tooltip: solid background, on-solid text in type-meta, padding 4 8, radius 8, no shadow, no arrow. -->
-  <Style Selector="ToolTip">
-    <Setter Property="Background" Value="{DynamicResource solid}"/>
-    <Setter Property="Foreground" Value="{DynamicResource on-solid}"/>
-    <Setter Property="BorderThickness" Value="0"/>
-    <Setter Property="CornerRadius" Value="8"/>
-    <Setter Property="Padding" Value="8,4"/>
-    <Setter Property="FontSize" Value="13"/>
+    <Setter Property="ToolTip.ShowDelay" Value="400"/>
+    <Setter Property="ToolTip.BetweenShowDelay" Value="-1"/>
   </Style>
 
   <!-- Buttons: 36 high, radius 10, padding 0 14, gap 8. Main is solid; quiet has no fill. The ring is two
@@ -86,13 +78,76 @@
     <Setter Property="Background" Value="{DynamicResource solid-hover}"/>
     <Setter Property="BorderBrush" Value="{DynamicResource solid-hover}"/>
   </Style>
-  <Style Selector="Button.cf.main:focus-visible /template/ Border#Inner">
+  <Style Selector="Button.cf.main:not(.unavailable):focus-visible /template/ Border#Inner">
     <Setter Property="IsVisible" Value="True"/>
   </Style>
-  <Style Selector="Button.cf.main:disabled">
+  <Style Selector="Button.cf.main:disabled, Button.cf.main.unavailable">
+    <Setter Property="Background" Value="{DynamicResource page}"/>
+    <Setter Property="BorderBrush" Value="{DynamicResource line}"/>
+    <Setter Property="Foreground" Value="{DynamicResource ink-3}"/>
+    <Setter Property="Cursor" Value="Arrow"/>
+  </Style>
+  <Style Selector="Button.cf.main.unavailable:pressed /template/ Panel#Root">
+    <Setter Property="RenderTransform" Value="scale(1)"/>
+  </Style>
+  <Style Selector="Button.cf.main:disabled TextBlock, Button.cf.main.unavailable TextBlock">
+    <Setter Property="FontWeight" Value="Medium"/>
+  </Style>
+
+  <Style Selector="Button.linelink">
+    <Setter Property="ClipToBounds" Value="False"/>
+    <Setter Property="Height" Value="24"/>
+    <Setter Property="Padding" Value="6,0"/>
+    <Setter Property="Cursor" Value="Hand"/>
+    <Setter Property="Background" Value="Transparent"/>
+    <Setter Property="Foreground" Value="{DynamicResource ink-2}"/>
+    <Setter Property="Template">
+      <ControlTemplate>
+        <Panel>
+          <parts:FocusRing Name="Ring" IsVisible="False" ControlRadius="6"
+                           GapBrush="{DynamicResource focus-gap}" LineBrush="{DynamicResource focus}"/>
+          <Border Background="{TemplateBinding Background}" CornerRadius="6" Padding="{TemplateBinding Padding}">
+            <Panel VerticalAlignment="Center" HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}" Height="18">
+              <ContentPresenter Content="{TemplateBinding Content}" VerticalAlignment="Center"/>
+              <Border Name="Underline" Background="{DynamicResource ink-3}" Height="1" VerticalAlignment="Bottom"
+                      IsHitTestVisible="False"/>
+            </Panel>
+          </Border>
+        </Panel>
+      </ControlTemplate>
+    </Setter>
+  </Style>
+  <Style Selector="Button.linelink TextBlock.line-text">
+    <Setter Property="Foreground" Value="{Binding $parent[Button].Foreground}"/>
+  </Style>
+  <Style Selector="Button.linelink:pointerover">
     <Setter Property="Background" Value="{DynamicResource hover}"/>
-    <Setter Property="BorderBrush" Value="{DynamicResource hover}"/>
-    <Setter Property="Foreground" Value="{DynamicResource ink-disabled}"/>
+  </Style>
+  <Style Selector="Button.linelink:pressed">
+    <Setter Property="Background" Value="{DynamicResource line}"/>
+  </Style>
+  <Style Selector="Button.linelink:focus-visible, Button.linelink.ring">
+    <Setter Property="ZIndex" Value="1"/>
+  </Style>
+  <Style Selector="Button.linelink:pointerover, Button.linelink:focus-visible, Button.linelink.ring">
+    <Setter Property="Foreground" Value="{DynamicResource ink}"/>
+  </Style>
+  <Style Selector="Button.linelink:pointerover /template/ Border#Underline, Button.linelink:focus-visible /template/ Border#Underline, Button.linelink.ring /template/ Border#Underline">
+    <Setter Property="Background" Value="{DynamicResource ink}"/>
+  </Style>
+  <Style Selector="Button.linelink:focus-visible /template/ parts|FocusRing#Ring, Button.linelink.ring /template/ parts|FocusRing#Ring">
+    <Setter Property="IsVisible" Value="True"/>
+  </Style>
+
+  <Style Selector="Separator.menu-divider">
+    <Setter Property="Height" Value="1"/>
+    <Setter Property="Margin" Value="0,4"/>
+    <Setter Property="Background" Value="{DynamicResource line-strong}"/>
+    <Setter Property="Template">
+      <ControlTemplate>
+        <Border Background="{TemplateBinding Background}"/>
+      </ControlTemplate>
+    </Setter>
   </Style>
 
   <Style Selector="Button.cf.quiet">
@@ -354,17 +409,17 @@
   <Style Selector="ToggleButton.cfswitch:checked:pointerover /template/ Border#Knob">
     <Setter Property="RenderTransform" Value="translateX(16px) scale(1.11)"/>
   </Style>
-  <Style Selector="ToggleButton.cfswitch:disabled:checked /template/ Border#Track">
+  <Style Selector="ToggleButton.cfswitch:disabled:checked:not(.draft) /template/ Border#Track">
     <Setter Property="Background" Value="{DynamicResource line-strong}"/>
     <Setter Property="BorderBrush" Value="{DynamicResource line-strong}"/>
   </Style>
-  <Style Selector="ToggleButton.cfswitch:disabled:checked /template/ Border#Knob">
+  <Style Selector="ToggleButton.cfswitch:disabled:checked:not(.draft) /template/ Border#Knob">
     <Setter Property="Background" Value="{DynamicResource page}"/>
   </Style>
-  <Style Selector="ToggleButton.cfswitch:disabled /template/ Border#Track">
+  <Style Selector="ToggleButton.cfswitch:disabled:not(.draft) /template/ Border#Track">
     <Setter Property="BorderBrush" Value="{DynamicResource line-strong}"/>
   </Style>
-  <Style Selector="ToggleButton.cfswitch:disabled /template/ Border#Knob">
+  <Style Selector="ToggleButton.cfswitch:disabled:not(.draft) /template/ Border#Knob">
     <Setter Property="Background" Value="{DynamicResource line-strong}"/>
   </Style>
   <Style Selector="ToggleButton.cfswitch.ring /template/ parts|FocusRing#Ring">

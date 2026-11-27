@@ -50,7 +50,7 @@
                    Text="{Binding Problem}"/>
       </StackPanel>
 
-      <Border Height="1" Margin="0,4" Background="{DynamicResource line}"/>
+      <Separator Classes="menu-divider"/>
 
       <TextBlock Margin="10,6,10,4" TextWrapping="Wrap" Theme="{StaticResource type-body}" Foreground="{DynamicResource ink-2}">
         <Run Text="From the root of "/><Run Text="{Binding RepositoryName}"/><Run Text=". "/>

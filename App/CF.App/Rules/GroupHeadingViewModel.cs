@@ -19,6 +19,14 @@ internal sealed partial class GroupHeadingViewModel : RuleListItemViewModel
     [NotifyPropertyChangedFor(nameof(SpokenName))]
     public partial int Count { get; set; }
 
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(SpokenName))]
+    public partial int TotalCount { get; set; }
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(SpokenName))]
+    public partial bool IsFiltered { get; set; }
+
     /// <summary>
     /// Whether the count is drawn: not while the group is still being read, and not when there is no file to count rules of.
     /// </summary>
@@ -81,8 +89,9 @@ internal sealed partial class GroupHeadingViewModel : RuleListItemViewModel
     {
         get
         {
-            var count = ShowsCount ? $"{CountWords}, " : string.Empty;
-            return $"{Name}, {count}{SpokenSource}, {(IsExpanded ? "expanded" : "collapsed")}";
+            var summary = !ShowsCount ? SpokenSource : IsFiltered ? $"{Count} of {TotalCount} rules shown" : CountWords;
+            var state = IsExpanded ? "expanded" : "collapsed";
+            return $"{Name}, {summary}, {state}";
         }
     }
 

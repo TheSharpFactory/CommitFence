@@ -7,6 +7,7 @@ namespace CF.Core.Rules.Settings;
 /// starts.
 /// </summary>
 [JsonSerializable(typeof(SettingsFileDto))]
+[JsonSerializable(typeof(SettingsRequirementDto))]
 [JsonSerializable(typeof(string))]
 internal sealed partial class SettingsJsonContext : JsonSerializerContext
 {

@@ -177,6 +177,36 @@ public sealed class SetupTests
     }
 
     [Fact]
+    public void InitPrintsNativePathsForSettingsAndHooks()
+    {
+        using var harness = new ReviewHarness();
+        var root = harness.RepositoryFolder;
+        var hooks = Path.Combine(root, ".git", "hooks");
+        Directory.CreateDirectory(hooks);
+        var hook = Path.Combine(hooks, "pre-push");
+        var settings = Path.Combine(root, "commitfence.json");
+        const string shell = "#!/bin/sh\necho test\n";
+        File.WriteAllText(hook, shell);
+        var service = Service(harness, hooks.Replace(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar));
+
+        var preview = Init(harness, service, "init", "--print");
+        Assert.Equal(ExitCode.Passed, preview.ExitCode);
+        Assert.Contains($"Would write {settings},", preview.Output, StringComparison.Ordinal);
+        Assert.Contains($"Would add this line to {hook} at line 2:", preview.Output, StringComparison.Ordinal);
+        Assert.Equal(shell, File.ReadAllText(hook));
+        Assert.False(File.Exists(settings));
+
+        var added = Init(harness, service, "init");
+        Assert.Equal(ExitCode.Passed, added.ExitCode);
+        Assert.Contains($"Added the CommitFence line to {hook} at line 2.", added.Output, StringComparison.Ordinal);
+
+        File.WriteAllText(hook, "#!/usr/bin/env node\nprocess.exit(0);\n");
+        var manual = Init(harness, service, "init");
+        Assert.Equal(ExitCode.Passed, manual.ExitCode);
+        Assert.Contains($"Add this line as the first command of {hook}:", manual.Output, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void PrintDescribesBothWritesWithoutCreatingFiles()
     {
         using var harness = new ReviewHarness();

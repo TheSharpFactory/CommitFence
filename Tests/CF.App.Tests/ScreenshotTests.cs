@@ -1,4 +1,5 @@
 using Avalonia.Controls;
+using Avalonia.Automation;
 using Avalonia.Headless.XUnit;
 using Avalonia.Input;
 using Avalonia.Styling;
@@ -7,6 +8,7 @@ using CF.App.Parts;
 using CF.App.Review;
 using CF.App.Rules;
 using CF.App.Shell;
+using CF.App.Settings;
 using CF.App.Tests.Support;
 using CF.Core.Code;
 using CF.Core.Findings;
@@ -168,6 +170,16 @@ public sealed class ScreenshotTests
     private static readonly string[] _themes = ["dark"];
 
     [AvaloniaFact]
+    public async Task RulesDesignStatesAreSavedWhenAFolderIsNamed()
+    {
+        var folder = Environment.GetEnvironmentVariable(_variable);
+        if(string.IsNullOrWhiteSpace(folder))
+            Assert.Skip(_variable + " names no folder.");
+
+        await RuleFieldsPictures.SaveRound67RulesAsync(folder);
+    }
+
+    [AvaloniaFact]
     public async Task EachScreenIsSavedWhenAFolderIsNamed()
     {
         var folder = Environment.GetEnvironmentVariable(_variable);
@@ -228,7 +240,7 @@ public sealed class ScreenshotTests
 
             shell.Model.Rules.SelectedItem = shell.Model.Rules.Items.OfType<FileRuleRowViewModel>().Single(row => row.Id == "IDE0055");
             host.Pump();
-            host.Save(folder, $"rules-places-{theme}-1440.png");
+            host.Save(folder, $"rules-file-page-{theme}-1440.png");
             window.Width = 760;
             host.Pump();
             host.Save(folder, $"rules-places-{theme}-760.png");
@@ -237,7 +249,34 @@ public sealed class ScreenshotTests
             window.Width = 1440;
             host.Pump();
 
-            // Review, after a push the review refused
+            var general = new FileRulePlace("*.cs", "warning", FileRuleState.On, Severity.Warn, 8, [], _ => true);
+            var production = new FileRulePlace("src/Production/**", "error", FileRuleState.On, Severity.Block, 18, [],
+                path => path.StartsWith("src/Production/", StringComparison.Ordinal));
+            var mixed = new FileRule("CA1822", "Mark members as static", ".editorconfig", "C#", general, [production]);
+            var mixedRules = fileRules.Select(rule => rule.Id == mixed.Id ? mixed : rule).ToList();
+            using(var mixedShell = new ShellHost(fileRules: mixedRules))
+            {
+                var rules = mixedShell.Model.Rules;
+                var mixedArrived = Signals.FileRulesArrived(rules);
+                window.DataContext = mixedShell.Model;
+                await mixedArrived;
+                rules.SelectedItem = rules.Items.OfType<TeamRuleRowViewModel>().Single(row => row.Id == "TEAM001");
+                rules.OpenSelectedRule();
+                host.Pump();
+                host.Save(folder, $"rules-mixed-{theme}-1440.png");
+                rules.SelectedFilter = rules.Filters.Single(filter => filter.Filter == RuleFilter.Blocks);
+                host.Pump();
+                host.Save(folder, $"rules-mixedblocks-{theme}-1440.png");
+                rules.SelectedFilter = rules.Filters.Single(filter => filter.Filter == RuleFilter.All);
+                var scoped = new FileRule(mixed.Id, mixed.Title, mixed.File, mixed.Language, null, [production with { Pattern = "src/**.cs" }]);
+                rules.Items.OfType<FileRuleRowViewModel>().Single(row => row.Id == scoped.Id).Update(scoped);
+                host.Save(folder, $"rules-scoped-only-{theme}-1440.png");
+                window.DataContext = shell.Model;
+                host.Pump();
+            }
+
+            // Review, after a push the review refused, its files on disk as they were reviewed
+            WriteFiles(shell.RepositoryPath, RefusedSources());
             shell.Model.ShowReview();
             await shell.Model.Review.RunCommand.ExecuteAsync(null);
             Assert.Equal(VerdictKind.Refused, shell.Model.Review.Verdict.Kind);
@@ -274,6 +313,7 @@ public sealed class ScreenshotTests
             window.Height = 900;
             await SaveFixStates(folder, theme, host);
             await RuleFieldsPictures.SaveAsync(folder, theme);
+            await ReviewFilesPictures.SaveAsync(folder, theme);
             using var cleanShell = new ShellHost(fileRules: fileRules);
             shell = cleanShell;
             window.DataContext = shell.Model;
@@ -431,6 +471,7 @@ public sealed class ScreenshotTests
             host.Save(folder, $"settings-notes-{theme}-1440.png");
             shell.Model.Settings.ShowsNotes = false;
             window.Height = 900;
+            await SaveStrictnessScreens(folder, theme, shell, host);
             shell.SettingsService.Custom = new Strictness(StrictnessPreset.Custom, null, Severity.Block, Severity.Warn);
             await shell.Model.Settings.RefreshAsync();
             host.Pump();
@@ -485,6 +526,41 @@ public sealed class ScreenshotTests
             await SaveExemptions(folder, theme);
             await DashboardPictures.SaveAsync(folder, theme);
         }
+    }
+
+    private static async Task SaveStrictnessScreens(string folder, string theme, ShellHost shell, ViewHost host)
+    {
+        var settings = shell.Model.Settings;
+        host.Save(folder, $"settings-preset-{theme}-1440.png");
+        settings.SelectedChoice = settings.Choices[3];
+        await settings.ChoiceSettledAsync();
+        host.Save(folder, $"settings-own-{theme}-1440.png");
+
+        shell.SettingsService.SaveFailure = new RuleChangeException("Could not write commitfence.json: the file is read-only.");
+        settings.EffectEditors[1].Choose(Severity.Block);
+        await settings.ChoiceSettledAsync();
+        host.Save(folder, $"settings-refused-{theme}-1440.png");
+
+        shell.SettingsService.SaveFailure = null;
+        settings.RetryStrictnessCommand.Execute(null);
+        await settings.ChoiceSettledAsync();
+        foreach(var width in new List<int> { 1440, 900 })
+        {
+            host.Window.Width = width;
+            host.Pump();
+            var warning = host.Find<EffectPickerButton>(button => button.IsEffectivelyVisible && AutomationProperties.GetName(button) == "warning effect")!;
+            Assert.True(warning.Focus(NavigationMethod.Tab));
+            host.Press(PhysicalKey.Enter);
+            host.Save(folder, $"settings-editing-{theme}-{width}.png");
+            host.Press(PhysicalKey.Escape);
+        }
+
+        host.Window.Width = 1440;
+        host.Window.FocusManager?.Focus(null);
+        settings.SelectedChoice = settings.Choices[1];
+        await settings.ChoiceSettledAsync();
+        host.Save(folder, $"settings-replaced-{theme}-1440.png");
+        await settings.ShownAsync();
     }
 
     private static async Task SaveExemptions(string folder, string theme)
@@ -633,19 +709,33 @@ public sealed class ScreenshotTests
     {
         var findings = new[]
         {
-            Samples.Finding("src/Billing/InvoiceTotals.cs", 5, "TEAM001", Severity.Block, "No braces around a single-line if"),
-            Samples.Finding("src/Billing/InvoiceTotals.cs", 9, "TEAM002", Severity.Warn, "Methods are documented"),
-            Samples.Finding("src/Billing/Ledger.cs", 3, "TEAM002", Severity.Warn, "Methods are documented"),
-            Samples.Finding("src/Orders/OrderLine.cs", 12, "TEAM004", Severity.Warn, "No partial classes")
+            Samples.Finding("src/Billing/InvoiceTotals.cs", 9, "TEAM001", Severity.Block, "No braces around a single-line if"),
+            Samples.Finding("src/Billing/InvoiceTotals.cs", 5, "TEAM002", Severity.Warn, "Methods are documented"),
+            Samples.Finding("src/Billing/Ledger.cs", 5, "TEAM002", Severity.Warn, "Methods are documented"),
+            Samples.Finding("src/Orders/OrderLine.cs", 3, "TEAM004", Severity.Warn, "No partial classes")
         };
         var coverage = new[] { Samples.Reviewed("src/Billing/InvoiceTotals.cs"), Samples.Reviewed("src/Billing/Ledger.cs"), Samples.Reviewed("src/Orders/OrderLine.cs"), Samples.Reviewed("src/Orders/Order.cs") };
+        return Samples.Result(ReviewOutcome.Blocked, findings, coverage, RefusedSources());
+    }
+
+    private static Dictionary<string, string> RefusedSources()
+    {
         var totals = "namespace Billing;\n\npublic sealed class InvoiceTotals\n{\n    public int Total(int[] lines)\n    {\n        var sum = 0;\n        foreach(var line in lines)\n            if(line > 0) { sum += line; }\n\n        return sum;\n    }\n}\n";
-        var sources = new Dictionary<string, string>
+        return new Dictionary<string, string>
         {
             ["src/Billing/InvoiceTotals.cs"] = totals,
             ["src/Billing/Ledger.cs"] = "namespace Billing;\n\npublic sealed class Ledger\n{\n    public void Post(int amount)\n    {\n    }\n}\n",
             ["src/Orders/OrderLine.cs"] = "namespace Orders;\n\npublic partial class OrderLine\n{\n    public int Quantity { get; set; }\n}\n"
         };
-        return Samples.Result(ReviewOutcome.Blocked, findings, coverage, sources);
+    }
+
+    private static void WriteFiles(string folder, Dictionary<string, string> files)
+    {
+        foreach(var (name, text) in files)
+        {
+            var path = Path.Combine(folder, name.Replace('/', Path.DirectorySeparatorChar));
+            Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+            File.WriteAllText(path, text);
+        }
     }
 }

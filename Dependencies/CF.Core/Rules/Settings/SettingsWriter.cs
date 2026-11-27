@@ -26,6 +26,9 @@ internal sealed class SettingsWriter
     public string Write(RuleSettings settings, string? featureVersion = null)
     {
         var parts = new List<string>();
+        if(settings.Schema != null)
+            parts.Add(_indent + "\"$schema\": " + JsonText.Quote(settings.Schema));
+
         var requires = featureVersion ?? settings.Requires;
         if(requires != null)
             parts.Add(_indent + "\"requires\": " + JsonText.Quote(requires));
@@ -179,6 +182,52 @@ internal sealed class SettingsWriter
 
         return Encoding.UTF8.GetString(bytes.AsSpan(0, insertAt)) + separator + _newline + _indent
             + "\"structure\": " + WriteStructure(structure) + suffix;
+    }
+
+    /// <summary>
+    /// The text with the requires key set to the version: its value replaced where the key is, otherwise a new line
+    /// after the $schema line or first in the file. The rest of the text is not touched.
+    /// </summary>
+    public string SetRequires(string settingsText, string version)
+    {
+        return SetProperty(settingsText, "requires", JsonText.Quote(version));
+    }
+
+    public string SetStrictness(string settingsText, Strictness strictness)
+    {
+        return SetProperty(settingsText, "strictness", WriteStrictness(strictness));
+    }
+
+    private string SetProperty(string settingsText, string key, string value)
+    {
+        var bytes = Encoding.UTF8.GetBytes(settingsText);
+        var reader = new Utf8JsonReader(bytes);
+        reader.Read();
+        var afterBrace = (int)reader.BytesConsumed;
+        var afterSchema = -1;
+        var hasProperties = false;
+        while(reader.Read() && reader.TokenType == JsonTokenType.PropertyName)
+        {
+            var isKey = reader.ValueTextEquals(key);
+            var isSchema = reader.ValueTextEquals("$schema"u8);
+            reader.Read();
+            var start = (int)reader.TokenStartIndex;
+            reader.Skip();
+            var end = (int)reader.BytesConsumed;
+            if(isKey)
+                return Encoding.UTF8.GetString(bytes.AsSpan(0, start)) + value + Encoding.UTF8.GetString(bytes.AsSpan(end));
+
+            if(isSchema)
+                afterSchema = end;
+
+            hasProperties = true;
+        }
+
+        var line = _indent + JsonText.Quote(key) + ": " + value;
+        if(afterSchema >= 0)
+            return Encoding.UTF8.GetString(bytes.AsSpan(0, afterSchema)) + "," + _newline + line + Encoding.UTF8.GetString(bytes.AsSpan(afterSchema));
+
+        return Encoding.UTF8.GetString(bytes.AsSpan(0, afterBrace)) + _newline + line + (hasProperties ? "," : string.Empty) + Encoding.UTF8.GetString(bytes.AsSpan(afterBrace));
     }
 
     public string WriteStructure(StructureRules structure)

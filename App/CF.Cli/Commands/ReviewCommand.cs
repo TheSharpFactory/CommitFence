@@ -11,33 +11,27 @@ namespace CF.Cli.Commands;
 internal sealed class ReviewCommand
 {
     private readonly IReviewService _reviewService;
-    private readonly TextWriter _output;
     private readonly string _settingsPath;
     private readonly string _currentFolder;
     private readonly IReadOnlyList<string> _files;
-    private readonly bool _asPrompt;
+    private readonly ReviewReportWriter _reportWriter;
     private readonly bool _quick;
 
-    public ReviewCommand(IReviewService reviewService, CommandEnvironment environment, string settingsPath, ReviewArguments arguments)
+    public ReviewCommand(IReviewService reviewService, CommandEnvironment environment, string settingsPath, ReviewArguments arguments, string version)
     {
         _reviewService = reviewService;
-        _output = environment.Output;
         _settingsPath = settingsPath;
         _currentFolder = environment.CurrentFolder;
         _files = arguments.Files;
-        _asPrompt = arguments.AsPrompt;
+        _reportWriter = new ReviewReportWriter(arguments, environment, version, Path.GetDirectoryName(settingsPath) ?? environment.CurrentFolder, countByRule: false);
         _quick = arguments.Quick;
     }
 
     public ExitCode Run()
     {
         var result = _reviewService.ReviewFiles(_settingsPath, _files.Select(ToFileToReview).ToList(), _quick);
-        if(_asPrompt)
-            new PromptReporter(_output).Write(result);
-        else
-            new PlainTextReporter(_output, countByRule: false).Write(result);
 
-        return result.ExitCode;
+        return _reportWriter.Write(result);
     }
 
     private FileToReview ToFileToReview(string path)

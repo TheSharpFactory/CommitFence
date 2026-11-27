@@ -84,10 +84,12 @@ public sealed class FixReviewTests
         host.Press(PhysicalKey.Tab);
         var apply = Assert.IsType<Button>(host.Window.FocusManager?.GetFocusedElement());
         Assert.Equal("Apply fix", AutomationProperties.GetName(apply));
+        var reviewsBeforeApply = shell.Review.Scopes.Count;
         host.Press(PhysicalKey.Enter);
         await first.ApplyFixCommand.ExecutionTask!;
         host.Pump();
 
+        Assert.Equal(reviewsBeforeApply, shell.Review.Scopes.Count);
         Assert.True(first.IsFixed);
         Assert.False(first.IsOpen);
         Assert.Equal(FixReviewFixture.After, commandBytes);

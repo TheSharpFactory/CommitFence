@@ -56,14 +56,15 @@ You can review without the hook: `commitfence review --push` says what the hook 
 **Rules.** The team's rules and the rules of `.editorconfig`, each as a sentence you can edit. Try it, under the rule,
 runs the rule on the code you type or paste and marks each place that breaks it, follows it or is not covered.
 
-![The Rules screen: four team rules in a list, and the page of the rule "No braces around a single-line if" with its sentence and the code it was tried on](docs/images/rules-screen.png)
+![The Rules screen: four team rules and four rules of .editorconfig in a list, and the page of the rule "No braces around a single-line if" with its sentence, its effect and the box to try it](docs/images/rules-screen.png)
 
 **Review.** What the push would send: the verdict, every finding under its file with the code around it, and the files
-of the push, or of the staged changes before a commit. "Open at line" opens a finding's file at its line, and says so
+of the push, or of the staged changes before a commit: every file the review covered, the ones without findings in a list
+you can filter. "Open at line" opens a finding's file at its line, and says so
 when the code on disk has moved. A finding of a rule of `.editorconfig` can be fixed there: the SDK's formatter
 prepares the change, you see all of it, and "Apply fix" writes it.
 
-![The Review screen after a refused push: two findings block it and one only warns, with the code of the first finding](docs/images/review-screen.png)
+![The Review screen after a refused push: one finding blocks it and three only warn, with the code of the blocking finding and the files reviewed](docs/images/review-screen.png)
 
 **Dashboard.** The reviews of pushes on this machine in the last 30 days: how many were blocked or incomplete, which
 rules found the most, which never fired, and how long a push waited.
@@ -76,8 +77,8 @@ direction in red. Every direction is also a list by layer, and each change is sa
 ![The Architecture screen: eleven modules in layers, the chosen module's lines, and one use that breaks a direction](docs/images/architecture-screen.png)
 
 **Exemptions, Settings and Doctor.** Every line that sets a rule aside, with its reason; the strictness of the
-repository, the version and its updates; and seven checks of whether a push from this machine will be reviewed, each
-with how to fix it.
+repository, a preset or your own, the version and its updates; and seven checks of whether a push from this machine will
+be reviewed, each with how to fix it.
 
 ## The command line
 
@@ -87,7 +88,7 @@ with how to fix it.
 | `commitfence init [--hook pre-push\|pre-commit] [--print]` | Starts `commitfence.json` and adds the line to a supported hook. `--print` previews the changes. |
 | `commitfence doctor` | Checks whether pushes from this repository will be reviewed and explains how to fix failed checks |
 | `commitfence settings show`, `set strictness <quiet\|standard\|strict>` | Shows or changes what the severity words in `.editorconfig` do to a push |
-| `commitfence stats [--all]` | Shows local push reviews from the last 30 days, the rules they found and how long they took. Use `--all` to list every rule that never fired |
+| `commitfence stats [--all]` | Shows the push reviews on this machine from the last 30 days, from the hook, the command line and the app's Review: the rules they found and how long they took. Use `--all` to list every rule that never fired |
 | `commitfence structure show`, `structure set` | Shows modules, allowed directions and the last structure judgment, or edits a module, part or direction |
 | `commitfence exemptions list [--rule <id>]` | Lists the lines of the last commit that set a rule aside, by file, with the reason each one gives |
 | `commitfence catalog [<language> [<artifact type>]]` | Lists what a rule can be about and the properties it can look at |
@@ -102,11 +103,37 @@ with how to fix it.
 | `commitfence review --files <path>... [--quick]` | Reviews the named files. `--quick` treats the rules requiring a build as intentionally omitted. |
 | `commitfence review --all [<folder or project file>]` | Reviews the whole of a folder, as of the last commit |
 | `commitfence review ... --format prompt` | Prints what was found as a prompt to hand to an AI coding agent, in place of the usual report |
+| `commitfence review ... --format sarif` | Prints what was found as a SARIF 2.1.0 log, in place of the usual report, for build servers and code scanning |
+| `commitfence review ... --output <file>` | Writes the report of the chosen `--format` to the file and keeps the plain text on the console. If the file cannot be written the reason is printed, and a review that would have passed exits 3 |
 | `commitfence update [--check]` | Installs the newest release; `--check` only says whether there is one |
 | `commitfence --version`, `--help` | The version and the usage |
 
 `commitfence --help` has every option. Exit codes of `review`: 0 the push may go, 1 a rule that blocks is broken,
-2 the review could not be completed, 3 wrong settings or a wrong command.
+2 the review could not be completed, 3 wrong settings, a wrong command, or a review that would have passed whose
+report `--output` could not write.
+
+In a GitHub Actions job, write the SARIF log and upload it, even when the review blocks, so the findings show on the pull
+request's lines; the job still fails from the review's exit code. The job needs the history of the branch the pull
+request targets (here `main`; `fetch-depth: 0` fetches it) and the permission to upload. A private repository also
+needs `actions: read`, and GitHub Code Security for code scanning:
+
+```yaml
+permissions:
+  contents: read
+  security-events: write
+  actions: read
+steps:
+  - uses: actions/checkout@v4
+    with:
+      fetch-depth: 0
+  - run: commitfence review --base origin/main --head HEAD --format sarif --output commitfence.sarif
+  - uses: github/codeql-action/upload-sarif@v3
+    if: always()
+    with:
+      sarif_file: commitfence.sarif
+```
+
+Upload the report from the same revision the review read: the one that was checked out, which the report names.
 
 ## What a rule is
 
@@ -146,6 +173,14 @@ is incomplete and asks to be updated.
 what it can look at in each. A rule can also forbid something altogether, apply only to some paths, and carry a message
 and a reason. This repository's own `commitfence.json` holds the rules it is reviewed by.
 
+An editor can complete and check `commitfence.json` as you type it: its JSON Schema is at
+`https://commitfence.com/schema/commitfence.schema.json`. In VS Code, add this to your user or workspace settings:
+`"json.schemas": [ { "fileMatch": [ "commitfence.json" ], "url": "https://commitfence.com/schema/commitfence.schema.json" } ]`.
+Or put `"$schema": "https://commitfence.com/schema/commitfence.schema.json"` first in the file, which needs CommitFence
+1.0.0.7 or newer on every machine that reads it. The schema is a guide for the editor, and CommitFence itself is the
+last word: it also refuses a whole number written as `1.0`, and a text made only of an unusual space character
+(U+0085, U+FEFF), which a schema cannot tell apart.
+
 ## Good to know
 
 - **It updates itself.** The app says when a new release is out, shows its notes and installs it on "Update now".
@@ -158,7 +193,9 @@ and a reason. This repository's own `commitfence.json` holds the rules it is rev
 - **Setting a rule aside.** `// commitfence:allow TEAM010: the reason`, on the line or alone on the line above,
   sets a finding of that rule aside. The reason is required: a comment without one is a finding of its own.
 - **Strictness.** `"strictness"` in `commitfence.json` (`quiet`, `standard`, `strict`) says what the words of
-  `.editorconfig` do to a push. Without it, `error` blocks and `warning` and `suggestion` warn.
+  `.editorconfig` do to a push. Without it, `error` blocks and `warning` and `suggestion` warn. Your own is a mapping
+  of the three words to `block`, `warn` or `off`, such as `{ "error": "block", "warning": "block", "suggestion": "off" }`;
+  Settings in the app sets it with "Your own".
 - The product never writes `.editorconfig`.
 
 ## Building

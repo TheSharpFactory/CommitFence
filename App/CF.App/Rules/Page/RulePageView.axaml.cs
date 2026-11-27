@@ -1,5 +1,7 @@
 using System.Globalization;
 using Avalonia;
+using Avalonia.Automation;
+using Avalonia.Automation.Peers;
 using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Interactivity;
@@ -21,7 +23,7 @@ internal sealed partial class RulePageView : UserControl
     private const double _contentMost = 900;
     private const double _titleLeast = 160;
     private const double _renameRoom = 110;
-    private const double _headGap = 12;
+    private const double _headGap = 8;
 
     private const double _idLeast = 48;
 
@@ -36,10 +38,19 @@ internal sealed partial class RulePageView : UserControl
         Scroller.SizeChanged += (_, _) => FitHead();
         HeadRow.SizeChanged += (_, _) => FitHead();
         RightGroup.SizeChanged += (_, _) => FitHead();
+        LeftGroup.SizeChanged += (_, _) => FitHead();
         Loaded += (_, _) => FitHead();
         Scroller.ScrollChanged += (_, _) => Head.Classes.Set("stuck", Scroller.Offset.Y > 0);
         TitleBox.TextChanged += (_, _) => FitTitle();
         LayoutUpdated += (_, _) => FitTryIt();
+        LayoutUpdated += (_, _) => FitIdLine();
+        IdBox.GotFocus += (_, _) => FitIdLine();
+        IdBox.LostFocus += (_, _) => FitIdLine();
+        DraftIdLine.PropertyChanged += (_, change) =>
+        {
+            if(change.Property == IsVisibleProperty)
+                FitIdLine();
+        };
         AddHandler(KeyDownEvent, OnKeyDownTunnel, RoutingStrategies.Tunnel);
         AddHandler(KeyUpEvent, OnKeyUpTunnel, RoutingStrategies.Tunnel);
         AddHandler(TextInputEvent, OnTextInputTunnel, RoutingStrategies.Tunnel);
@@ -60,6 +71,12 @@ internal sealed partial class RulePageView : UserControl
     /// </summary>
     public void FocusEntry()
     {
+        if(_page?.IsDraft == true)
+        {
+            FocusId();
+            return;
+        }
+
         var back = this.GetVisualDescendants().OfType<Button>().FirstOrDefault(button => button.Classes.Contains("back") && button.IsEffectivelyVisible);
         if(back != null)
             back.Focus(NavigationMethod.Tab);
@@ -70,6 +87,12 @@ internal sealed partial class RulePageView : UserControl
     /// <summary>
     /// Puts the keyboard in the title with the caret at its end (F2, Rename, Enter on a row).
     /// </summary>
+    public void FocusId()
+    {
+        if(IdBox.Focus(NavigationMethod.Tab))
+            IdBox.SelectAll();
+    }
+
     public void FocusTitle()
     {
         TitleBox.Focus();
@@ -90,12 +113,32 @@ internal sealed partial class RulePageView : UserControl
     /// </summary>
     private void FocusBlocker(object? target)
     {
-        if(target is PathPieceViewModel { IsOpen: true })
+        if(target is RulePageViewModel)
+        {
+            if(IdBox.IsFocused)
+                TopLevel.GetTopLevel(this)?.FocusManager?.Focus(null);
+
+            FocusId();
+            AnnounceId(_page?.IdLine ?? string.Empty);
             return;
+        }
+
+        if(target is PathPieceViewModel { IsOpen: true } path)
+        {
+            TopLevel.GetTopLevel(this)?.GetVisualDescendants().OfType<TextBox>()
+                .FirstOrDefault(box => box.IsEffectivelyVisible && ReferenceEquals(box.DataContext, path))?.Focus(NavigationMethod.Tab);
+            return;
+        }
 
         var stop = target == null ? null : TabStops().FirstOrDefault(candidate => ReferenceEquals(candidate.DataContext, target));
         if(stop != null)
             stop.Focus(NavigationMethod.Tab);
+        else if(_page is { IsComplete: false, HasTitle: true } page)
+        {
+            var button = page.ArtifactIsEmpty ? ArtifactButton
+                : this.GetVisualDescendants().OfType<Button>().FirstOrDefault(candidate => candidate.Classes.Contains("addrequirement"));
+            button?.Focus(NavigationMethod.Tab);
+        }
         else
             FocusTitle();
     }
@@ -173,6 +216,7 @@ internal sealed partial class RulePageView : UserControl
             _page.RenameRequested -= FocusTitle;
             _page.RequireAddFocusRequested -= FocusRequireAdd;
             _page.BlockerFocusRequested -= FocusBlocker;
+            _page.IdFixed -= FocusFixedId;
             _page.RemovalStarting -= KeepNeighbourOf;
             _page.RemovalDone -= FocusNeighbour;
         }
@@ -183,11 +227,68 @@ internal sealed partial class RulePageView : UserControl
             _page.RenameRequested += FocusTitle;
             _page.RequireAddFocusRequested += FocusRequireAdd;
             _page.BlockerFocusRequested += FocusBlocker;
+            _page.IdFixed += FocusFixedId;
             _page.RemovalStarting += KeepNeighbourOf;
             _page.RemovalDone += FocusNeighbour;
         }
 
         Fit();
+    }
+
+    private void FocusFixedId(string id)
+    {
+        IdBox.Focus(NavigationMethod.Tab);
+        IdBox.SelectionStart = id.Length;
+        IdBox.SelectionEnd = id.Length;
+        IdBox.CaretIndex = id.Length;
+        AnnounceId($"ID set to {id}");
+    }
+
+    private void AnnounceId(string message)
+    {
+        AutomationProperties.SetName(IdAnnouncement, message);
+        ControlAutomationPeer.CreatePeerForElement(IdAnnouncement)
+            .RaisePropertyChangedEvent(AutomationElementIdentifiers.NameProperty, null, message);
+    }
+
+    private void FitIdLine()
+    {
+        if(DraftIdLine.IsVisible)
+            DraftIdLine.Margin = new Thickness(LeftGroup.Bounds.X + IdField.Bounds.X, 0, 0, 0);
+
+        IdRefusedRing.IsVisible = IdBox.IsKeyboardFocusWithin && _page?.HasIdProblem == true;
+    }
+
+    private void OnIdLabelPressed(object? sender, PointerPressedEventArgs e)
+    {
+        if(e.GetCurrentPoint(IdBox).Properties.IsLeftButtonPressed)
+            IdBox.Focus(NavigationMethod.Pointer);
+    }
+
+    private void OnMoreOpened(object? sender, EventArgs e)
+    {
+        RuleMenu.Focus(NavigationMethod.Directional);
+    }
+
+    private void OnRuleMenuKey(object? sender, KeyEventArgs e)
+    {
+        switch(e.Key)
+        {
+            case Key.Up:
+                (RemoveEntry.IsFocused ? DuplicateEntry : RemoveEntry).Focus(NavigationMethod.Directional);
+                break;
+            case Key.Down:
+                (DuplicateEntry.IsFocused ? RemoveEntry : DuplicateEntry).Focus(NavigationMethod.Directional);
+                break;
+            case Key.Escape:
+                MorePopup.IsOpen = false;
+                MoreButton.Focus(NavigationMethod.Directional);
+                break;
+            default:
+                return;
+        }
+
+        e.Handled = true;
     }
 
     private void Fit()
@@ -233,7 +334,7 @@ internal sealed partial class RulePageView : UserControl
     /// </summary>
     private void FitHead()
     {
-        var room = Math.Min(_contentMost, Scroller.Bounds.Width - Sheet.Padding.Left - Sheet.Padding.Right);
+        var room = Math.Min(_contentMost, Head.Bounds.Width - Head.Padding.Left - Head.Padding.Right);
         if(room > 0 && HeadRow.Width != room)
         {
             HeadRow.Width = room;
@@ -269,8 +370,8 @@ internal sealed partial class RulePageView : UserControl
     /// <summary>
     /// The keyboard stops of the page in this order: the back button in one pane, the title,
     /// Rename, the parts of the sentence in reading order, the choice of effect, Paste, Clear, the code box, and then the
-    /// switch, Discard, Save rule and the More button. The head stands first in the page's tree, so its stops, but the back
-    /// button, are moved to the end.
+    /// switch, Discard, Save rule and the More button. The back button and draft ID stay first; the other controls in the head
+    /// are moved to the end.
     /// </summary>
     public IReadOnlyList<InputElement> TabStops()
     {
@@ -281,9 +382,9 @@ internal sealed partial class RulePageView : UserControl
             .Where(stop => stop == editor.TextArea || (stop != editor && !editor.IsVisualAncestorOf(stop)))
             .ToList();
         var head = all.Where(Head.IsVisualAncestorOf).ToList();
-        var back = head.Where(stop => stop is Button button && button.Classes.Contains("back")).ToList();
+        var first = head.Where(stop => stop == IdBox || stop == IdFix || stop is Button button && button.Classes.Contains("back")).ToList();
 
-        return back.Concat(all.Except(head)).Concat(head.Except(back)).ToList();
+        return first.Concat(all.Except(head)).Concat(head.Except(first)).ToList();
     }
 
     /// <summary>
@@ -325,6 +426,13 @@ internal sealed partial class RulePageView : UserControl
     {
         if(e.Key == Key.Tab && (e.KeyModifiers & (KeyModifiers.Control | KeyModifiers.Alt)) == 0 && MoveAlongTabStops(e))
         {
+            e.Handled = true;
+            return;
+        }
+
+        if(e.Key == Key.Enter && e.KeyModifiers == KeyModifiers.Alt && IdBox.IsFocused && _page?.HasIdProblem == true)
+        {
+            _page.UseSuggestedIdCommand.Execute(null);
             e.Handled = true;
             return;
         }

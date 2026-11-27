@@ -1,0 +1,1299 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://commitfence.com/schema/commitfence.schema.json",
+  "title": "CommitFence settings",
+  "description": "The settings file of a repository: the rules its pushes are reviewed by, how strict the .editorconfig words are, and the structure of its modules.",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "$schema": {
+      "type": "string",
+      "description": "The address of this schema, for editors; CommitFence ignores it. A file that has it needs CommitFence 1.0.0.7 or newer."
+    },
+    "requires": {
+      "type": "string",
+      "pattern": "^[0-9]{1,6}(\\.[0-9]{1,6}){0,3}$",
+      "description": "The lowest version of CommitFence the repository accepts: one to four numbers separated by dots, such as 1.0.0.6. An older program refuses to review. Saving a rule that needs a newer version raises it."
+    },
+    "strictness": {
+      "description": "What the severity words of .editorconfig do to a push: a preset, or a mapping of error, warning and suggestion. Without it, error blocks and warning and suggestion warn.",
+      "anyOf": [
+        {
+          "enum": [
+            "quiet",
+            "standard",
+            "strict"
+          ]
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "error",
+            "warning",
+            "suggestion"
+          ],
+          "properties": {
+            "error": {
+              "description": "What an error of .editorconfig does to a push.",
+              "enum": [
+                "block",
+                "warn",
+                "off"
+              ]
+            },
+            "warning": {
+              "description": "What a warning of .editorconfig does to a push.",
+              "enum": [
+                "block",
+                "warn",
+                "off"
+              ]
+            },
+            "suggestion": {
+              "description": "What a suggestion of .editorconfig does to a push.",
+              "enum": [
+                "block",
+                "warn",
+                "off"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    "rules": {
+      "type": "array",
+      "description": "The code rules, in the order they are shown.",
+      "items": {
+        "$ref": "#/$defs/rule"
+      }
+    },
+    "structure": {
+      "description": "The modules of the code and the directions allowed between them.",
+      "$ref": "#/$defs/structure"
+    }
+  },
+  "$defs": {
+    "rule": {
+      "type": "object",
+      "description": "One code rule: for an artifact type, where some conditions hold, require that others hold or forbid it.",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "language",
+        "for",
+        "severity",
+        "title"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "The team's own identifier of the rule, such as TEAM010. No two rules share one.",
+          "pattern": "\\S"
+        },
+        "language": {
+          "description": "The language the rule is for.",
+          "enum": [
+            "csharp"
+          ]
+        },
+        "for": {
+          "description": "The kind of code the rule is about.",
+          "enum": [
+            "if-statement",
+            "method",
+            "class",
+            "usage",
+            "file"
+          ],
+          "enumDescriptions": [
+            "An if statement. Each else if is an if statement of its own, and it is found where the if keyword after the else is.",
+            "A method of a class, struct, record or interface. Constructors, local functions, lambdas and accessors are not methods.",
+            "A class. Structs, records and interfaces are not classes.",
+            "A place where code refers to a type or to a member of a type, as the compiler resolved the name. Only known from the build.",
+            "A C# source file. A file rule applies when the file is added or renamed, or when any line in it changes. Rules for it need CommitFence 1.0.0.6 or newer."
+          ]
+        },
+        "severity": {
+          "description": "Whether a break blocks the push or only warns.",
+          "enum": [
+            "block",
+            "warn"
+          ]
+        },
+        "enabled": {
+          "type": "boolean",
+          "description": "Whether the rule is evaluated in a review. A rule that is off stays in the file and is shown, but never runs. The default is true."
+        },
+        "title": {
+          "type": "string",
+          "description": "What the rule says, in a line.",
+          "pattern": "\\S"
+        },
+        "where": {
+          "type": "object",
+          "description": "Which artifacts the rule looks at; every artifact when left out. Every condition here must hold.",
+          "minProperties": 1
+        },
+        "require": {
+          "type": "object",
+          "description": "What must hold of those artifacts. Every condition here must hold. Give either require or forbid.",
+          "minProperties": 1
+        },
+        "forbid": {
+          "const": true,
+          "description": "True when no such artifact may exist at all. Give either forbid or require."
+        },
+        "paths": {
+          "type": "array",
+          "description": "The files the rule applies to, as patterns with *, ** and ?; every file when left out.",
+          "items": {
+            "type": "string"
+          }
+        },
+        "message": {
+          "type": "string",
+          "description": "The message of a finding, when the team wants other words than the title."
+        },
+        "why": {
+          "type": "string",
+          "description": "Why the team has the rule."
+        }
+      },
+      "oneOf": [
+        {
+          "required": [
+            "require"
+          ]
+        },
+        {
+          "required": [
+            "forbid"
+          ]
+        }
+      ],
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "language": {
+                "const": "csharp"
+              },
+              "for": {
+                "const": "if-statement"
+              }
+            },
+            "required": [
+              "language",
+              "for"
+            ]
+          },
+          "then": {
+            "properties": {
+              "where": {
+                "$ref": "#/$defs/conditions-if-statement"
+              },
+              "require": {
+                "$ref": "#/$defs/conditions-if-statement"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "language": {
+                "const": "csharp"
+              },
+              "for": {
+                "const": "method"
+              }
+            },
+            "required": [
+              "language",
+              "for"
+            ]
+          },
+          "then": {
+            "properties": {
+              "where": {
+                "$ref": "#/$defs/conditions-method"
+              },
+              "require": {
+                "$ref": "#/$defs/conditions-method"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "language": {
+                "const": "csharp"
+              },
+              "for": {
+                "const": "class"
+              }
+            },
+            "required": [
+              "language",
+              "for"
+            ]
+          },
+          "then": {
+            "properties": {
+              "where": {
+                "$ref": "#/$defs/conditions-class"
+              },
+              "require": {
+                "$ref": "#/$defs/conditions-class"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "language": {
+                "const": "csharp"
+              },
+              "for": {
+                "const": "usage"
+              }
+            },
+            "required": [
+              "language",
+              "for"
+            ]
+          },
+          "then": {
+            "properties": {
+              "where": {
+                "$ref": "#/$defs/conditions-usage"
+              },
+              "require": {
+                "$ref": "#/$defs/conditions-usage"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "language": {
+                "const": "csharp"
+              },
+              "for": {
+                "const": "file"
+              }
+            },
+            "required": [
+              "language",
+              "for"
+            ]
+          },
+          "then": {
+            "properties": {
+              "where": {
+                "$ref": "#/$defs/conditions-file"
+              },
+              "require": {
+                "$ref": "#/$defs/conditions-file"
+              }
+            }
+          }
+        }
+      ]
+    },
+    "structure": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "modules": {
+          "type": "object",
+          "description": "Named groups of code. Each name maps to selectors written kind:pattern, with the kind namespace, project or folder, such as namespace:*.Domain.",
+          "propertyNames": {
+            "pattern": "\\S"
+          },
+          "additionalProperties": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "pattern": "^(namespace|project|folder):[\\s\\S]+$"
+            }
+          }
+        },
+        "directions": {
+          "type": "object",
+          "description": "Which modules may use which. Each direction is written from -> to, with the names of two different modules.",
+          "additionalProperties": false,
+          "properties": {
+            "allow": {
+              "type": "array",
+              "description": "The directions that are allowed.",
+              "items": {
+                "type": "string",
+                "pattern": "^(?!\\s*([\\s\\S]*?\\S)\\s*->\\s*\\1\\s*$)(?:(?!->)[\\s\\S])*(?!->)\\S(?:(?!->)[\\s\\S])*->(?:(?!->)[\\s\\S])*(?!->)\\S(?:(?!->)[\\s\\S])*$"
+              }
+            },
+            "forbid": {
+              "type": "array",
+              "description": "The directions that are forbidden.",
+              "items": {
+                "type": "string",
+                "pattern": "^(?!\\s*([\\s\\S]*?\\S)\\s*->\\s*\\1\\s*$)(?:(?!->)[\\s\\S])*(?!->)\\S(?:(?!->)[\\s\\S])*->(?:(?!->)[\\s\\S])*(?!->)\\S(?:(?!->)[\\s\\S])*$"
+              }
+            },
+            "noCycles": {
+              "type": "boolean",
+              "description": "Whether modules may not use each other in a circle."
+            }
+          }
+        },
+        "references": {
+          "type": "array",
+          "description": "Rules about what each module may reference.",
+          "items": {
+            "type": "object",
+            "additionalProperties": {
+              "$ref": "#/$defs/noNulls"
+            }
+          }
+        },
+        "layout": {
+          "type": "array",
+          "description": "Rules about where each module's code is laid out.",
+          "items": {
+            "type": "object",
+            "additionalProperties": {
+              "$ref": "#/$defs/noNulls"
+            }
+          }
+        }
+      }
+    },
+    "noNulls": {
+      "description": "Any value except null.",
+      "anyOf": [
+        {
+          "type": [
+            "string",
+            "number",
+            "boolean"
+          ]
+        },
+        {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/noNulls"
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": {
+            "$ref": "#/$defs/noNulls"
+          }
+        }
+      ]
+    },
+    "integerCondition": {
+      "description": "A whole number to be equal to, a list of whole numbers (one of them), or a comparison.",
+      "anyOf": [
+        {
+          "type": "integer",
+          "minimum": -9223372036854775808,
+          "maximum": 9223372036854775807
+        },
+        {
+          "type": "array",
+          "items": {
+            "type": "integer",
+            "minimum": -9223372036854775808,
+            "maximum": 9223372036854775807
+          },
+          "minItems": 1
+        },
+        {
+          "type": "object",
+          "description": "A comparison. atLeast and atMost together make a range; the others go alone.",
+          "additionalProperties": false,
+          "minProperties": 1,
+          "maxProperties": 2,
+          "properties": {
+            "not": {
+              "description": "Is none of these.",
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "minimum": -9223372036854775808,
+                  "maximum": 9223372036854775807
+                },
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "integer",
+                    "minimum": -9223372036854775808,
+                    "maximum": 9223372036854775807
+                  },
+                  "minItems": 1
+                }
+              ]
+            },
+            "atMost": {
+              "type": "integer",
+              "minimum": -9223372036854775808,
+              "maximum": 9223372036854775807,
+              "description": "Is this or fewer."
+            },
+            "atLeast": {
+              "type": "integer",
+              "minimum": -9223372036854775808,
+              "maximum": 9223372036854775807,
+              "description": "Is this or more."
+            }
+          },
+          "if": {
+            "minProperties": 2
+          },
+          "then": {
+            "required": [
+              "atLeast",
+              "atMost"
+            ]
+          }
+        }
+      ]
+    },
+    "booleanCondition": {
+      "type": [
+        "boolean",
+        "array"
+      ],
+      "description": "true or false, or a list of them.",
+      "items": {
+        "type": "boolean"
+      },
+      "minItems": 1
+    },
+    "textCondition": {
+      "description": "A text to be equal to, a list of texts (one of them), or a comparison.",
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "minItems": 1
+        },
+        {
+          "type": "object",
+          "description": "A comparison; one at a time.",
+          "additionalProperties": false,
+          "minProperties": 1,
+          "maxProperties": 1,
+          "properties": {
+            "not": {
+              "description": "Is none of these.",
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  },
+                  "minItems": 1
+                }
+              ]
+            },
+            "matches": {
+              "type": "string",
+              "description": "Matches this pattern, where * stands for any text and ? for any one character."
+            }
+          }
+        }
+      ]
+    },
+    "conditions-if-statement": {
+      "type": "object",
+      "description": "An if statement. Each else if is an if statement of its own, and it is found where the if keyword after the else is.",
+      "additionalProperties": false,
+      "minProperties": 1,
+      "properties": {
+        "statementsInBody": {
+          "description": "How many statements the body holds, braces or not. The body is the branch taken when the condition holds; an else branch is not part of it. A body without braces holds one statement.",
+          "$ref": "#/$defs/integerCondition"
+        },
+        "bodyFitsOnOneLine": {
+          "description": "Whether what is inside the body, from the first token of its first statement to the last token of its last one, sits on one line. The braces and comments are not counted. An empty body fits.",
+          "$ref": "#/$defs/booleanCondition"
+        },
+        "fitsOnOneLine": {
+          "description": "Whether the whole if statement, from the if keyword to the end of its last branch, sits on one line.",
+          "$ref": "#/$defs/booleanCondition"
+        },
+        "braces": {
+          "description": "Whether the body is written inside braces.",
+          "$ref": "#/$defs/booleanCondition"
+        },
+        "isElseIf": {
+          "description": "Whether this if statement is the one after an else.",
+          "$ref": "#/$defs/booleanCondition"
+        },
+        "hasElse": {
+          "description": "Whether an else follows the body.",
+          "$ref": "#/$defs/booleanCondition"
+        },
+        "lines": {
+          "description": "How many lines the if statement takes, from the if keyword to its end.",
+          "$ref": "#/$defs/integerCondition"
+        }
+      }
+    },
+    "conditions-method": {
+      "type": "object",
+      "description": "A method of a class, struct, record or interface. Constructors, local functions, lambdas and accessors are not methods.",
+      "additionalProperties": false,
+      "minProperties": 1,
+      "properties": {
+        "name": {
+          "description": "The name of the method.",
+          "$ref": "#/$defs/textCondition"
+        },
+        "writtenAccess": {
+          "description": "The access keyword written in the file, or none.",
+          "anyOf": [
+            {
+              "type": "string",
+              "enum": [
+                "none",
+                "public",
+                "internal",
+                "protected",
+                "private",
+                "protected internal",
+                "private protected"
+              ]
+            },
+            {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "enum": [
+                  "none",
+                  "public",
+                  "internal",
+                  "protected",
+                  "private",
+                  "protected internal",
+                  "private protected"
+                ]
+              },
+              "minItems": 1
+            },
+            {
+              "type": "object",
+              "description": "A comparison; one at a time.",
+              "additionalProperties": false,
+              "minProperties": 1,
+              "maxProperties": 1,
+              "properties": {
+                "not": {
+                  "description": "Is none of these.",
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "enum": [
+                        "none",
+                        "public",
+                        "internal",
+                        "protected",
+                        "private",
+                        "protected internal",
+                        "private protected"
+                      ]
+                    },
+                    {
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "enum": [
+                          "none",
+                          "public",
+                          "internal",
+                          "protected",
+                          "private",
+                          "protected internal",
+                          "private protected"
+                        ]
+                      },
+                      "minItems": 1
+                    }
+                  ]
+                },
+                "matches": {
+                  "type": "string",
+                  "description": "Matches this pattern, where * stands for any text and ? for any one character."
+                }
+              }
+            }
+          ]
+        },
+        "modifiers": {
+          "description": "Every modifier keyword written, in the order written, separated by a space.",
+          "$ref": "#/$defs/textCondition"
+        },
+        "isOverride": {
+          "description": "Whether the method is written with the override keyword.",
+          "$ref": "#/$defs/booleanCondition"
+        },
+        "declaredAccess": {
+          "description": "The access the method really has, as the compiler says: the language's default applied when none is written.",
+          "anyOf": [
+            {
+              "type": "string",
+              "enum": [
+                "public",
+                "internal",
+                "protected",
+                "private",
+                "protected internal",
+                "private protected"
+              ]
+            },
+            {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "enum": [
+                  "public",
+                  "internal",
+                  "protected",
+                  "private",
+                  "protected internal",
+                  "private protected"
+                ]
+              },
+              "minItems": 1
+            },
+            {
+              "type": "object",
+              "description": "A comparison; one at a time.",
+              "additionalProperties": false,
+              "minProperties": 1,
+              "maxProperties": 1,
+              "properties": {
+                "not": {
+                  "description": "Is none of these.",
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "enum": [
+                        "public",
+                        "internal",
+                        "protected",
+                        "private",
+                        "protected internal",
+                        "private protected"
+                      ]
+                    },
+                    {
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "enum": [
+                          "public",
+                          "internal",
+                          "protected",
+                          "private",
+                          "protected internal",
+                          "private protected"
+                        ]
+                      },
+                      "minItems": 1
+                    }
+                  ]
+                },
+                "matches": {
+                  "type": "string",
+                  "description": "Matches this pattern, where * stands for any text and ? for any one character."
+                }
+              }
+            }
+          ]
+        },
+        "containingType": {
+          "description": "The kind of type the method is immediately declared in, or none. A record struct is a record.",
+          "anyOf": [
+            {
+              "type": "string",
+              "enum": [
+                "none",
+                "class",
+                "struct",
+                "record",
+                "interface"
+              ]
+            },
+            {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "enum": [
+                  "none",
+                  "class",
+                  "struct",
+                  "record",
+                  "interface"
+                ]
+              },
+              "minItems": 1
+            },
+            {
+              "type": "object",
+              "description": "A comparison; one at a time.",
+              "additionalProperties": false,
+              "minProperties": 1,
+              "maxProperties": 1,
+              "properties": {
+                "not": {
+                  "description": "Is none of these.",
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "enum": [
+                        "none",
+                        "class",
+                        "struct",
+                        "record",
+                        "interface"
+                      ]
+                    },
+                    {
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "enum": [
+                          "none",
+                          "class",
+                          "struct",
+                          "record",
+                          "interface"
+                        ]
+                      },
+                      "minItems": 1
+                    }
+                  ]
+                },
+                "matches": {
+                  "type": "string",
+                  "description": "Matches this pattern, where * stands for any text and ? for any one character."
+                }
+              }
+            }
+          ]
+        },
+        "containingTypeName": {
+          "description": "The name of that type, or empty.",
+          "$ref": "#/$defs/textCondition"
+        },
+        "containingTypeWrittenAccess": {
+          "description": "The access keyword written on that type, or none.",
+          "anyOf": [
+            {
+              "type": "string",
+              "enum": [
+                "none",
+                "public",
+                "internal",
+                "protected",
+                "private",
+                "protected internal",
+                "private protected"
+              ]
+            },
+            {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "enum": [
+                  "none",
+                  "public",
+                  "internal",
+                  "protected",
+                  "private",
+                  "protected internal",
+                  "private protected"
+                ]
+              },
+              "minItems": 1
+            },
+            {
+              "type": "object",
+              "description": "A comparison; one at a time.",
+              "additionalProperties": false,
+              "minProperties": 1,
+              "maxProperties": 1,
+              "properties": {
+                "not": {
+                  "description": "Is none of these.",
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "enum": [
+                        "none",
+                        "public",
+                        "internal",
+                        "protected",
+                        "private",
+                        "protected internal",
+                        "private protected"
+                      ]
+                    },
+                    {
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "enum": [
+                          "none",
+                          "public",
+                          "internal",
+                          "protected",
+                          "private",
+                          "protected internal",
+                          "private protected"
+                        ]
+                      },
+                      "minItems": 1
+                    }
+                  ]
+                },
+                "matches": {
+                  "type": "string",
+                  "description": "Matches this pattern, where * stands for any text and ? for any one character."
+                }
+              }
+            }
+          ]
+        },
+        "containingTypeDeclaredAccess": {
+          "description": "The declared access of that type, as the compiler says (every part of a partial type taken together), or none.",
+          "anyOf": [
+            {
+              "type": "string",
+              "enum": [
+                "none",
+                "public",
+                "internal",
+                "protected",
+                "private",
+                "protected internal",
+                "private protected"
+              ]
+            },
+            {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "enum": [
+                  "none",
+                  "public",
+                  "internal",
+                  "protected",
+                  "private",
+                  "protected internal",
+                  "private protected"
+                ]
+              },
+              "minItems": 1
+            },
+            {
+              "type": "object",
+              "description": "A comparison; one at a time.",
+              "additionalProperties": false,
+              "minProperties": 1,
+              "maxProperties": 1,
+              "properties": {
+                "not": {
+                  "description": "Is none of these.",
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "enum": [
+                        "none",
+                        "public",
+                        "internal",
+                        "protected",
+                        "private",
+                        "protected internal",
+                        "private protected"
+                      ]
+                    },
+                    {
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "enum": [
+                          "none",
+                          "public",
+                          "internal",
+                          "protected",
+                          "private",
+                          "protected internal",
+                          "private protected"
+                        ]
+                      },
+                      "minItems": 1
+                    }
+                  ]
+                },
+                "matches": {
+                  "type": "string",
+                  "description": "Matches this pattern, where * stands for any text and ? for any one character."
+                }
+              }
+            }
+          ]
+        },
+        "parameterCount": {
+          "description": "How many parameters the method has.",
+          "$ref": "#/$defs/integerCondition"
+        },
+        "nestingDepth": {
+          "description": "The deepest nesting of statement bodies, ignoring lambdas and local functions. For example, a return alone has depth 0, and an if inside a while has depth 2. Needs CommitFence 1.0.0.6 or newer.",
+          "$ref": "#/$defs/integerCondition"
+        },
+        "statements": {
+          "description": "How many statements are directly in the body; an expression body counts one, a method without a body none.",
+          "$ref": "#/$defs/integerCondition"
+        },
+        "lines": {
+          "description": "How many lines the method takes, attributes included, documentation comment not.",
+          "$ref": "#/$defs/integerCondition"
+        },
+        "fitsOnOneLine": {
+          "description": "Whether the whole method sits on one line.",
+          "$ref": "#/$defs/booleanCondition"
+        },
+        "documentationPresent": {
+          "description": "Whether a documentation comment comes right before the method.",
+          "$ref": "#/$defs/booleanCondition"
+        },
+        "attributes": {
+          "description": "The names of the attributes, as written, separated by a comma and a space.",
+          "$ref": "#/$defs/textCondition"
+        }
+      }
+    },
+    "conditions-class": {
+      "type": "object",
+      "description": "A class. Structs, records and interfaces are not classes.",
+      "additionalProperties": false,
+      "minProperties": 1,
+      "properties": {
+        "name": {
+          "description": "The name of the class.",
+          "$ref": "#/$defs/textCondition"
+        },
+        "writtenAccess": {
+          "description": "The access keyword written in the file, or none.",
+          "anyOf": [
+            {
+              "type": "string",
+              "enum": [
+                "none",
+                "public",
+                "internal",
+                "protected",
+                "private",
+                "protected internal",
+                "private protected"
+              ]
+            },
+            {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "enum": [
+                  "none",
+                  "public",
+                  "internal",
+                  "protected",
+                  "private",
+                  "protected internal",
+                  "private protected"
+                ]
+              },
+              "minItems": 1
+            },
+            {
+              "type": "object",
+              "description": "A comparison; one at a time.",
+              "additionalProperties": false,
+              "minProperties": 1,
+              "maxProperties": 1,
+              "properties": {
+                "not": {
+                  "description": "Is none of these.",
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "enum": [
+                        "none",
+                        "public",
+                        "internal",
+                        "protected",
+                        "private",
+                        "protected internal",
+                        "private protected"
+                      ]
+                    },
+                    {
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "enum": [
+                          "none",
+                          "public",
+                          "internal",
+                          "protected",
+                          "private",
+                          "protected internal",
+                          "private protected"
+                        ]
+                      },
+                      "minItems": 1
+                    }
+                  ]
+                },
+                "matches": {
+                  "type": "string",
+                  "description": "Matches this pattern, where * stands for any text and ? for any one character."
+                }
+              }
+            }
+          ]
+        },
+        "modifiers": {
+          "description": "Every modifier keyword written, in the order written, separated by a space.",
+          "$ref": "#/$defs/textCondition"
+        },
+        "declaredAccess": {
+          "description": "The access the class really has, as the compiler says: the language's default applied when none is written, and every part of a partial class taken together.",
+          "anyOf": [
+            {
+              "type": "string",
+              "enum": [
+                "public",
+                "internal",
+                "protected",
+                "private",
+                "protected internal",
+                "private protected"
+              ]
+            },
+            {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "enum": [
+                  "public",
+                  "internal",
+                  "protected",
+                  "private",
+                  "protected internal",
+                  "private protected"
+                ]
+              },
+              "minItems": 1
+            },
+            {
+              "type": "object",
+              "description": "A comparison; one at a time.",
+              "additionalProperties": false,
+              "minProperties": 1,
+              "maxProperties": 1,
+              "properties": {
+                "not": {
+                  "description": "Is none of these.",
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "enum": [
+                        "public",
+                        "internal",
+                        "protected",
+                        "private",
+                        "protected internal",
+                        "private protected"
+                      ]
+                    },
+                    {
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "enum": [
+                          "public",
+                          "internal",
+                          "protected",
+                          "private",
+                          "protected internal",
+                          "private protected"
+                        ]
+                      },
+                      "minItems": 1
+                    }
+                  ]
+                },
+                "matches": {
+                  "type": "string",
+                  "description": "Matches this pattern, where * stands for any text and ? for any one character."
+                }
+              }
+            }
+          ]
+        },
+        "containingType": {
+          "description": "The kind of type the class is immediately declared in, or none for a class that is not nested.",
+          "anyOf": [
+            {
+              "type": "string",
+              "enum": [
+                "none",
+                "class",
+                "struct",
+                "record",
+                "interface"
+              ]
+            },
+            {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "enum": [
+                  "none",
+                  "class",
+                  "struct",
+                  "record",
+                  "interface"
+                ]
+              },
+              "minItems": 1
+            },
+            {
+              "type": "object",
+              "description": "A comparison; one at a time.",
+              "additionalProperties": false,
+              "minProperties": 1,
+              "maxProperties": 1,
+              "properties": {
+                "not": {
+                  "description": "Is none of these.",
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "enum": [
+                        "none",
+                        "class",
+                        "struct",
+                        "record",
+                        "interface"
+                      ]
+                    },
+                    {
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "enum": [
+                          "none",
+                          "class",
+                          "struct",
+                          "record",
+                          "interface"
+                        ]
+                      },
+                      "minItems": 1
+                    }
+                  ]
+                },
+                "matches": {
+                  "type": "string",
+                  "description": "Matches this pattern, where * stands for any text and ? for any one character."
+                }
+              }
+            }
+          ]
+        },
+        "isNested": {
+          "description": "Whether the class is declared inside another type. Needs CommitFence 1.0.0.6 or newer.",
+          "$ref": "#/$defs/booleanCondition"
+        },
+        "isNamedLikeFile": {
+          "description": "Whether the class name, without type parameters, equals the entire file name with its .cs extension removed. Needs CommitFence 1.0.0.6 or newer.",
+          "$ref": "#/$defs/booleanCondition"
+        },
+        "isPartial": {
+          "description": "Whether this part of the class is written partial.",
+          "$ref": "#/$defs/booleanCondition"
+        },
+        "lines": {
+          "description": "How many lines the class takes, attributes included, documentation comment not.",
+          "$ref": "#/$defs/integerCondition"
+        },
+        "fitsOnOneLine": {
+          "description": "Whether the whole class sits on one line.",
+          "$ref": "#/$defs/booleanCondition"
+        },
+        "documentationPresent": {
+          "description": "Whether a documentation comment comes right before the class.",
+          "$ref": "#/$defs/booleanCondition"
+        },
+        "attributes": {
+          "description": "The names of the attributes, as written, separated by a comma and a space.",
+          "$ref": "#/$defs/textCondition"
+        }
+      }
+    },
+    "conditions-usage": {
+      "type": "object",
+      "description": "A place where code refers to a type or to a member of a type, as the compiler resolved the name. Only known from the build.",
+      "additionalProperties": false,
+      "minProperties": 1,
+      "properties": {
+        "target": {
+          "description": "What the name refers to, as the compiler resolved it: a member written as Type.Member with the type's full name and no parameters, such as System.DateTime.Now, or a type's full name. A constructor counts as its type.",
+          "$ref": "#/$defs/textCondition"
+        },
+        "targetType": {
+          "description": "The full name of the type that is used, or that holds the member that is used.",
+          "$ref": "#/$defs/textCondition"
+        },
+        "targetAssembly": {
+          "description": "The name of the assembly that type comes from.",
+          "$ref": "#/$defs/textCondition"
+        }
+      }
+    },
+    "conditions-file": {
+      "type": "object",
+      "description": "A C# source file. A file rule applies when the file is added or renamed, or when any line in it changes. Rules for it need CommitFence 1.0.0.6 or newer.",
+      "additionalProperties": false,
+      "minProperties": 1,
+      "properties": {
+        "name": {
+          "description": "The file name, including its extension and without its directory.",
+          "$ref": "#/$defs/textCondition"
+        },
+        "typesInFile": {
+          "description": "How many top-level classes, records, structs, interfaces, enums and delegates this file declares.",
+          "$ref": "#/$defs/integerCondition"
+        }
+      }
+    }
+  }
+}

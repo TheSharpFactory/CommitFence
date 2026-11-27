@@ -1,3 +1,5 @@
+using Avalonia.Automation;
+using Avalonia.Automation.Peers;
 using System.ComponentModel;
 using Avalonia;
 using Avalonia.Controls;
@@ -38,6 +40,7 @@ internal sealed partial class SettingsView : UserControl
             _model.Status.PropertyChanged -= OnStatusChanged;
             _model.VersionRevealRequested -= OnVersionRevealRequested;
             _model.OpenFileRequested -= OnOpenFileRequested;
+            _model.StrictnessAnnounced -= AnnounceStrictness;
         }
 
         _model = DataContext as SettingsViewModel;
@@ -46,9 +49,18 @@ internal sealed partial class SettingsView : UserControl
             _model.Status.PropertyChanged += OnStatusChanged;
             _model.VersionRevealRequested += OnVersionRevealRequested;
             _model.OpenFileRequested += OnOpenFileRequested;
+            _model.StrictnessAnnounced += AnnounceStrictness;
         }
 
         Arrange();
+    }
+
+    private void AnnounceStrictness(string message)
+    {
+        AutomationProperties.SetName(StrictnessAnnouncement, message);
+        AutomationProperties.SetLiveSetting(StrictnessAnnouncement, _model?.HasWriteFailure == true ? AutomationLiveSetting.Assertive : AutomationLiveSetting.Polite);
+        ControlAutomationPeer.CreatePeerForElement(StrictnessAnnouncement)
+            .RaisePropertyChangedEvent(AutomationElementIdentifiers.NameProperty, null, message);
     }
 
     private void OnStatusChanged(object? sender, PropertyChangedEventArgs e)

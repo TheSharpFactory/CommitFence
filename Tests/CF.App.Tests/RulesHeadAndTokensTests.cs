@@ -1,6 +1,9 @@
 using Avalonia;
 using Avalonia.Controls;
+using Avalonia.Headless;
 using Avalonia.Headless.XUnit;
+using Avalonia.Input;
+using Avalonia.Styling;
 using CF.App.Rules.Page;
 using CF.App.Tests.Support;
 using CF.Core.Rules;
@@ -88,6 +91,103 @@ public sealed class RulesHeadAndTokensTests
         Assert.Equal(0, tail.Bounds.Y);
         Assert.Equal(298, tail.DesiredSize.Width);
         Assert.Equal(36, condition.DesiredSize.Height);
+    }
+
+    [AvaloniaTheory]
+    [InlineData(24, 72, 360, false)]
+    [InlineData(72, 72, 360, false)]
+    [InlineData(72, 24, 360, true)]
+    [InlineData(48, 72, 185, true)]
+    [InlineData(20, 72, 185, false)]
+    [InlineData(20, 400, 185, false)]
+    public async Task HoveredComparisonTooltipFitsAgainstTheWholeCondition(int top, int tipHeight, int windowHeight, bool above)
+    {
+        using var rules = new RulesHost(_rangeSettings);
+        await rules.Loaded;
+        var model = Assert.Single(rules.Open("R").RequireFlow);
+        var condition = new ConditionPiece { DataContext = model, Margin = new Thickness(16, top, 16, 0), VerticalAlignment = Avalonia.Layout.VerticalAlignment.Top };
+        var button = condition.FindControl<Button>("ComparisonButton")!;
+        // Give the comparison a second row while keeping the real token and hover behavior.
+        button.Margin = new Thickness(0, 80, 0, 0);
+        var tip = new ToolTip { Content = new Border { Width = 180, Height = tipHeight } };
+        ToolTip.SetTip(button, tip);
+        ToolTip.SetShowDelay(button, 0);
+        using var host = new ViewHost(new Window
+        {
+            Content = new ScrollViewer { Content = condition },
+            RequestedThemeVariant = ThemeVariant.Dark,
+            Width = 500,
+            Height = windowHeight
+        });
+
+        var pointer = button.TranslatePoint(new Rect(button.Bounds.Size).Center, host.Window);
+        Assert.NotNull(pointer);
+        host.Window.MouseMove(pointer.Value, RawInputModifiers.None);
+        host.Pump();
+
+        Assert.True(ToolTip.GetIsOpen(button));
+        var tipTop = tip.PointToScreen(default).Y;
+        var tipBottom = tip.PointToScreen(new Point(0, tip.Bounds.Height)).Y;
+        var conditionTop = condition.PointToScreen(default).Y;
+        var conditionBottom = condition.PointToScreen(new Point(0, condition.Bounds.Height)).Y;
+        if(tipHeight > windowHeight)
+        {
+            Assert.InRange(tip.Bounds.Height, 1, host.Window.Bounds.Height - 16);
+            Assert.True(tipTop >= host.Window.PointToScreen(default).Y);
+            Assert.True(tipBottom <= host.Window.PointToScreen(new Point(0, host.Window.Bounds.Height)).Y);
+            return;
+        }
+
+        if(windowHeight < 200)
+        {
+            if(above)
+                Assert.Equal(host.Window.PointToScreen(new Point(0, 8)).Y, tipTop);
+            else
+                Assert.Equal(host.Window.PointToScreen(new Point(0, host.Window.Bounds.Height - 8)).Y, tipBottom);
+
+            return;
+        }
+
+        if(above)
+            Assert.True(tipBottom <= conditionTop, $"The tooltip ends at {tipBottom} but the condition starts at {conditionTop}.");
+        else
+            Assert.True(tipTop >= conditionBottom, $"The tooltip starts at {tipTop} but the condition ends at {conditionBottom}.");
+    }
+
+    [AvaloniaFact]
+    public void LongTooltipTextWrapsInsideTheWindow()
+    {
+        var button = new Button { Content = "Path" };
+        using var host = new ViewHost(button, 320, 185);
+        var text = new string('x', 2000);
+        TipPlacement.SetAvoidsHead(button, true);
+        ToolTip.SetTip(button, text);
+        ToolTip.SetIsOpen(button, true);
+        host.Pump();
+
+        var tip = Assert.IsType<ToolTip>(ToolTip.GetTip(button));
+        var viewport = Assert.IsType<ScrollViewer>(tip.Content);
+        var wrapped = Assert.IsType<TextBlock>(viewport.Content);
+        Assert.Equal(text, wrapped.Text);
+        Assert.True(viewport.Extent.Height > viewport.Viewport.Height);
+        Assert.InRange(tip.Bounds.Width, 1, host.Window.Bounds.Width - 16);
+        Assert.InRange(tip.Bounds.Height, 1, host.Window.Bounds.Height - 16);
+        Assert.True(tip.PointToScreen(default).X >= host.Window.PointToScreen(default).X);
+        Assert.True(tip.PointToScreen(new Point(tip.Bounds.Width, 0)).X <= host.Window.PointToScreen(new Point(host.Window.Bounds.Width, 0)).X);
+    }
+
+    [Fact]
+    public void ShorteningKeepsWholeTextElementsAtBothEndsOfACut()
+    {
+        static double Measure(string text)
+        {
+            return text.Length;
+        }
+
+        Assert.Equal(new ValueShortening.Shown("A…", 1), ValueShortening.Shorten(["A😀BC", "Other"], true, 5, Measure, _ => 2));
+        Assert.Equal("A…Z", ValueShortening.CutMiddle("A😀/folder/😀Z", 4, Measure));
+        Assert.Equal("A…", ValueShortening.CutEnd("Ae\u0301BC", 3, Measure));
+        Assert.Equal("abc/\u0301…file", ValueShortening.CutMiddle("abc/\u0301middle/file", 10, Measure));
     }
 
     [Fact]
@@ -182,7 +282,7 @@ public sealed class RulesHeadAndTokensTests
     }
 
     [AvaloniaFact]
-    public async Task TheHeadSaysSavedUnsavedOrCannotSaveAndTheLineUnderTheTitleIsNeverEmpty()
+    public async Task LocalRefusalsStayAtTheirClauseWhileTheHeadSaysUnsaved()
     {
         using var host = new RulesHost(_rangeSettings);
         await host.Loaded;
@@ -203,12 +303,13 @@ public sealed class RulesHeadAndTokensTests
         path.Open();
         Assert.True(page.IsSavedState);
         path.FieldText = "C:\\invoicing\\src";
-        Assert.Equal(SaveStateKind.CannotSave, page.SaveState);
-        Assert.Equal("Cannot save", page.SaveStateWord);
+        Assert.Equal(SaveStateKind.Unsaved, page.SaveState);
+        Assert.Equal("Unsaved", page.SaveStateWord);
         Assert.True(page.IsUnsaved);
         Assert.False(page.SaveCommand.CanExecute(null));
-        Assert.Equal("Cannot save: the path in within is not valid.", page.HeadLine);
-        Assert.StartsWith("Path C:\\invoicing\\src: Write the path from the root of ", page.SaveBlockerText, StringComparison.Ordinal);
+        Assert.Equal("Changed since it was saved. Save writes it to commitfence.json.", page.HeadLine);
+        Assert.Empty(page.SaveBlockerText);
+        Assert.StartsWith("Write the path from the root of ", path.Problem, StringComparison.Ordinal);
         seen.Add(page.HeadLine);
         path.FieldText = "src/Billing";
         Assert.Equal(SaveStateKind.Unsaved, page.SaveState);
@@ -231,11 +332,11 @@ public sealed class RulesHeadAndTokensTests
         // the range no method can meet: the line names the clause and the reason, and following it goes to the token
         var range = page.RequireFlow[0];
         range.SetValues(["50", "5"]);
-        Assert.Equal("Cannot save", page.SaveStateWord);
-        Assert.Equal("Cannot save: the parameter count requirement cannot be met.", page.HeadLine);
+        Assert.Equal("Unsaved", page.SaveStateWord);
+        Assert.Equal("Changed since it was saved. Save writes it to commitfence.json.", page.HeadLine);
         Assert.Equal("\"parameter count is between 50 and 5\" cannot be met: the lower end is above the upper end. Change either number to save the rule.", page.RequireReason);
         Assert.Null(page.WhereReason);
-        Assert.True(page.HeadLineIsBad);
+        Assert.False(page.HeadLineIsBad);
         Assert.True(page.IsUnsaved);
         Assert.Same(range, page.SaveBlockerTarget);
         seen.Add(page.HeadLine);
@@ -273,9 +374,10 @@ public sealed class RulesHeadAndTokensTests
         Assert.Equal("Unsaved", page.SaveStateWord);
         Assert.True(page.SaveCommand.CanExecute(null));
         range.ComparisonPicker.RangeHighText = "-";
-        Assert.Equal("Cannot save", page.SaveStateWord);
-        Assert.Equal("Cannot save: the range of parameter count is not valid.", page.HeadLine);
-        Assert.Equal("Range of parameter count: Type a number.", page.SaveBlockerText);
+        Assert.Equal("Unsaved", page.SaveStateWord);
+        Assert.Equal("Changed since it was saved. Save writes it to commitfence.json.", page.HeadLine);
+        Assert.Empty(page.SaveBlockerText);
+        Assert.Equal("Type a number.", range.ComparisonPicker.PendingProblem);
         Assert.False(page.SaveCommand.CanExecute(null));
         Assert.Same(range, page.SaveBlockerTarget);
         range.ComparisonPicker.RangeHighText = "9";

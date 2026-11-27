@@ -49,6 +49,12 @@ public interface IFileSystem
         throw new NotSupportedException();
     }
 
+    /// <summary>Whether the file is marked read-only.</summary>
+    bool IsReadOnly(string path)
+    {
+        return false;
+    }
+
     /// <summary>Whether the path is a symbolic link or other reparse point.</summary>
     bool IsLink(string path)
     {

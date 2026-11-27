@@ -1,3 +1,5 @@
+using System.Security.Cryptography;
+using System.Text;
 using CF.Core.Ports;
 
 namespace CF.Core.Rules.Settings;
@@ -8,6 +10,9 @@ namespace CF.Core.Rules.Settings;
 /// </summary>
 public sealed class SettingsFile
 {
+    private static readonly Encoding[] _markedEncodings =
+        [Encoding.UTF32, new UTF32Encoding(true, true), Encoding.UTF8, Encoding.Unicode, Encoding.BigEndianUnicode];
+
     private readonly IFileSystem _fileSystem;
     private readonly SettingsReader _reader;
 
@@ -41,12 +46,46 @@ public sealed class SettingsFile
     /// </summary>
     public string ReadText(string settingsPath)
     {
+        return ReadFrom(settingsPath, _fileSystem.ReadAllText);
+    }
+
+    internal (string Text, string Revision) ReadVersion(string settingsPath)
+    {
+        return ReadFrom(settingsPath, path =>
+        {
+            using var file = _fileSystem.OpenRead(path);
+            using var snapshot = new MemoryStream();
+            file.CopyTo(snapshot);
+            snapshot.Position = 0;
+            var revision = RevisionOf(snapshot);
+            return (Decode(snapshot.GetBuffer().AsSpan(0, (int)snapshot.Length)), revision);
+        });
+    }
+
+    private static string Decode(ReadOnlySpan<byte> bytes)
+    {
+        foreach(var encoding in _markedEncodings)
+        {
+            if(bytes.StartsWith(encoding.Preamble))
+                return encoding.GetString(bytes[encoding.Preamble.Length..]);
+        }
+
+        return Encoding.UTF8.GetString(bytes);
+    }
+
+    internal static string RevisionOf(Stream bytes)
+    {
+        return Convert.ToHexString(SHA256.HashData(bytes));
+    }
+
+    private T ReadFrom<T>(string settingsPath, Func<string, T> read)
+    {
         if(!_fileSystem.FileExists(settingsPath))
             throw new SettingsException("The settings file does not exist.");
 
         try
         {
-            return _fileSystem.ReadAllText(settingsPath);
+            return read(settingsPath);
         }
         catch(IOException exception)
         {

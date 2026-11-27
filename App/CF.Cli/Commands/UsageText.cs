@@ -51,7 +51,7 @@ internal static class UsageText
         "Put this first in the pre-push hook:",
         "  " + HookLine.PrePush,
         "rules list and rules show also cover the rules that .editorconfig sets; the product never changes that file.",
-        "Every rules command takes [--settings <path>]; review takes [--settings <path>] and [--format text|prompt]    (prompt prints what was found as text to hand to an AI coding agent)."
+        "Every rules command takes [--settings <path>]; review takes [--settings <path>], [--format text|prompt|sarif] and [--output <file>]    (prompt prints what was found as text to hand to an AI coding agent; sarif prints a SARIF 2.1.0 log for build servers; --output writes that report to a file and keeps the plain text on the console)."
     };
 
     /// <summary>

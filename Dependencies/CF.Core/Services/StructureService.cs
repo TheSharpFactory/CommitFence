@@ -172,7 +172,7 @@ public sealed class StructureService : IStructureService
         var modules = structure.Modules.ToList();
         var directions = edit(modules, structure.Directions);
         var updated = new StructureRules(modules, directions, structure.References, structure.Layout);
-        var after = _saver.SaveStructure(path, text, new RuleSettings(settings.Requires, settings.Rules, updated, settings.ConfiguredStrictness));
+        var after = _saver.SaveStructure(path, text, new RuleSettings(settings.Requires, settings.Rules, updated, settings.ConfiguredStrictness, settings.Schema));
         return new StructureChange(path, text, after, message);
     }
 

@@ -11,6 +11,7 @@ internal sealed partial class App : Application
     public override void Initialize()
     {
         AvaloniaXamlLoader.Load(this);
+        ToolTipBehavior.Initialize();
     }
 
     public override void OnFrameworkInitializationCompleted()

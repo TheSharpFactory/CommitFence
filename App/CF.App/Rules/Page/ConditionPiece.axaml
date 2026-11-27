@@ -40,7 +40,7 @@
         <Button Name="ComparisonButton" Classes="token end comparison" Classes.where="{Binding IsWhereClause}"
                 Classes.req="{Binding !IsWhereClause}" Classes.invalid="{Binding ComparisonIsRefused}"
                 Classes.open="{Binding ComparisonPicker.IsOpen}" IsEnabled="{Binding CanEditComparison}" Command="{Binding ChooseComparisonCommand}"
-                HorizontalAlignment="Left" ToolTip.Tip="Comparison and value" ToolTip.ShowDelay="500" ToolTip.Placement="Top" ToolTip.VerticalOffset="-8" local:TipPlacement.AvoidsHead="True" AutomationProperties.Name="{Binding ComparisonSpokenName}"
+                HorizontalAlignment="Left" ToolTip.Tip="Comparison and value" local:TipPlacement.AvoidsHead="True" AutomationProperties.Name="{Binding ComparisonSpokenName}"
                 AutomationProperties.HelpText="{Binding ConflictReason}">
           <DockPanel>
             <parts:Icon DockPanel.Dock="Right" Data="{StaticResource i-down}" Width="13" Height="13" StrokeThickness="1.8"

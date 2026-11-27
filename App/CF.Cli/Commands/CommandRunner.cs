@@ -152,7 +152,7 @@ internal sealed class CommandRunner
     private ExitCode RunReviewCommand(ReviewArguments arguments, string settingsPath)
     {
         if(arguments.Mode == ReviewMode.Files)
-            return new ReviewCommand(_reviewService, _environment, settingsPath, arguments).Run();
+            return new ReviewCommand(_reviewService, _environment, settingsPath, arguments, arguments.AsSarif ? _productInfo.Version : string.Empty).Run();
 
         var givenPath = arguments.SettingsPath == null ? null : settingsPath;
         return new ChangesReviewCommand(_productInfo, _reviewService, _environment, givenPath, arguments).Run();

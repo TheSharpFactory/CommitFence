@@ -6,7 +6,7 @@ namespace CF.Core.Rules.Settings;
 /// Writes changed settings into the settings file safely.
 /// </summary>
 /// <remarks>
-/// The file must still hold the text the change was made from, or nothing is written. The new text must read back
+/// The file must still match what the change was made from, or nothing is written. The new text must read back
 /// through the strict reader, and with the same structure rules, before the file is touched; it is then written beside
 /// the file and put in place in one step, so a crash leaves the old file or the new one, never half.
 /// </remarks>
@@ -55,8 +55,28 @@ internal sealed class SettingsSaver
 
     public string SaveStructure(string settingsPath, string textRead, RuleSettings settings)
     {
-        var text = WriterFor(textRead).ReplaceStructure(textRead, settings.Structure);
+        var writer = WriterFor(textRead);
+        var text = writer.ReplaceStructure(textRead, settings.Structure);
+        var featureVersion = _reader.HigherFeatureVersion(settings);
+        if(featureVersion != null)
+            text = writer.SetRequires(text, featureVersion);
+
         SaveText(settingsPath, textRead, text, settings);
+        return text;
+    }
+
+    public string SaveStrictness(string settingsPath, string textRead, RuleSettings settings, string revisionRead)
+    {
+        if(_fileSystem.IsReadOnly(settingsPath))
+            throw new RuleChangeException("Could not write commitfence.json: the file is read-only.");
+
+        var writer = WriterFor(textRead);
+        var text = writer.SetStrictness(textRead, settings.Strictness);
+        var featureVersion = _reader.HigherFeatureVersion(settings);
+        if(featureVersion != null)
+            text = writer.SetRequires(text, featureVersion);
+
+        SaveText(settingsPath, textRead, text, settings, revisionRead);
         return text;
     }
 
@@ -70,7 +90,7 @@ internal sealed class SettingsSaver
         return new SettingsWriter(textRead.Contains("\r\n", StringComparison.Ordinal) ? "\r\n" : "\n");
     }
 
-    private void SaveText(string settingsPath, string textRead, string text, RuleSettings settings)
+    private void SaveText(string settingsPath, string textRead, string text, RuleSettings settings, string? revisionRead = null)
     {
         CheckReadsBack(text, settings);
 
@@ -81,7 +101,7 @@ internal sealed class SettingsSaver
             _fileSystem.WriteNewFile(temporaryPath, text);
             created = true;
             CheckReadsBack(_fileSystem.ReadAllText(temporaryPath), settings);
-            CheckUnchanged(settingsPath, textRead);
+            CheckUnchanged(settingsPath, textRead, revisionRead);
             _fileSystem.ReplaceFile(temporaryPath, settingsPath);
         }
         catch(Exception exception) when(exception is IOException || exception is UnauthorizedAccessException)
@@ -96,12 +116,21 @@ internal sealed class SettingsSaver
         }
     }
 
-    private void CheckUnchanged(string settingsPath, string textRead)
+    private void CheckUnchanged(string settingsPath, string textRead, string? revisionRead)
     {
         // another command or a person saved the file after it was read: this edit was made on old text, so writing it
         // would lose theirs
-        if(!_fileSystem.FileExists(settingsPath) || _fileSystem.ReadAllText(settingsPath) != textRead)
+        if(!_fileSystem.FileExists(settingsPath) || !Matches(settingsPath, textRead, revisionRead))
             throw new RuleChangeException($"{settingsPath} changed while this command was working. Nothing was written; run the command again.");
+    }
+
+    private bool Matches(string settingsPath, string textRead, string? revisionRead)
+    {
+        if(revisionRead == null)
+            return _fileSystem.ReadAllText(settingsPath) == textRead;
+
+        using var file = _fileSystem.OpenRead(settingsPath);
+        return SettingsFile.RevisionOf(file) == revisionRead;
     }
 
     private void RemoveOwnTemporaryFile(string temporaryPath, bool created)

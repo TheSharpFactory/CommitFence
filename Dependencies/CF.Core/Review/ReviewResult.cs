@@ -63,10 +63,17 @@ public sealed class ReviewResult
     public string BaseTreeReviewed { get; init; } = string.Empty;
 
     /// <summary>
-    /// The full id of the commit a review of the staged changes or of a folder was against, resolved once when the review took its
-    /// snapshot; empty for the other reviews and when the repository has no commit.
+    /// The full id of the commit a review was about, resolved once when the review took its snapshot: the commit the staged
+    /// changes or a folder were read against, the head of a range, the tip of a pushed ref. Empty when the review read more
+    /// than one change or the repository has no commit.
     /// </summary>
     public string CommitReviewed { get; init; } = string.Empty;
+
+    /// <summary>
+    /// The address of the remote the repository is hosted at, without credentials and never a local path, so that a report can
+    /// name where the reviewed commit lives; empty when the repository has no such remote.
+    /// </summary>
+    public string RemoteAddress { get; init; } = string.Empty;
 
     /// <summary>The repository of the reviewed trees, when the review used git.</summary>
     public RepositoryLocation? Repository { get; internal init; }

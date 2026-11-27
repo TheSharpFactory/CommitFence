@@ -31,17 +31,49 @@
     <Style Selector="local|RulePageView Border.rulehead.tighter TextBlock.tagword">
       <Setter Property="IsVisible" Value="False"/>
     </Style>
-    <Style Selector="local|RulePageView Border.rulehead.tight TextBlock.switchword">
+    <Style Selector="local|RulePageView Border.rulehead.tight TextBlock.switchword:not(.draftword)">
       <Setter Property="IsVisible" Value="False"/>
     </Style>
     <Style Selector="local|RulePageView StackPanel.stategroup">
-      <Setter Property="Opacity" Value="0"/>
+      <Setter Property="IsVisible" Value="False"/>
       <Setter Property="IsHitTestVisible" Value="False"/>
       <Setter Property="AutomationProperties.AccessibilityView" Value="Raw"/>
     </Style>
     <Style Selector="local|RulePageView StackPanel.stategroup.on">
-      <Setter Property="Opacity" Value="1"/>
+      <Setter Property="IsVisible" Value="True"/>
       <Setter Property="AutomationProperties.AccessibilityView" Value="Content"/>
+    </Style>
+    <Style Selector="TextBlock.id-help">
+      <Setter Property="Foreground" Value="{DynamicResource ink-2}"/>
+    </Style>
+    <Style Selector="TextBlock.id-help.refused">
+      <Setter Property="Foreground" Value="{DynamicResource block-ink}"/>
+    </Style>
+    <Style Selector="Border.id-outline">
+      <Setter Property="BorderBrush" Value="{DynamicResource line-strong}"/>
+      <Setter Property="BorderThickness" Value="1"/>
+      <Setter Property="Padding" Value="10,0,11,0"/>
+    </Style>
+    <Style Selector="Border.id-outline:focus-within">
+      <Setter Property="BorderBrush" Value="{DynamicResource focus}"/>
+      <Setter Property="BorderThickness" Value="2"/>
+      <Setter Property="Padding" Value="9,0,10,0"/>
+    </Style>
+    <Style Selector="Border.id-outline.refused">
+      <Setter Property="BorderBrush" Value="{DynamicResource block}"/>
+      <Setter Property="BorderThickness" Value="2"/>
+      <Setter Property="Padding" Value="9,0,10,0"/>
+    </Style>
+    <Style Selector="TextBox.rule-id /template/ TextBlock#PART_Placeholder">
+      <Setter Property="FontFamily" Value="avares://Avalonia.Fonts.Inter/Assets#Inter, Segoe UI, Helvetica Neue, sans-serif"/>
+      <Setter Property="Foreground" Value="{DynamicResource ink-3}"/>
+      <Setter Property="FontWeight" Value="Normal"/>
+    </Style>
+    <Style Selector="Button.rule-more.open">
+      <Setter Property="Background" Value="{DynamicResource hover}"/>
+    </Style>
+    <Style Selector="Button.rule-menu-entry:pointerover /template/ Border#Surface, Button.rule-menu-entry:focus-visible /template/ Border#Surface">
+      <Setter Property="Background" Value="{DynamicResource hover}"/>
     </Style>
     <Style Selector="local|RulePageView Button.rename">
       <Setter Property="Foreground" Value="{DynamicResource ink-2}"/>
@@ -80,11 +112,10 @@
 
   <Grid RowDefinitions="Auto,*">
 
-  <!-- The head: one row of 48 in every state, opaque, above the sheet that scrolls under it. At the left the tag, the id, a hairline
-       and the switch, which never move; at the right, always the same four, right to left: the menu, Save rule, Discard and
-       the state word. Once the sheet has scrolled, a line of 1 runs along its bottom. -->
-  <Border Name="Head" Classes="rulehead" Height="48" Background="{DynamicResource page}" BorderThickness="0,0,0,1" ZIndex="3">
-    <Grid Name="HeadRow" ColumnDefinitions="Auto,*,Auto" HorizontalAlignment="Left">
+  <!-- The head stays above the scrolling sheet. The action row holds the ID and switch at the left and the state and actions
+       at the right. The draft ID help has room below it. -->
+  <Border Name="Head" Classes="rulehead" Background="{DynamicResource page}" BorderThickness="0,0,0,1" ZIndex="3">
+    <Grid Name="HeadRow" RowDefinitions="47,Auto" ColumnDefinitions="Auto,*,Auto" HorizontalAlignment="Left">
       <StackPanel Name="LeftGroup" Orientation="Horizontal" Spacing="10" VerticalAlignment="Center">
         <Button Classes="cf quiet back" Padding="8,0,12,0" Command="{Binding $parent[rules:RulesView].((rules:RulesViewModel)DataContext).BackCommand}"
                 AutomationProperties.Name="Back to the rules">
@@ -93,76 +124,96 @@
             <TextBlock Classes="tagword" Theme="{StaticResource type-body-strong}" FontWeight="Medium" Text="Rules"/>
           </StackPanel>
         </Button>
-        <Border Height="24" CornerRadius="7" Padding="7,0,9,0" Background="{DynamicResource hover}" VerticalAlignment="Center">
+        <TextBlock IsVisible="{Binding IsDraft}" Theme="{StaticResource type-label}" FontWeight="SemiBold"
+                   VerticalAlignment="Center" Text="New rule"/>
+        <Border IsVisible="{Binding IsSaved}" Height="24" CornerRadius="7" Padding="7,0,9,0" Background="{DynamicResource hover}" VerticalAlignment="Center">
           <StackPanel Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
             <parts:Icon Data="{StaticResource i-pen}" Width="12" Height="12" Stroke="{DynamicResource ink-2}"/>
             <TextBlock Classes="tagword" Theme="{StaticResource type-label}" Foreground="{DynamicResource ink-2}" Text="Custom rule"/>
           </StackPanel>
         </Border>
-        <TextBlock Name="IdText" Theme="{StaticResource code-strong}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" TextWrapping="NoWrap"
-                   ToolTip.Tip="{Binding Id}" Text="{Binding Id}"/>
+        <TextBlock Name="IdText" IsVisible="{Binding IsSaved}" Theme="{StaticResource code-strong}" VerticalAlignment="Center"
+                   TextTrimming="CharacterEllipsis" TextWrapping="NoWrap" Text="{Binding Id}"/>
+        <Panel Name="IdField" Classes="id-field" IsVisible="{Binding IsDraft}" Width="220" Height="36">
+          <Border Classes="id-outline" Classes.refused="{Binding HasIdProblem}" CornerRadius="10" Background="{DynamicResource page}">
+            <TextBox Name="IdBox" Classes="bare rule-id" Height="32" VerticalAlignment="Center" Cursor="IBeam"
+                     FontFamily="{StaticResource code-font}" FontSize="13" FontWeight="SemiBold"
+                     Text="{Binding Id, Mode=TwoWay}" PlaceholderText="Letters, digits, - and _" AutomationProperties.Name="Rule ID"
+                     AutomationProperties.HelpText="{Binding IdLine}" AutomationProperties.ItemStatus="{Binding IdStatus}">
+              <TextBox.InnerLeftContent>
+                <TextBlock Theme="{StaticResource type-meta}" Foreground="{DynamicResource ink-2}" Text="ID"
+                           Margin="0,0,8,0" VerticalAlignment="Center" PointerPressed="OnIdLabelPressed"
+                           AutomationProperties.AccessibilityView="Raw"/>
+              </TextBox.InnerLeftContent>
+              <TextBox.InnerRightContent>
+                <parts:EffectMark IsVisible="{Binding HasIdProblem}" Kind="Block" Width="14" Height="14" Margin="8,0,0,0"
+                                  Shape="{DynamicResource block}" Sign="{DynamicResource on-block}" VerticalAlignment="Center"/>
+              </TextBox.InnerRightContent>
+            </TextBox>
+          </Border>
+          <parts:FocusRing Name="IdRefusedRing" IsVisible="False" ControlRadius="10"
+                           GapBrush="{DynamicResource focus-gap}" LineBrush="{DynamicResource focus}"/>
+        </Panel>
         <Border Width="1" Height="24" Margin="6,0,0,0" Background="{DynamicResource line}"/>
         <StackPanel Name="SwitchGroup" Orientation="Horizontal" Spacing="12" Margin="6,0,0,0" VerticalAlignment="Center">
-          <TextBlock Classes="switchword" Theme="{StaticResource type-body}" FontWeight="Medium" Foreground="{DynamicResource ink-2}"
+          <TextBlock Classes="switchword" Classes.draftword="{Binding IsDraft}" Theme="{StaticResource type-body}" FontWeight="Medium" Foreground="{DynamicResource ink-2}"
                      VerticalAlignment="Center" Text="{Binding SwitchWord}"/>
-          <ToggleButton Classes="cfswitch" Focusable="True" IsEnabled="{Binding IsSaved}" IsChecked="{Binding IsOn, Mode=OneWay}"
+          <ToggleButton Classes="cfswitch" Classes.draft="{Binding IsDraft}" Focusable="True" IsEnabled="{Binding IsSaved}" IsChecked="{Binding IsOn, Mode=OneWay}"
                         Command="{Binding ToggleSwitchCommand}" AutomationProperties.Name="{Binding SwitchSpokenName}"/>
         </StackPanel>
       </StackPanel>
 
       <StackPanel Name="RightGroup" Grid.Column="2" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
 
-        <!-- The three states are drawn on top of each other and the one that is on shows: the state's place is as wide as the widest word,
-             "Cannot save", in every state, so the head keeps its shape. -->
-        <Panel Margin="0,0,2,0" VerticalAlignment="Center" AutomationProperties.Name="{Binding SaveStateSpoken}"
+        <!-- Only the current state takes room, with the action buttons anchored at the right. -->
+        <Panel Margin="0,0,2,0" IsVisible="{Binding IsSaved}" VerticalAlignment="Center" AutomationProperties.Name="{Binding SaveStateSpoken}"
                AutomationProperties.LiveSetting="Polite">
           <StackPanel Classes="stategroup" Classes.on="{Binding IsSavedState}" Orientation="Horizontal" Spacing="6" HorizontalAlignment="Right">
             <parts:Icon Data="{StaticResource i-check}" Width="14" Height="14" Stroke="{DynamicResource req-ink}" VerticalAlignment="Center"/>
             <TextBlock Classes="save-state" Theme="{StaticResource type-body}" Foreground="{DynamicResource ink-2}"
                        VerticalAlignment="Center" Text="Saved"/>
           </StackPanel>
-          <StackPanel Classes="stategroup" Classes.on="{Binding IsUnsavedState}" Orientation="Horizontal" Spacing="6" HorizontalAlignment="Right">
+          <StackPanel Classes="stategroup" Classes.on="{Binding IsUnsaved}" Orientation="Horizontal" Spacing="6" HorizontalAlignment="Right">
             <Ellipse Width="7" Height="7" Fill="{DynamicResource ink}" VerticalAlignment="Center"/>
             <TextBlock Classes="save-state" Theme="{StaticResource type-body}" Foreground="{DynamicResource ink}"
                        FontWeight="Medium" VerticalAlignment="Center" Text="Unsaved"/>
           </StackPanel>
-          <StackPanel Classes="stategroup" Classes.on="{Binding IsCannotSaveState}" Orientation="Horizontal" Spacing="6" HorizontalAlignment="Right">
-            <parts:EffectMark Kind="Block" Width="14" Height="14" Shape="{DynamicResource block}" Sign="{DynamicResource on-block}"
-                              VerticalAlignment="Center"/>
-            <TextBlock Classes="save-state" Theme="{StaticResource type-body}" Foreground="{DynamicResource block-ink}"
-                       VerticalAlignment="Center" Text="Cannot save"/>
-          </StackPanel>
         </Panel>
 
-        <Button Classes="cf second" Width="84" IsEnabled="{Binding IsUnsaved}" Command="{Binding DiscardCommand}"
+        <Button Classes="cf second" Width="84" IsVisible="{Binding IsUnsaved}" Command="{Binding DiscardCommand}"
                 AutomationProperties.Name="Discard">
           <TextBlock Theme="{StaticResource type-body-strong}" HorizontalAlignment="Center" Text="Discard"/>
         </Button>
-        <Button Classes="cf main" Width="96" Command="{Binding SaveCommand}"
-                ToolTip.Tip="{Binding SaveTip}" ToolTip.ShowOnDisabled="True" AutomationProperties.Name="Save rule"
-                AutomationProperties.HelpText="{Binding SaveBlockerText}">
+        <Button Classes="cf main" Classes.unavailable="{Binding !CanSave}"
+                Width="104" IsVisible="{Binding IsUnsaved}" Command="{Binding AttemptSaveCommand}"
+                AutomationProperties.Name="Save rule" AutomationProperties.HelpText="{Binding SaveButtonHelp}">
           <TextBlock Theme="{StaticResource type-body-strong}" HorizontalAlignment="Center" Text="Save rule"/>
         </Button>
 
         <Panel>
-          <Button Name="MoreButton" Classes="cf quiet" Width="36" Padding="0" IsEnabled="{Binding IsSaved}" Command="{Binding OpenMoreCommand}"
+          <Button Name="MoreButton" Classes="cf quiet rule-more" Classes.open="{Binding IsMoreOpen}" Width="36" Padding="0" IsEnabled="{Binding IsSaved}" Command="{Binding OpenMoreCommand}"
                   AutomationProperties.Name="{Binding MoreSpokenName}">
             <parts:Icon Data="{StaticResource i-more}" Width="16" Height="16" StrokeThickness="2.4"
                         Stroke="{Binding $parent[Button].Foreground}"/>
           </Button>
-          <Popup IsOpen="{Binding IsMoreOpen, Mode=TwoWay}" PlacementTarget="{Binding #MoreButton}"
+          <Popup Name="MorePopup" local:PickerRoom.Fits="False" Opened="OnMoreOpened" IsOpen="{Binding IsMoreOpen, Mode=TwoWay}" PlacementTarget="{Binding #MoreButton}"
                  Placement="BottomEdgeAlignedRight" VerticalOffset="6" IsLightDismissEnabled="True"
                  ShouldUseOverlayLayer="True" PlacementConstraintAdjustment="SlideX, FlipY">
-            <Border Classes="picker" Width="220">
-              <StackPanel>
-              <Button Classes="pick" Command="{Binding DuplicateRuleCommand}" AutomationProperties.Name="Duplicate rule">
+            <Border Classes="picker" Width="264">
+              <StackPanel Name="RuleMenu" Focusable="True" IsTabStop="False" KeyDown="OnRuleMenuKey">
+              <Button Name="DuplicateEntry" Focusable="True" Classes="pick rule-menu-entry" Height="52" Padding="10,8"
+                      Command="{Binding DuplicateRuleCommand}" AutomationProperties.Name="Duplicate rule. A copy, with an ID you choose.">
                 <StackPanel Orientation="Horizontal" Spacing="8">
-                  <parts:Icon Data="{StaticResource i-copy}" Width="14" Height="14" Stroke="{DynamicResource ink-2}"/>
-                  <TextBlock Theme="{StaticResource type-body}" Text="Duplicate rule"/>
+                  <parts:Icon Data="{StaticResource i-copy}" Width="14" Height="14" Stroke="{DynamicResource ink-2}"
+                              VerticalAlignment="Top" Margin="0,3,0,0"/>
+                  <StackPanel>
+                    <TextBlock Theme="{StaticResource type-body}" Text="Duplicate rule"/>
+                    <TextBlock Theme="{StaticResource type-meta}" Foreground="{DynamicResource ink-2}" Text="A copy, with an ID you choose."/>
+                  </StackPanel>
                 </StackPanel>
               </Button>
-              <Border Height="1" Margin="0,4" Background="{DynamicResource line}"/>
-              <Button Classes="pick" Command="{Binding RemoveRuleCommand}" AutomationProperties.Name="Remove rule">
+              <Separator Classes="menu-divider"/>
+              <Button Name="RemoveEntry" Focusable="True" Classes="pick rule-menu-entry" Height="36" Command="{Binding RemoveRuleCommand}" AutomationProperties.Name="Remove rule">
                 <StackPanel Orientation="Horizontal" Spacing="8">
                   <parts:Icon Data="{StaticResource i-bin}" Width="14" Height="14" Stroke="{DynamicResource block-ink}"/>
                   <TextBlock Theme="{StaticResource type-body}" Foreground="{DynamicResource block-ink}" Text="Remove rule"/>
@@ -173,6 +224,21 @@
           </Popup>
         </Panel>
       </StackPanel>
+      <Grid Name="DraftIdLine" ColumnDefinitions="Auto,*,Auto" HorizontalAlignment="Left" Grid.Row="1" Grid.ColumnSpan="3"
+            IsVisible="{Binding IsDraft}" Height="24">
+        <parts:EffectMark IsVisible="{Binding HasIdProblem}" Kind="Block" Width="13" Height="13"
+                          Margin="0,0,6,0" VerticalAlignment="Center" Shape="{DynamicResource block}" Sign="{DynamicResource on-block}"/>
+        <Button Name="IdFix" Classes="linelink" Grid.Column="2" HorizontalAlignment="Left"
+                IsVisible="{Binding HasIdProblem}" Command="{Binding UseSuggestedIdCommand}"
+                AutomationProperties.HelpText="{Binding IdFixDescription}" ToolTip.Tip="{Binding IdFixDescription}">
+          <TextBlock Classes="line-text" Theme="{StaticResource type-meta-strong}" Text="{Binding IdFixLabel}" Foreground="{DynamicResource ink}"/>
+        </Button>
+        <TextBlock Name="IdHelp" Grid.Column="1" Classes="id-help" Classes.refused="{Binding HasIdProblem}"
+                   Theme="{StaticResource type-meta}" Text="{Binding IdLine}" TextTrimming="CharacterEllipsis"
+                   VerticalAlignment="Center" AutomationProperties.LiveSetting="Polite"/>
+      </Grid>
+      <TextBlock Name="IdAnnouncement" Grid.Row="1" Width="1" Height="1" Opacity="0" IsHitTestVisible="False"
+                 IsVisible="{Binding IsDraft}" AutomationProperties.LiveSetting="Polite"/>
     </Grid>
   </Border>
 
@@ -210,15 +276,15 @@
              was saved, what changed, or why it cannot be saved. -->
         <Grid Name="HeadLine" ColumnDefinitions="Auto,*" ColumnSpacing="8" Height="20" Margin="0,2,0,14" ClipToBounds="True">
           <Panel VerticalAlignment="Center">
-            <parts:Icon IsVisible="{Binding IsSavedState}" Data="{StaticResource i-file}" Width="14" Height="14" Stroke="{DynamicResource ink-3}"/>
-            <parts:Icon IsVisible="{Binding IsUnsavedState}" Data="{StaticResource i-pen}" Width="14" Height="14" Stroke="{DynamicResource ink-3}"/>
-            <parts:EffectMark IsVisible="{Binding IsCannotSaveState}" Kind="Block" Width="14" Height="14" Shape="{DynamicResource block}"
+            <parts:Icon IsVisible="{Binding HeadLineShowsFile}" Data="{StaticResource i-file}" Width="14" Height="14" Stroke="{DynamicResource ink-3}"/>
+            <parts:Icon IsVisible="{Binding HeadLineShowsPen}" Data="{StaticResource i-pen}" Width="14" Height="14" Stroke="{DynamicResource ink-3}"/>
+            <parts:EffectMark IsVisible="{Binding HeadLineIsBad}" Kind="Block" Width="14" Height="14" Shape="{DynamicResource block}"
                               Sign="{DynamicResource on-block}"/>
           </Panel>
           <TextBlock Classes="headline" Classes.bad="{Binding HeadLineIsBad}" Theme="{StaticResource type-body}" Foreground="{DynamicResource ink-2}"
-                     Grid.Column="1" IsVisible="{Binding !IsCannotSaveState}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" TextWrapping="NoWrap" Text="{Binding HeadLine}"/>
+                     Grid.Column="1" IsVisible="{Binding !HeadLineIsBad}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" TextWrapping="NoWrap" Text="{Binding HeadLine}"/>
           <!-- Why it cannot be saved is a link: the keyboard reaches it here and it goes to the field the reason is about. -->
-          <Button Name="BlockerLink" Grid.Column="1" Classes="cf quiet reasonlink" IsVisible="{Binding IsCannotSaveState}" Command="{Binding GoToBlockerCommand}"
+          <Button Name="BlockerLink" Grid.Column="1" Classes="cf quiet reasonlink" IsVisible="{Binding HeadLineIsBad}" Command="{Binding GoToBlockerCommand}"
                   ToolTip.Tip="{Binding SaveBlocker}" AutomationProperties.Name="{Binding SaveBlocker}">
             <TextBlock Classes="headline bad" Theme="{StaticResource type-body}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis"
                        TextWrapping="NoWrap" Text="{Binding HeadLine}"/>

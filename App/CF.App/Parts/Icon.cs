@@ -14,13 +14,15 @@ internal sealed class Icon : Control
 
     public static readonly StyledProperty<Geometry?> DataProperty = AvaloniaProperty.Register<Icon, Geometry?>(nameof(Data));
 
+    public static readonly StyledProperty<Geometry?> FillDataProperty = AvaloniaProperty.Register<Icon, Geometry?>(nameof(FillData));
+
     public static readonly StyledProperty<IBrush?> StrokeProperty = AvaloniaProperty.Register<Icon, IBrush?>(nameof(Stroke));
 
     public static readonly StyledProperty<double> StrokeThicknessProperty = AvaloniaProperty.Register<Icon, double>(nameof(StrokeThickness), 1.5);
 
     static Icon()
     {
-        AffectsRender<Icon>(DataProperty, StrokeProperty, StrokeThicknessProperty);
+        AffectsRender<Icon>(DataProperty, FillDataProperty, StrokeProperty, StrokeThicknessProperty);
     }
 
     public Geometry? Data
@@ -33,6 +35,12 @@ internal sealed class Icon : Control
         {
             SetValue(DataProperty, value);
         }
+    }
+
+    public Geometry? FillData
+    {
+        get { return GetValue(FillDataProperty); }
+        set { SetValue(FillDataProperty, value); }
     }
 
     public IBrush? Stroke
@@ -69,6 +77,8 @@ internal sealed class Icon : Control
         using(context.PushTransform(Matrix.CreateScale(scale, scale)))
         {
             context.DrawGeometry(null, pen, Data);
+            if(FillData != null)
+                context.DrawGeometry(Stroke, null, FillData);
         }
     }
 }

@@ -8,7 +8,7 @@ namespace CF.App.Rules.Page;
 /// with "+N", and a name or a path that is still too long cut in the middle. It tells when it is not showing the whole value, so that the
 /// token can offer the whole one in a tooltip.
 /// </summary>
-internal sealed partial class ShortValueText : UserControl
+internal partial class ShortValueText : UserControl
 {
     private const double _moreGap = 8;
     private const double _morePadding = 14;

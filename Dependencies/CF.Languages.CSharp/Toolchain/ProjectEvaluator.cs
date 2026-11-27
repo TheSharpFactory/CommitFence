@@ -38,7 +38,12 @@ internal sealed class ProjectEvaluator
             var units = ReadFrameworks(project, treeFolder).Select(framework => ReadUnit(project, framework, treeFolder)).ToList();
             return ProjectEvaluation.Succeeded(project, units);
         }
-        catch(Exception exception) when(exception is JsonException || exception is InvalidOperationException)
+        catch(JsonException exception)
+        {
+            // Keep the reader's diagnostic for malformed JSON, including its original position.
+            return ProjectEvaluation.Failed(project, (exception.InnerException as JsonException ?? exception).Message);
+        }
+        catch(InvalidOperationException exception)
         {
             return ProjectEvaluation.Failed(project, exception.Message);
         }
@@ -46,50 +51,46 @@ internal sealed class ProjectEvaluator
 
     private List<string> ReadFrameworks(ProjectFile project, string treeFolder)
     {
-        using(var document = Ask(project, treeFolder, new List<string> { "-getProperty:TargetFramework", "-getProperty:TargetFrameworks" }))
-        {
-            var properties = document.RootElement.GetProperty("Properties");
-            var single = properties.GetProperty("TargetFramework").GetString();
-            var several = properties.GetProperty("TargetFrameworks").GetString();
-            var names = string.IsNullOrEmpty(single) ? (several ?? string.Empty).Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries) : new[] { single };
-            if(names.Length == 0)
-                throw new InvalidOperationException("the project has no target framework");
+        var answer = Ask(project, treeFolder, new List<string> { "-getProperty:TargetFramework", "-getProperty:TargetFrameworks" });
+        var single = ReadProperty(answer, "TargetFramework");
+        var several = ReadProperty(answer, "TargetFrameworks");
+        var names = string.IsNullOrEmpty(single) ? several.Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries) : new[] { single };
+        if(names.Length == 0)
+            throw new InvalidOperationException("the project has no target framework");
 
-            return names.ToList();
-        }
+        return names.ToList();
     }
 
     private ProjectUnit ReadUnit(ProjectFile project, string framework, string treeFolder)
     {
         var arguments = new List<string> { "-p:TargetFramework=" + framework, "-getItem:Compile", "-getItem:ProjectReference", "-getItem:IntermediateAssembly", "-getProperty:DefineConstants", "-getProperty:CustomAfterDirectoryBuildTargets" };
-        using(var document = AskWithImplicitSymbols(project, treeFolder, arguments))
-        {
-            var items = document.RootElement.GetProperty("Items");
-            var compile = ReadFullPaths(items, "Compile").ToHashSet(ToolchainPaths.Comparer);
-            var references = ReadFullPaths(items, "ProjectReference").ToList();
-            var assembly = ReadFullPaths(items, "IntermediateAssembly").FirstOrDefault() ?? string.Empty;
+        var answer = AskWithImplicitSymbols(project, treeFolder, arguments);
+        var items = answer.Items ?? throw new JsonException("the build's answer has no item groups");
+        var compile = ReadFullPaths(items, "Compile").ToHashSet(ToolchainPaths.Comparer);
+        var references = ReadFullPaths(items, "ProjectReference");
+        var assembly = ReadFullPaths(items, "IntermediateAssembly").FirstOrDefault() ?? string.Empty;
+        var symbols = ReadProperty(answer, "DefineConstants").Split(_symbolSeparators, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).Distinct().ToList();
 
-            return new ProjectUnit(project, framework, compile, references, assembly, ReadSymbols(document.RootElement), ReadProperty(document.RootElement, "CustomAfterDirectoryBuildTargets"));
-        }
+        return new ProjectUnit(project, framework, compile, references, assembly, symbols, ReadProperty(answer, "CustomAfterDirectoryBuildTargets"));
     }
 
-    private static List<string> ReadSymbols(JsonElement root)
+    private static string ReadProperty(MsBuildAnswerDto answer, string name)
     {
-        var text = ReadProperty(root, "DefineConstants");
-        return text.Split(_symbolSeparators, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).Distinct().ToList();
+        if(answer.Properties == null || !answer.Properties.TryGetValue(name, out var value))
+            throw new JsonException($"the build's answer has no '{name}' property");
+
+        return value ?? string.Empty;
     }
 
-    private static string ReadProperty(JsonElement root, string name)
+    private static List<string> ReadFullPaths(Dictionary<string, List<MsBuildItemDto>> items, string name)
     {
-        return root.GetProperty("Properties").GetProperty(name).GetString() ?? string.Empty;
-    }
+        if(!items.TryGetValue(name, out var list))
+            return [];
 
-    private static IEnumerable<string> ReadFullPaths(JsonElement items, string name)
-    {
-        if(!items.TryGetProperty(name, out var list))
-            return new List<string>();
+        if(list == null || list.Any(item => string.IsNullOrEmpty(item?.FullPath)))
+            throw new JsonException($"the build's '{name}' items must each have a full path");
 
-        return list.EnumerateArray().Select(item => ToolchainPaths.Normalize(item.GetProperty("FullPath").GetString() ?? string.Empty)).ToList();
+        return list.Select(item => ToolchainPaths.Normalize(item.FullPath)).ToList();
     }
 
     /// <summary>
@@ -101,7 +102,7 @@ internal sealed class ProjectEvaluator
     /// such target (one not written for the SDK) is asked again without it; any other failure, a time limit included,
     /// stays a failure, so that a list of symbols that is not the build's is never taken for it.
     /// </remarks>
-    private JsonDocument AskWithImplicitSymbols(ProjectFile project, string treeFolder, List<string> questions)
+    private MsBuildAnswerDto AskWithImplicitSymbols(ProjectFile project, string treeFolder, List<string> questions)
     {
         var withTarget = new List<string> { "-t:" + _implicitSymbolsTarget };
         withTarget.AddRange(questions);
@@ -112,7 +113,7 @@ internal sealed class ProjectEvaluator
         return ReadAnswer(result);
     }
 
-    private JsonDocument Ask(ProjectFile project, string treeFolder, List<string> questions)
+    private MsBuildAnswerDto Ask(ProjectFile project, string treeFolder, List<string> questions)
     {
         return ReadAnswer(Run(project, treeFolder, questions));
     }
@@ -130,11 +131,12 @@ internal sealed class ProjectEvaluator
         return result.ExitCode != 0 && !result.TimedOut && (result.Output + result.Error).Contains(_missingTargetError, StringComparison.Ordinal);
     }
 
-    private static JsonDocument ReadAnswer(ProcessResult result)
+    private static MsBuildAnswerDto ReadAnswer(ProcessResult result)
     {
         if(result.ExitCode != 0)
             throw new InvalidOperationException("the build cannot evaluate the project: " + DotnetTool.SummarizeErrors(result));
 
-        return JsonDocument.Parse(result.Output);
+        return JsonSerializer.Deserialize(result.Output, MsBuildAnswerJsonContext.Default.MsBuildAnswerDto)
+            ?? throw new JsonException("the build's answer must be a JSON object");
     }
 }

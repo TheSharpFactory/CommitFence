@@ -1,0 +1,31 @@
+<ResourceDictionary xmlns="https://github.com/avaloniaui"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+  <ControlTheme x:Key="{x:Type ToolTip}" TargetType="ToolTip">
+    <Setter Property="Background" Value="{DynamicResource page}"/>
+    <Setter Property="Foreground" Value="{DynamicResource ink}"/>
+    <Setter Property="BorderBrush" Value="{DynamicResource line-strong}"/>
+    <Setter Property="BorderThickness" Value="1"/>
+    <Setter Property="CornerRadius" Value="8"/>
+    <Setter Property="Padding" Value="10,4"/>
+    <Setter Property="MaxWidth" Value="360"/>
+    <Setter Property="FontFamily" Value="avares://Avalonia.Fonts.Inter/Assets#Inter, Segoe UI, sans-serif"/>
+    <Setter Property="FontSize" Value="13"/>
+    <Setter Property="FontWeight" Value="Normal"/>
+    <Setter Property="Template">
+      <ControlTemplate>
+        <Border Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}"
+                BorderThickness="{TemplateBinding BorderThickness}" CornerRadius="{TemplateBinding CornerRadius}"
+                Padding="{TemplateBinding Padding}" BoxShadow="{DynamicResource shadow-popup}">
+          <ContentPresenter Name="PART_ContentPresenter" Content="{TemplateBinding Content}"
+                            ContentTemplate="{TemplateBinding ContentTemplate}">
+            <ContentPresenter.DataTemplates>
+              <DataTemplate DataType="x:String">
+                <TextBlock Text="{Binding}" TextWrapping="Wrap" LineHeight="18"/>
+              </DataTemplate>
+            </ContentPresenter.DataTemplates>
+          </ContentPresenter>
+        </Border>
+      </ControlTemplate>
+    </Setter>
+  </ControlTheme>
+</ResourceDictionary>

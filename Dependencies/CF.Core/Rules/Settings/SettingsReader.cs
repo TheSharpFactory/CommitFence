@@ -11,6 +11,9 @@ namespace CF.Core.Rules.Settings;
 /// </summary>
 public sealed class SettingsReader
 {
+    // the first version that accepts the $schema key
+    private const string _schemaKeyVersion = "1.0.0.7";
+
     private readonly IReadOnlyList<ILanguage> _languages;
 
     /// <summary>
@@ -47,11 +50,11 @@ public sealed class SettingsReader
     {
         try
         {
-            using var document = JsonDocument.Parse(text);
-            if(document.RootElement.ValueKind != JsonValueKind.Object || !document.RootElement.TryGetProperty("requires", out var value) || value.ValueKind != JsonValueKind.String)
+            var file = JsonSerializer.Deserialize(text, SettingsJsonContext.Default.SettingsRequirementDto);
+            if(file == null || file.Requires.ValueKind != JsonValueKind.String)
                 return null;
 
-            var requires = value.GetString();
+            var requires = file.Requires.GetString();
             return requires != null && VersionRequirement.IsValid(requires) ? requires : null;
         }
         catch(JsonException)
@@ -64,7 +67,7 @@ public sealed class SettingsReader
     {
         var minimum = settings.Requires == null ? null : ProductVersion.TryParse(settings.Requires);
         string? raised = null;
-        foreach(var required in settings.Rules.SelectMany(FeatureVersions))
+        foreach(var required in FeatureVersions(settings))
         {
             var version = ProductVersion.TryParse(required)!;
             if(minimum != null && minimum.CompareTo(version) >= 0)
@@ -75,6 +78,15 @@ public sealed class SettingsReader
         }
 
         return raised;
+    }
+
+    private IEnumerable<string> FeatureVersions(RuleSettings settings)
+    {
+        if(settings.Schema != null)
+            yield return _schemaKeyVersion;
+
+        foreach(var version in settings.Rules.SelectMany(FeatureVersions))
+            yield return version;
     }
 
     private IEnumerable<string> FeatureVersions(RuleDefinition rule)
@@ -154,7 +166,7 @@ public sealed class SettingsReader
 
         var structure = new StructureReader(positions).Read(file.Structure, "structure");
 
-        return new RuleSettings(file.Requires, rules, structure, new StrictnessReader(positions).Read(file.Strictness));
+        return new RuleSettings(file.Requires, rules, structure, new StrictnessReader(positions).Read(file.Strictness), file.Schema);
     }
 
     private static void RejectDuplicateId(List<RuleDefinition> earlier, RuleDefinition rule, string path, JsonPositions positions)

@@ -1,7 +1,10 @@
 using Avalonia;
 using Avalonia.Automation;
+using Avalonia.Automation.Peers;
+using Avalonia.Automation.Provider;
 using Avalonia.Controls;
 using Avalonia.Controls.Documents;
+using Avalonia.Controls.Primitives;
 using Avalonia.Headless.XUnit;
 using Avalonia.Input;
 using Avalonia.VisualTree;
@@ -145,8 +148,10 @@ public sealed class ReviewScreenTests
         {
             Assert.Equal(VerdictKind.AllowedClean, model.Verdict.Kind);
             Assert.Empty(shown);
-            Assert.Equal(new[] { "src/a.cs", "src/b.cs", "src/c.cs" }, model.CleanPushFiles);
-            Assert.False(model.HasPanel);
+            Assert.Equal(model.PanelFiles.Select(file => file.Path), ["src/a.cs", "src/b.cs", "src/c.cs"], StringComparer.Ordinal);
+            Assert.All(model.PanelFiles, file => Assert.True(file.IsClean));
+            Assert.True(model.HasCleanPush);
+            Assert.Equal("3 in this push, none with findings", model.PanelHead);
         }
         else
         {
@@ -436,7 +441,7 @@ public sealed class ReviewScreenTests
 
         model.SelectedChoice = model.Choices[0];
         Assert.Equal(VerdictKind.AllowedClean, model.Verdict.Kind);
-        Assert.Equal(new[] { "c.cs" }, model.CleanPushFiles);
+        Assert.Equal("c.cs", Assert.Single(model.PanelFiles).Path);
         model.SelectedChoice = model.Choices[2];
 
         Assert.Equal(VerdictKind.FolderFindings, model.Verdict.Kind);
@@ -555,6 +560,8 @@ public sealed class ReviewScreenTests
         Assert.False(model.PanelIsListed);
         Assert.Empty(window.FindAll<Button>(button => button.Classes.Contains("panelfile") && button.IsEffectivelyVisible));
 
+        view.FindControl<ItemsControl>("Rows")!.ScrollIntoView(model.Items.Count - 1);
+        window.Pump();
         var toggle = window.Find<Button>(button => AutomationProperties.GetName(button) == "Show the files of this push" && button.IsEffectivelyVisible);
         Assert.NotNull(toggle);
         toggle.Focus(NavigationMethod.Tab);
@@ -563,6 +570,166 @@ public sealed class ReviewScreenTests
         Assert.True(model.PanelIsListed);
         var file = Assert.Single(window.FindAll<Button>(button => button.Classes.Contains("panelfile") && button.IsEffectivelyVisible));
         Assert.StartsWith("src/a.cs", AutomationProperties.GetName(file), StringComparison.Ordinal);
+    }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(1)]
+    [InlineData(2)]
+    public async Task DisclosureCountsOnlyFullyReviewedFilesAndFiltersTheOnesItHolds(int choice)
+    {
+        using var host = new ReviewHost();
+        var model = host.Model;
+        model.SelectedChoice = model.Choices[choice];
+        var paths = Enumerable.Range(1, 21).Select(index => $"src/{(index % 2 == 0 ? "Billing" : "Orders")}/File{index:D2}.cs").Order(StringComparer.Ordinal).ToList();
+        var coverage = paths.AsEnumerable().Reverse().Select(Samples.Reviewed).ToList();
+        host.Review.Result = _ => Samples.Result(ReviewOutcome.Clean, coverage: coverage);
+        await host.RunAsync();
+
+        Assert.Empty(model.PanelFiles);
+        Assert.Equal("21 files, all clean", model.PanelClean?.Name);
+        Assert.Equal("No findings in the reviewed changes. Every file is in the Files panel.", model.CleanPushLine);
+        Assert.Equal("All 21 clean files are listed.", model.PanelClean!.ClosingText);
+
+        model.PanelClean.FilterText = "billing/file1";
+        var matching = paths.Where(path => path.Contains("Billing/File1", StringComparison.Ordinal)).ToList();
+        Assert.Equal(matching, model.PanelClean.VisibleRows.Select(row => row.Path));
+        Assert.Equal($"{matching.Count} of 21", model.PanelClean.FilterCountText);
+        Assert.Equal($"{matching.Count} of 21 clean files match.", model.PanelClean.ClosingText);
+        Assert.True(model.PanelClean.FilterShown);
+        model.PanelClean.FilterText = "nothing";
+        Assert.Equal("No file matches “nothing”.", model.PanelClean.ClosingText);
+
+        coverage.RemoveAt(0);
+        await host.RunAsync();
+        Assert.Equal("20 files, all clean", model.PanelClean?.Name);
+
+        coverage.Add(Samples.Reviewed(paths[^1]));
+        coverage.Add(Samples.NotReviewed(paths[^1], "some lines could not be read"));
+        coverage.Add(new Coverage("src/Skipped.cs", CoverageStatus.Skipped, string.Empty));
+        var findings = new[] { Samples.Finding(paths[0], 1, "TEAM001", Severity.Block) };
+        host.Review.Result = _ => Samples.Result(ReviewOutcome.Incomplete, findings, coverage);
+        await host.RunAsync();
+
+        Assert.False(model.HasCleanPush);
+        var disclosure = Assert.IsType<CleanFilesViewModel>(model.PanelClean);
+        Assert.Equal("19 more files, all clean", disclosure.Name);
+        Assert.Equal(paths.Skip(1).Take(19), disclosure.Rows.Select(row => row.Path));
+        Assert.Equal("All 19 clean files are listed.", disclosure.ClosingText);
+        Assert.Equal(paths[0], choice == 2 ? model.FileGroups[0].Path : model.PanelFiles[0].Path);
+        Assert.Equal(paths[^1], model.PanelFiles.Single(row => row.NotReviewedReason == "some lines could not be read").Path);
+        Assert.True(model.PanelFiles.Single(row => row.Path == "src/Skipped.cs").IsNotReviewed);
+    }
+
+    [Fact]
+    public async Task ChoosingARuleKeepsEveryFileOfTheFolderListedOnce()
+    {
+        using var host = new ReviewHost();
+        var model = host.Model;
+        model.SelectedChoice = model.Choices[2];
+        var clean = Enumerable.Range(1, 10).Select(index => $"src/Clean{index:D2}.cs").ToList();
+        var coverage = clean.Prepend("src/b.cs").Prepend("src/a.cs").Select(Samples.Reviewed).ToList();
+        var findings = new[]
+        {
+            Samples.Finding("src/a.cs", 3, "TEAM001", Severity.Block),
+            Samples.Finding("src/a.cs", 9, "TEAM002", Severity.Warn),
+            Samples.Finding("src/b.cs", 4, "TEAM002", Severity.Warn)
+        };
+        host.Review.Result = _ => Samples.Result(ReviewOutcome.Blocked, findings, coverage);
+        await host.RunAsync();
+
+        model.RuleRows.Single(row => row.RuleId == "TEAM001").ChooseCommand.Execute(null);
+
+        var listed = model.FileGroups.Select(group => group.Path)
+            .Concat(model.PanelFiles.Select(row => row.Path))
+            .Concat(model.PanelClean!.Rows.Select(row => row.Path)).Order(StringComparer.Ordinal).ToList();
+        Assert.Equal(coverage.Select(entry => entry.What).Order(StringComparer.Ordinal), listed);
+        var other = Assert.Single(model.PanelFiles);
+        Assert.Equal("src/b.cs", other.Path);
+        Assert.False(other.IsClean);
+        Assert.False(other.IsNotReviewed);
+        Assert.Equal("12 in this folder, 1 with findings of TEAM001", model.PanelHead);
+        Assert.Equal("All 10 clean files are listed.", model.PanelClean.ClosingText);
+
+        model.ClearRuleCommand.Execute(null);
+
+        Assert.Empty(model.PanelFiles);
+        Assert.Equal("12 in this folder, 2 with findings", model.PanelHead);
+    }
+
+    [Theory]
+    [InlineData(0, "2 in this push, 1 with findings", new[] { "src/a.cs", "src/b.cs" })]
+    [InlineData(1, "2 staged, 1 with findings", new[] { "src/a.cs", "src/b.cs" })]
+    [InlineData(2, "2 in this folder, 1 with findings", new[] { "src/b.cs" })]
+    public async Task AFindingWithNoFileIsNotCountedOrListedAsAFile(int choice, string head, string[] panelPaths)
+    {
+        using var host = new ReviewHost();
+        var model = host.Model;
+        model.SelectedChoice = model.Choices[choice];
+        var noFile = new Finding("CS0246", FindingSource.Compiler, Severity.Block, "csharp", null, null, null, null, null, "The type could not be found.", null, null);
+        var findings = new[] { Samples.Finding("src/a.cs", 3, "TEAM001", Severity.Block), noFile };
+        host.Review.Result = _ => Samples.Result(ReviewOutcome.Blocked, findings, [Samples.Reviewed("src/a.cs"), Samples.Reviewed("src/b.cs")]);
+
+        await host.RunAsync();
+
+        Assert.Equal(2, model.FileGroups.Count);
+        Assert.Contains(model.FileGroups, group => group.Findings.Any(finding => finding.RuleId == "CS0246"));
+        Assert.Equal(panelPaths, model.PanelFiles.Select(row => row.Path));
+        Assert.Equal(head, model.PanelHead);
+        Assert.Equal("1 file with findings, and findings with no file", model.FilesLine);
+    }
+
+    [AvaloniaFact]
+    public async Task AShortPushShowsNoCleanFilesCard()
+    {
+        using var host = new ReviewHost();
+        var view = new ReviewView { DataContext = host.Model };
+        using var window = new ViewHost(view, 1440, 900);
+        var coverage = new[] { Samples.Reviewed("src/A.cs"), Samples.Reviewed("src/B.cs") };
+        host.Review.Result = _ => Samples.Result(ReviewOutcome.Blocked, [Samples.Finding("src/A.cs", 1, "TEAM001", Severity.Block)], coverage);
+        await host.RunAsync();
+        window.Pump();
+
+        Assert.Null(host.Model.PanelClean);
+        Assert.Null(window.Find<Panel>(element => element.IsEffectivelyVisible && element.Name == "Card"));
+    }
+
+    [AvaloniaFact]
+    public async Task CleanFilesDisclosureKeepsAndRestoresKeyboardFocus()
+    {
+        using var host = new ReviewHost();
+        var model = host.Model;
+        var view = new ReviewView { DataContext = model };
+        using var window = new ViewHost(view, 1440, 900);
+        var coverage = Enumerable.Range(0, 62).Select(index => Samples.Reviewed($"src/{index:D2}.cs")).ToList();
+        host.Review.Result = _ => Samples.Result(ReviewOutcome.Blocked,
+            [Samples.Finding("src/00.cs", 1, "TEAM001", Severity.Block)], coverage);
+        await host.RunAsync();
+        window.Pump();
+
+        var disclosure = Assert.IsType<Expander>(window.Find<Expander>(element => element.IsEffectivelyVisible && element.Name == "Disclosure"));
+        var automation = Assert.IsType<IExpandCollapseProvider>(ControlAutomationPeer.CreatePeerForElement(disclosure), exactMatch: false);
+        var button = Assert.IsType<ToggleButton>(window.Find<ToggleButton>(element => element.IsEffectivelyVisible && element.Classes.Contains("disclosure")));
+        Assert.Equal(ExpandCollapseState.Collapsed, automation.ExpandCollapseState);
+        button.Focus(NavigationMethod.Tab);
+        window.Press(PhysicalKey.Space);
+        Assert.True(button.IsFocused);
+        Assert.True(model.PanelClean!.IsExpanded);
+        Assert.Equal(ExpandCollapseState.Expanded, automation.ExpandCollapseState);
+
+        window.Pump();
+        Assert.True(model.PanelClean.FilterShown);
+        window.Press(PhysicalKey.Tab);
+        Assert.Equal("Filter", Assert.IsType<TextBox>(window.Window.FocusManager?.GetFocusedElement()).Name);
+        window.Press(PhysicalKey.Tab);
+        var scroller = Assert.IsType<ScrollViewer>(window.Window.FocusManager?.GetFocusedElement());
+        Assert.Equal("CleanScroller", scroller.Name);
+        window.Press(PhysicalKey.End);
+        Assert.True(scroller.Offset.Y > 0);
+        automation.Collapse();
+        window.Pump();
+        Assert.True(button.IsFocused);
+        Assert.False(model.PanelClean.IsExpanded);
     }
 
     [AvaloniaFact]

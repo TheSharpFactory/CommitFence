@@ -135,16 +135,13 @@ internal sealed class UpdateChecker
     {
         try
         {
-            using(var document = JsonDocument.Parse(json))
-            {
-                var root = document.RootElement;
-                if(root.ValueKind != JsonValueKind.Object || !TryParseVersion(GetString(root, "tag_name"), out var version))
-                    return Fail("GitHub's answer has no release version.");
+            var answer = JsonSerializer.Deserialize(json, GitHubReleaseJsonContext.Default.GitHubReleaseDto);
+            if(answer == null || !TryParseVersion(answer.TagName, out var version))
+                return Fail("GitHub's answer has no release version.");
 
-                var release = ReadAssets(root, version, packageName);
-                var status = version > currentVersion ? UpdateCheckStatus.Available : UpdateCheckStatus.UpToDate;
-                return new UpdateCheckResult { Status = status, Release = release };
-            }
+            var release = ReadAssets(answer, version, packageName);
+            var status = version > currentVersion ? UpdateCheckStatus.Available : UpdateCheckStatus.UpToDate;
+            return new UpdateCheckResult { Status = status, Release = release };
         }
         catch(JsonException)
         {
@@ -152,30 +149,32 @@ internal sealed class UpdateChecker
         }
     }
 
-    private static ReleaseInfo ReadAssets(JsonElement root, Version version, string? packageName)
+    private static ReleaseInfo ReadAssets(GitHubReleaseDto answer, Version version, string? packageName)
     {
         Uri? packageUri = null;
         Uri? checksumsUri = null;
         Uri? signatureUri = null;
-        if(root.TryGetProperty("assets", out var assets) && assets.ValueKind == JsonValueKind.Array)
+        if(answer.Assets != null)
         {
-            foreach(var asset in assets.EnumerateArray())
+            foreach(var asset in answer.Assets)
             {
-                var name = GetString(asset, "name");
-                if(packageName != null && string.Equals(name, packageName, StringComparison.Ordinal))
-                    packageUri = GetUri(asset, "browser_download_url");
-                else if(string.Equals(name, ChecksumsFileName, StringComparison.Ordinal))
-                    checksumsUri = GetUri(asset, "browser_download_url");
-                else if(string.Equals(name, UpdateSignature.SignatureFileName, StringComparison.Ordinal))
-                    signatureUri = GetUri(asset, "browser_download_url");
+                if(asset == null)
+                    continue;
+
+                if(packageName != null && string.Equals(asset.Name, packageName, StringComparison.Ordinal))
+                    packageUri = GetUri(asset.BrowserDownloadUrl);
+                else if(string.Equals(asset.Name, ChecksumsFileName, StringComparison.Ordinal))
+                    checksumsUri = GetUri(asset.BrowserDownloadUrl);
+                else if(string.Equals(asset.Name, UpdateSignature.SignatureFileName, StringComparison.Ordinal))
+                    signatureUri = GetUri(asset.BrowserDownloadUrl);
             }
         }
 
         return new ReleaseInfo
         {
             Version = version,
-            Notes = GetString(root, "body"),
-            PageUri = GetUri(root, "html_url"),
+            Notes = answer.Body,
+            PageUri = GetUri(answer.HtmlUrl),
             PackageName = packageName,
             PackageUri = packageUri,
             ChecksumsUri = checksumsUri,
@@ -183,20 +182,11 @@ internal sealed class UpdateChecker
         };
     }
 
-    private static string? GetString(JsonElement element, string name)
-    {
-        if(element.ValueKind == JsonValueKind.Object && element.TryGetProperty(name, out var value) && value.ValueKind == JsonValueKind.String)
-            return value.GetString();
-
-        return null;
-    }
-
     /// <summary>
     /// An https address (http only for a local test server), or null.
     /// </summary>
-    private static Uri? GetUri(JsonElement element, string name)
+    private static Uri? GetUri(string? text)
     {
-        var text = GetString(element, name);
         if(text == null || !Uri.TryCreate(text, UriKind.Absolute, out var uri))
             return null;
 

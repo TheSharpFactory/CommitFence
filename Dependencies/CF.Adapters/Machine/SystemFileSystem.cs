@@ -73,6 +73,12 @@ public sealed class SystemFileSystem : IFileSystem
     }
 
     /// <inheritdoc />
+    public bool IsReadOnly(string path)
+    {
+        return new FileInfo(path).IsReadOnly;
+    }
+
+    /// <inheritdoc/>
     public bool IsLink(string path)
     {
         try

@@ -96,7 +96,7 @@ internal sealed partial class RulePageViewModel : ObservableObject
     {
         _catalog = catalog;
         _changes = changes;
-        Id = id;
+        _id = id;
         IsDraft = rule == null;
         _addItem = new AddConditionItem(this);
         _addPathItem = new AddPathItem(this);
@@ -124,7 +124,33 @@ internal sealed partial class RulePageViewModel : ObservableObject
     /// </summary>
     public event Action? RenameRequested;
 
-    public string Id { get; }
+    private string _id;
+
+    public bool HasTitle { get { return Title.Trim().Length > 0; } }
+
+    public string DraftSpokenName
+    {
+        get { return $"New rule, not saved yet: {(HasId ? Id : "no ID")}, {(HasTitle ? Title : "Name the rule")}."; }
+    }
+
+    public string Id
+    {
+        get { return _id; }
+        set
+        {
+            if(!IsDraft || !SetProperty(ref _id, value))
+                return;
+
+            OnPropertyChanged(nameof(HasId));
+            OnPropertyChanged(nameof(DraftSpokenName));
+            EditMade();
+        }
+    }
+
+    public bool HasId
+    {
+        get { return Id.Length > 0; }
+    }
 
     /// <summary>
     /// Try it: the code of this page and what the rule, as the page holds it now, says about the code.
@@ -411,11 +437,8 @@ internal sealed partial class RulePageViewModel : ObservableObject
     {
         get
         {
-            if(Paths.Any(candidate => candidate.HasInvalidDraft))
-                return "Fix the path to save it.";
-
-            if(PendingRanges().Any(candidate => candidate.ComparisonPicker.PendingProblem != null))
-                return "Fix the range to save it.";
+            if(HasLocalRefusal)
+                return null;
 
             if(InvalidReason != null)
                 return "Fix the sentence to save it.";
@@ -628,17 +651,10 @@ internal sealed partial class RulePageViewModel : ObservableObject
         KindPicker.Open(entries, byKeyboard);
     }
 
-    /// <summary>
-    /// The first picker a new rule shows open: its artifact type.
-    /// </summary>
-    public void OpenFirstPicker()
-    {
-        if(ArtifactName == null)
-            OpenArtifactPicker(false);
-    }
-
     partial void OnTitleChanged(string value)
     {
+        OnPropertyChanged(nameof(HasTitle));
+        OnPropertyChanged(nameof(DraftSpokenName));
         OnPropertyChanged(nameof(SwitchSpokenName));
         OnPropertyChanged(nameof(MessagePlaceholder));
         EditMade();
@@ -766,19 +782,42 @@ internal sealed partial class RulePageViewModel : ObservableObject
             RefreshHead();
     }
 
+    [RelayCommand]
+    private void AttemptSave()
+    {
+        if(!IsUnsaved)
+            return;
+
+        if(CanSave)
+            Save();
+        else
+            GoToBlocker();
+    }
+
     [RelayCommand(CanExecute = nameof(CanSave))]
     private void Save()
     {
         if(!CommitOpenDrafts() || !CanSave)
+        {
+            GoToBlocker();
             return;
+        }
 
         _justSaved = true;
         var message = _baseline == null ? _changes.AddRule(ToDraft(), _copyOf) : _changes.ChangeRule(Id, ToChange());
         if(message != null)
         {
             _justSaved = false;
-            ErrorText = message;
-            OnPropertyChanged(nameof(HasError));
+            if(HasIdProblem)
+            {
+                RefreshHead();
+                BlockerFocusRequested?.Invoke(this);
+            }
+            else
+            {
+                ErrorText = message;
+                OnPropertyChanged(nameof(HasError));
+            }
         }
     }
 
@@ -992,6 +1031,7 @@ internal sealed partial class RulePageViewModel : ObservableObject
         OnPropertyChanged(nameof(IsComplete));
         OnPropertyChanged(nameof(CanSave));
         OnPropertyChanged(nameof(SaveTip));
+        SaveCommand.NotifyCanExecuteChanged();
         RefreshHead();
         OnPropertyChanged(nameof(HasError));
         OnPropertyChanged(nameof(InvalidReason));
@@ -999,7 +1039,6 @@ internal sealed partial class RulePageViewModel : ObservableObject
         OnPropertyChanged(nameof(InvalidText));
         OnPropertyChanged(nameof(InvalidSpokenName));
         RefreshReasons();
-        SaveCommand.NotifyCanExecuteChanged();
         TryIt.PathsChanged(PathPatterns);
         TryIt.RuleChanged(Id, RepositoryName);
         TryIt.IsSaved = !IsDraft && !IsDirty;
@@ -1074,7 +1113,7 @@ internal sealed partial class RulePageViewModel : ObservableObject
         if(_baseline == null)
         {
             var draft = ToDraft();
-            return new TryPlan(key, code => _changes.TryNewRule(draft, code));
+            return new TryPlan((Id, key), code => _changes.TryNewRule(draft, code));
         }
 
         var change = ToChange();

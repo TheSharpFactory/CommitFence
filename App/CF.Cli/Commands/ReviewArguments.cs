@@ -3,7 +3,7 @@ namespace CF.Cli.Commands;
 /// <summary>
 /// The arguments after the word review, made for one form: --files with one or more paths, --staged, --hook pre-push
 /// with the remote's name and address, --base with an optional --head, or --all with an optional folder or project
-/// file; and an optional --settings path.
+/// file; and an optional --settings path, --format and --output.
 /// </summary>
 internal sealed class ReviewArguments
 {
@@ -33,6 +33,18 @@ internal sealed class ReviewArguments
     /// Whether the review is printed as a prompt for an AI coding agent (--format prompt) in place of the usual report.
     /// </summary>
     public bool AsPrompt { get; internal set; }
+
+    /// <summary>Whether the review is written as a SARIF 2.1.0 log (--format sarif) for build servers.</summary>
+    public bool AsSarif { get; internal set; }
+
+    /// <summary>The file the report is written to (--output); the console then keeps the plain text.</summary>
+    public string? OutputPath { get; internal set; }
+
+    /// <summary>Whether the report is printed in place of the plain text: a prompt or a SARIF log with no file to go to.</summary>
+    public bool ReplacesConsoleText
+    {
+        get { return (AsPrompt || AsSarif) && OutputPath == null; }
+    }
 
     public bool Quick { get; set; }
 

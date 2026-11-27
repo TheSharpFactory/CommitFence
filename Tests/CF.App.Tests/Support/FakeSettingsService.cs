@@ -1,3 +1,4 @@
+using System.Globalization;
 using CF.Core.Findings;
 using CF.Core.Rules;
 using CF.Core.Services;
@@ -14,6 +15,7 @@ internal sealed class FakeSettingsService : ISettingsService
         [("error", 41), ("warning", 6), ("suggestion", 20), ("silent, none", 11)];
 
     private Strictness _current = Strictness.Standard;
+    private int _revision;
 
     /// <summary>
     /// The mapping the file holds when it is not a preset: the three words and what each does.
@@ -28,6 +30,11 @@ internal sealed class FakeSettingsService : ISettingsService
     public ManualResetEventSlim? SaveGate { get; set; }
 
     public List<StrictnessPreset> Saved { get; } = new List<StrictnessPreset>();
+
+    public void OutsideEdit()
+    {
+        _revision++;
+    }
 
     public StrictnessReport Show(string folder)
     {
@@ -44,14 +51,25 @@ internal sealed class FakeSettingsService : ISettingsService
 
     public Strictness SetStrictness(string folder, StrictnessPreset preset)
     {
+        return ChangeStrictness(folder, _ => Strictness.For(preset)).After;
+    }
+
+    public StrictnessChange ChangeStrictness(string folder, Func<Strictness, Strictness> change, string? expectedRevision = null)
+    {
         SaveGate?.Wait();
         if(SaveFailure != null)
             throw SaveFailure;
 
-        Saved.Add(preset);
-        _current = Strictness.For(preset);
-        Custom = null;
-        return _current;
+        var previousRevision = _revision.ToString(CultureInfo.InvariantCulture);
+        if(expectedRevision != null && previousRevision != expectedRevision)
+            throw new RuleChangeException("Could not undo: commitfence.json changed on disk.");
+
+        var before = Custom ?? _current;
+        var after = change(before);
+        Saved.Add(after.Preset);
+        _current = after;
+        Custom = after.Preset == StrictnessPreset.Custom ? after : null;
+        return new StrictnessChange(before, after, previousRevision, (++_revision).ToString(CultureInfo.InvariantCulture));
     }
 }
 

@@ -68,8 +68,9 @@ public sealed class ChangeSet
     public string? WholeFolder { get; }
 
     /// <summary>
-    /// The full id of the last commit as it was when this change set was taken, for a staged review (the commit the index is
-    /// compared with) and a whole review (the commit read); empty for the others and when the repository has no commit.
+    /// The full id of the commit this change set is about, resolved once when it was taken: the commit the index is compared
+    /// with for a staged review, the commit read for a whole review, the head of a range and the tip of a pushed ref; empty
+    /// when there is none.
     /// </summary>
     public string Commit { get; }
 

@@ -16,7 +16,7 @@ internal sealed partial class RulePageViewModel
             if(SaveBlocker == null)
                 return string.Empty;
 
-            return $"Cannot save: {SaveSummaryClause()}.";
+            return IdProblem is { } idProblem ? $"Cannot save: {idProblem}" : $"Cannot save: {SaveSummaryClause()}.";
         }
     }
 

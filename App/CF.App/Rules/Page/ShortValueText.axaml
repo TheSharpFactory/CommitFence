@@ -6,6 +6,9 @@
 
   <!-- The value of a token on one line: the text, and "+N" in a box of the page colour, 8 after it, when a list leaves values out. -->
   <UserControl.Styles>
+    <Style Selector="TextBlock#Text">
+      <Setter Property="Theme" Value="{StaticResource type-token}"/>
+    </Style>
     <Style Selector="local|ShortValueText.path TextBlock#Text">
       <Setter Property="Theme" Value="{StaticResource code-token}"/>
     </Style>
@@ -13,10 +16,13 @@
       <Setter Property="FontFamily" Value="{StaticResource code-font}"/>
       <Setter Property="FontSize" Value="18"/>
     </Style>
+    <Style Selector=":is(local|ShortValueText).compact TextBlock#Text">
+      <Setter Property="Theme" Value="{StaticResource code}"/>
+    </Style>
   </UserControl.Styles>
 
   <StackPanel Orientation="Horizontal">
-    <TextBlock Name="Text" Theme="{StaticResource type-token}" TextWrapping="NoWrap" VerticalAlignment="Top"/>
+    <TextBlock Name="Text" TextWrapping="NoWrap" VerticalAlignment="Top"/>
     <Border Name="More" IsVisible="False" Margin="8,0,0,0" Height="24" CornerRadius="6" Padding="7,0" VerticalAlignment="Center"
             Background="{DynamicResource page}">
       <TextBlock Name="MoreText" Theme="{StaticResource type-card}" VerticalAlignment="Center"/>

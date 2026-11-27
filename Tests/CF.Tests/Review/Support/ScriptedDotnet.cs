@@ -1,5 +1,6 @@
 using System.Text.Json;
 using CF.Core.Ports;
+using CF.Tests.Wire;
 
 namespace CF.Tests.Review.Support;
 
@@ -26,24 +27,39 @@ internal static class ScriptedDotnet
         if(appCannotBeEvaluated && NameOf(request) == "App")
             return ScriptedProcessRunner.Failure(1, "error MSB4025: The project file could not be loaded.");
 
-        return ScriptedProcessRunner.Output(JsonSerializer.Serialize(new { Properties = new { TargetFramework = "net11.0", TargetFrameworks = string.Empty } }));
+        var properties = new Dictionary<string, string>
+        {
+            ["TargetFramework"] = "net11.0",
+            ["TargetFrameworks"] = string.Empty
+        };
+        var answer = new MsBuildWire(properties);
+
+        return ScriptedProcessRunner.Output(JsonSerializer.Serialize(answer, WireJsonContext.Default.MsBuildWire));
     }
 
     private static ProcessResult AnswerItems(ProcessRequest request)
     {
         var name = NameOf(request);
         var folder = Path.GetDirectoryName(request.Arguments[1])!;
-        var compile = new[] { new { FullPath = Path.Combine(folder, name == "App" ? "Program.cs" : "Lib.cs") } };
-        var referencedProjects = name == "App" ? new[] { Path.GetFullPath(Path.Combine(folder, "..", "Lib", "Lib.csproj")) } : Array.Empty<string>();
-        var references = referencedProjects.Select(path => new { FullPath = path }).ToArray();
-        var assembly = new[] { new { FullPath = Path.Combine(folder, "obj", "Debug", "net11.0", name + ".dll") } };
-        var answer = new
+        var source = Path.Combine(folder, name == "App" ? "Program.cs" : "Lib.cs");
+        var assembly = Path.Combine(folder, "obj", "Debug", "net11.0", name + ".dll");
+        List<MsBuildItemWire> references = name == "App"
+            ? [new MsBuildItemWire(Path.GetFullPath(Path.Combine(folder, "..", "Lib", "Lib.csproj")))]
+            : [];
+        var properties = new Dictionary<string, string>
         {
-            Items = new { Compile = compile, ProjectReference = references, IntermediateAssembly = assembly },
-            Properties = new { DefineConstants = string.Empty, CustomAfterDirectoryBuildTargets = string.Empty }
+            ["DefineConstants"] = string.Empty,
+            ["CustomAfterDirectoryBuildTargets"] = string.Empty
         };
+        var items = new Dictionary<string, List<MsBuildItemWire>>
+        {
+            ["Compile"] = [new MsBuildItemWire(source)],
+            ["ProjectReference"] = references,
+            ["IntermediateAssembly"] = [new MsBuildItemWire(assembly)]
+        };
+        var answer = new MsBuildWire(properties, items);
 
-        return ScriptedProcessRunner.Output(JsonSerializer.Serialize(answer));
+        return ScriptedProcessRunner.Output(JsonSerializer.Serialize(answer, WireJsonContext.Default.MsBuildWire));
     }
 
     private static string NameOf(ProcessRequest request)

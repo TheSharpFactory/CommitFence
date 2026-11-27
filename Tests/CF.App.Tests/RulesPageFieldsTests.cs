@@ -239,8 +239,8 @@ public sealed class RulesPageFieldsTests
         Assert.Contains("\"parameter count is between 50 and 5\" cannot be met: the lower end is above the upper end. Change either number to save the rule.", page.InvalidText, StringComparison.Ordinal);
         Assert.True(number.ShowsInvalid);
         Assert.False(page.SaveCommand.CanExecute(null));
-        Assert.Equal("Fix the sentence to save it.", page.SaveTip);
-        Assert.Equal("Cannot save: the parameter count requirement cannot be met.", page.HeadLine);
+        Assert.Null(page.SaveTip);
+        Assert.Equal("Changed since it was saved. Save writes it to commitfence.json.", page.HeadLine);
         Assert.Equal("Require clause: \"parameter count is between 50 and 5\" cannot be met: the lower end is above the upper end. Change either number to save the rule.", page.InvalidSpokenName);
 
         // two conditions on one property that a range cannot hold are refused on the page before they are saved

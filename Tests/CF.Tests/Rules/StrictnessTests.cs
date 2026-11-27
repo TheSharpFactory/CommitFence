@@ -1,9 +1,14 @@
+using System.Text;
+using CF.Adapters.Machine;
+using CF.Adapters.Storage;
 using CF.Core.Findings;
 using CF.Core.Review;
 using CF.Core.Rules;
 using CF.Core.Rules.Settings;
+using CF.Core.Services;
 using CF.Tests.Review.Support;
 using CF.Tests.Rules.Support;
+using CF.Tests.Toolchain.Support;
 using Xunit;
 
 namespace CF.Tests.Rules;
@@ -75,6 +80,69 @@ public sealed class StrictnessTests
         Assert.Equal("Changed title", Assert.Single(afterSetting.Rules).Title);
         Assert.Equal(afterRule.Structure.Describe(), afterSetting.Structure.Describe());
         Assert.Equal(before.Requires, afterSetting.Requires);
+    }
+
+    [Fact]
+    public void OwnMappingReadsBackAndAChangedFileRefusesItsUndo()
+    {
+        using var fixture = new RulesFixture("""{"$schema":"https://example.org/schema.json","strictness":"quiet","rules":[]}""");
+        var service = new SettingsService(new SystemFileSystem(), new FileSettingsLock(new TestDataFolder(fixture.Folder)), []);
+
+        service.ChangeStrictness(fixture.Folder, current => current with { Preset = StrictnessPreset.Custom });
+        Assert.Equal(new Strictness(StrictnessPreset.Custom, Severity.Block, Severity.Warn, null), fixture.Settings().Strictness);
+        var edited = service.ChangeStrictness(fixture.Folder, current => current with { Error = null }).After;
+        Assert.Equal(edited, fixture.Settings().Strictness);
+        var saved = fixture.SettingsText();
+        Assert.StartsWith("""{"$schema":"https://example.org/schema.json",""", saved, StringComparison.Ordinal);
+        Assert.Contains("\"strictness\":{ \"error\": \"off\"", saved, StringComparison.Ordinal);
+        Assert.EndsWith(""","rules":[]}""", saved, StringComparison.Ordinal);
+
+        var replacement = service.ChangeStrictness(fixture.Folder, _ => Strictness.Standard);
+        service.ChangeStrictness(fixture.Folder, _ => replacement.Before, replacement.Revision);
+        Assert.Equal(edited, fixture.Settings().Strictness);
+
+        var second = service.ChangeStrictness(fixture.Folder, _ => Strictness.Standard);
+        var newer = fixture.SettingsText() + " ";
+        fixture.Write(SettingsFileName.Default, newer);
+        var refused = Assert.Throws<RuleChangeException>(() => service.ChangeStrictness(fixture.Folder, _ => second.Before, second.Revision));
+        Assert.Equal("Could not undo: commitfence.json changed on disk.", refused.Message);
+        Assert.Equal(newer, fixture.SettingsText());
+    }
+
+    [Fact]
+    public void UndoRefusesAByteOrderMarkAddedAfterSaving()
+    {
+        using var fixture = new RulesFixture(Settings("\"quiet\""));
+        var service = new SettingsService(new SystemFileSystem(), new FileSettingsLock(new TestDataFolder(fixture.Folder)), []);
+        var saved = service.ChangeStrictness(fixture.Folder, _ => Strictness.Standard);
+        File.WriteAllText(fixture.SettingsPath, fixture.SettingsText(), Encoding.UTF8);
+        var withMark = fixture.SettingsBytes();
+
+        var refused = Assert.Throws<RuleChangeException>(() => service.ChangeStrictness(fixture.Folder, _ => saved.Before, saved.Revision));
+        Assert.Equal("Could not undo: commitfence.json changed on disk.", refused.Message);
+        Assert.Equal(withMark, fixture.SettingsBytes());
+    }
+
+    [Fact]
+    public void StrictnessSaveRefusesAByteOrderMarkAddedWhileWorking()
+    {
+        byte[]? withMark = null;
+        var files = new ObservedFileSystem(_ => { }, (path, _) =>
+        {
+            if(!path.EndsWith(".new", StringComparison.Ordinal))
+                return;
+
+            var settingsPath = Path.Combine(Path.GetDirectoryName(path)!, SettingsFileName.Default);
+            File.WriteAllText(settingsPath, File.ReadAllText(settingsPath), Encoding.UTF8);
+            withMark = File.ReadAllBytes(settingsPath);
+        });
+        using var fixture = new RulesFixture(Settings("\"quiet\""), fileSystem: files);
+        var service = new SettingsService(files, new FileSettingsLock(new TestDataFolder(fixture.Folder)), []);
+
+        var refused = Assert.Throws<RuleChangeException>(() => service.ChangeStrictness(fixture.Folder, _ => Strictness.Standard));
+        Assert.Contains("changed while this command was working", refused.Message, StringComparison.Ordinal);
+        Assert.NotNull(withMark);
+        Assert.Equal(withMark, fixture.SettingsBytes());
     }
 
     [Fact]

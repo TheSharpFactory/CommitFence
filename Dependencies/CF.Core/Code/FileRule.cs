@@ -52,7 +52,7 @@ public sealed class FileRule
     /// <summary>The narrower settings in file order.</summary>
     public IReadOnlyList<FileRulePlace> Exceptions { get; }
 
-    /// <summary>The place used for the rule's list filters and counts.</summary>
+    /// <summary>The main place or, when there is no main setting, the first exception.</summary>
     public FileRulePlace? ListedPlace
     {
         get { return Main ?? (Exceptions.Count > 0 ? Exceptions[0] : null); }

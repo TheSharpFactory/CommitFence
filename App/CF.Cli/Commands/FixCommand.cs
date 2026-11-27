@@ -55,7 +55,7 @@ internal sealed class FixCommand(IReviewService review, IFixService fixes, Comma
             return NoFix(push?.Reason);
 
         var settings = arguments.SettingsPath == null ? null : Path.GetFullPath(arguments.SettingsPath, environment.CurrentFolder);
-        var result = review.ReviewChanges(environment.CurrentFolder, scope, settings);
+        var result = review.ReviewChanges(environment.CurrentFolder, scope.WithoutHistory(), settings);
         if(result.Repository == null)
             return NoFix(result.Coverage.FirstOrDefault(entry => entry.Status == CoverageStatus.Failed)?.Reason);
 

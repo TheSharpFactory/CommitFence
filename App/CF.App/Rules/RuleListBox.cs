@@ -137,6 +137,8 @@ internal sealed class RuleListBox : ListBox
         e.Container.Classes.Set("heading", e.Container.DataContext is GroupHeadingViewModel);
         e.Container.Classes.Set("note", e.Container.DataContext is GroupNoteViewModel);
         e.Container.Classes.Set("setup", e.Container.DataContext is GroupNoteViewModel { OffersSetup: true });
+        e.Container.Classes.Set("file-rule", e.Container.DataContext is FileRuleRowViewModel);
+        e.Container.Classes.Set("draft-rule", e.Container.DataContext is DraftRuleRowViewModel);
     }
 
     private static void OnContainerClearing(object? sender, ContainerClearingEventArgs e)
@@ -145,6 +147,8 @@ internal sealed class RuleListBox : ListBox
         e.Container.Classes.Set("note", false);
         e.Container.Classes.Set("setup", false);
         e.Container.Classes.Set("ring", false);
+        e.Container.Classes.Set("file-rule", false);
+        e.Container.Classes.Set("draft-rule", false);
     }
 
     private void OnSelectionChanged(object? sender, SelectionChangedEventArgs e)
@@ -180,7 +184,7 @@ internal sealed class RuleListBox : ListBox
         if(item is FileRuleRowViewModel fileRow)
         {
             fileRow.IsRingVisible = false;
-            fileRow.Part = RowPart.Row;
+            fileRow.ResetPart();
         }
     }
 
@@ -250,6 +254,9 @@ internal sealed class RuleListBox : ListBox
         }
 
         var entry = entries[Math.Clamp(target, 0, entries.Count - 1)];
+        if(entry is FileRuleRowViewModel fileRow)
+            fileRow.ResetPart();
+
         SelectedItem = entry;
         Reveal(entry);
         ContainerFromItem(entry)?.Focus(NavigationMethod.Directional);
@@ -263,7 +270,7 @@ internal sealed class RuleListBox : ListBox
     /// to an item (ScrollIntoView) lays out the whole window and took 100 ms or more for each key press of a held key. Only an
     /// entry that is not drawn yet goes the long way.
     /// </summary>
-    private void Reveal(object entry)
+    public void Reveal(object entry)
     {
         var container = ContainerFromItem(entry);
         var top = TopOf(container);
@@ -296,7 +303,7 @@ internal sealed class RuleListBox : ListBox
 
         RefreshRing();
         var onAControl = (e.Source as Visual)?.FindAncestorOfType<Button>(true) != null || (e.Source as Visual)?.FindAncestorOfType<ToggleButton>(true) != null;
-        if(container?.DataContext is (TeamRuleRowViewModel or FileRuleRowViewModel) && !onAControl)
+        if(container?.DataContext is (TeamRuleRowViewModel or FileRuleRowViewModel or DraftRuleRowViewModel) && !onAControl)
             OpenRequested?.Invoke(false);
     }
 
@@ -310,6 +317,9 @@ internal sealed class RuleListBox : ListBox
 
         if(SelectedItem is FileRuleRowViewModel fileRow)
             return HandleFileRowKey(fileRow, e);
+
+        if(SelectedItem is DraftRuleRowViewModel)
+            return e.Key == Key.Space || (e.Key == Key.Enter && OpenByKeyboard());
 
         return false;
     }

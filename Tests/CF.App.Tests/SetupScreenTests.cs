@@ -276,7 +276,14 @@ public sealed class SetupScreenTests
             await starting;
         }
 
-        Assert.True(draft.SaveCommand.CanExecute(null));
+        Assert.Equal(!isValid, draft.SaveCommand.CanExecute(null));
+        if(isValid)
+        {
+            Assert.Contains("TEAM001 is taken by", draft.IdLine, StringComparison.Ordinal);
+            draft.Id = "TEAM005";
+            Assert.True(draft.SaveCommand.CanExecute(null));
+        }
+
         Assert.False(rules.NeedsSetup);
         Assert.Null(rules.SetupError);
         Assert.Null(rules.SetupConfirmation);

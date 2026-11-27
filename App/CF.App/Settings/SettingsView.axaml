@@ -12,12 +12,6 @@
        and its status, the app's facts, the release notes). In one pane they are one column, this repository first; while an update waits, runs
        or failed, this app comes first and its status leads the page. -->
   <UserControl.Styles>
-    <Style Selector="ListBox.segmented.large.strictness ListBoxItem">
-      <Setter Property="MinWidth" Value="132"/>
-    </Style>
-    <Style Selector="ListBox.segmented.large.strictness ListBoxItem:disabled TextBlock.segment">
-      <Setter Property="Foreground" Value="{DynamicResource ink-2}"/>
-    </Style>
     <Style Selector="Border.fact">
       <Setter Property="BorderBrush" Value="{DynamicResource line}"/>
       <Setter Property="BorderThickness" Value="0,0,0,1"/>
@@ -38,9 +32,24 @@
     <Style Selector="StackPanel#StatusButtons.ownline">
       <Setter Property="Margin" Value="0,4,0,0"/>
     </Style>
-    <Style Selector="Border.mxcell">
-      <Setter Property="MinHeight" Value="40"/>
-      <Setter Property="Padding" Value="12,0"/>
+    <Style Selector="ListBox.strictness ListBoxItem">
+      <Setter Property="Height" Value="38"/>
+      <Setter Property="Margin" Value="2,0"/>
+      <Setter Property="Padding" Value="2,0"/>
+      <Setter Property="AutomationProperties.Name" Value="{ReflectionBinding Label}"/>
+    </Style>
+    <Style Selector="TextBlock.effectword.off">
+      <Setter Property="Foreground" Value="{DynamicResource ink-2}"/>
+    </Style>
+    <Style Selector="TextBlock.effectword.preview">
+      <Setter Property="Foreground" Value="{DynamicResource ink-3}"/>
+    </Style>
+    <Style Selector="Border.strictness-status">
+      <Setter Property="Background" Value="{DynamicResource side}"/>
+      <Setter Property="CornerRadius" Value="12"/>
+      <Setter Property="MinHeight" Value="44"/>
+      <Setter Property="Padding" Value="14,4,4,4"/>
+      <Setter Property="Margin" Value="0,12,0,0"/>
     </Style>
   </UserControl.Styles>
 
@@ -60,7 +69,7 @@
           </Border>
 
           <!-- Strictness: the choice, the table with the column in force marked, the sentence with its three counts. -->
-          <StackPanel Margin="0,24,0,0" IsVisible="{Binding HasStrictness}">
+          <StackPanel Margin="0,24,0,0">
             <parts:WrapRow MinHeight="28" Margin="0,0,0,12">
               <TextBlock Theme="{StaticResource type-h3}" VerticalAlignment="Center" Text="Strictness"/>
             </parts:WrapRow>
@@ -78,110 +87,105 @@
               </Grid>
             </Border>
 
-            <parts:SegmentedList Name="StrictnessChoice" Classes="segmented large strictness" ItemsSource="{Binding Choices}"
-                                 SelectedItem="{Binding SelectedChoice, Mode=TwoWay}" AutomationProperties.Name="Strictness">
-              <parts:SegmentedList.Styles>
-                <Style Selector="ListBoxItem" x:DataType="screen:StrictnessChoiceViewModel">
-                  <Setter Property="IsEnabled" Value="{Binding IsEnabled}"/>
-                </Style>
-              </parts:SegmentedList.Styles>
-              <parts:SegmentedList.ItemTemplate>
-                <DataTemplate DataType="screen:StrictnessChoiceViewModel" x:DataType="screen:StrictnessChoiceViewModel">
-                  <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" AutomationProperties.Name="{Binding Label}"
-                              ToolTip.Tip="{Binding Tip}">
-                    <TextBlock Classes="segment" Theme="{StaticResource type-note}" Text="{Binding Label}"/>
-                    <parts:Icon IsVisible="{Binding IsCurrent}" Data="{StaticResource i-check}" Width="15" Height="15" StrokeThickness="2"
-                                Stroke="{DynamicResource ink}" Margin="6,0,0,0"/>
-                  </StackPanel>
-                </DataTemplate>
-              </parts:SegmentedList.ItemTemplate>
-            </parts:SegmentedList>
-            <Grid IsVisible="{Binding IsCustom}" ColumnDefinitions="Auto,*" ColumnSpacing="6" MaxWidth="640" HorizontalAlignment="Left" Margin="0,8,0,0">
-              <parts:Icon Data="{StaticResource i-lock-line}" Width="12" Height="12" Stroke="{DynamicResource ink-2}" VerticalAlignment="Top" Margin="0,4,0,0"/>
-              <TextBlock Grid.Column="1" Name="CustomNote" Theme="{StaticResource type-meta}" Foreground="{DynamicResource ink-2}"
-                         TextWrapping="Wrap" Text="{Binding CustomNote}"/>
-            </Grid>
-
-            <!-- What each word of the file does under each choice. It is not a control: the choice above is. -->
-            <StackPanel Margin="0,16,0,0" AutomationProperties.Name="What each word of the file does, by strictness">
-              <Border BorderBrush="{DynamicResource line}" BorderThickness="0,1,0,1">
-                <Grid ColumnDefinitions="132,*">
-                  <Border Classes="mxcell" VerticalAlignment="Stretch">
-                    <TextBlock Theme="{StaticResource type-meta}" Foreground="{DynamicResource ink-2}" VerticalAlignment="Center" Text="The file says"/>
-                  </Border>
-                  <ItemsControl Grid.Column="1" ItemsSource="{Binding Columns}" Focusable="False">
-                    <ItemsControl.ItemsPanel>
-                      <ItemsPanelTemplate>
-                        <UniformGrid Rows="1"/>
-                      </ItemsPanelTemplate>
-                    </ItemsControl.ItemsPanel>
-                    <ItemsControl.ItemTemplate>
-                      <DataTemplate DataType="screen:StrictnessColumnViewModel" x:DataType="screen:StrictnessColumnViewModel">
-                        <Panel>
-                          <Border IsVisible="{Binding IsInForce}" Background="{DynamicResource hover}"/>
-                          <Border IsVisible="{Binding IsInForce}" Height="4" VerticalAlignment="Top" Background="{DynamicResource here}"/>
-                          <Border Classes="mxcell">
-                            <TextBlock Classes.inforce="{Binding IsInForce}" Theme="{StaticResource type-meta}" Foreground="{DynamicResource ink-2}"
-                                       VerticalAlignment="Center" Text="{Binding Name}">
-                              <TextBlock.Styles>
-                                <Style Selector="TextBlock.inforce">
-                                  <Setter Property="Foreground" Value="{DynamicResource ink}"/>
-                                  <Setter Property="FontWeight" Value="SemiBold"/>
-                                </Style>
-                              </TextBlock.Styles>
-                            </TextBlock>
-                          </Border>
-                        </Panel>
-                      </DataTemplate>
-                    </ItemsControl.ItemTemplate>
-                  </ItemsControl>
-                </Grid>
-              </Border>
-              <ItemsControl ItemsSource="{Binding Rows}" Focusable="False">
-                <ItemsControl.ItemTemplate>
-                  <DataTemplate DataType="screen:StrictnessRowViewModel" x:DataType="screen:StrictnessRowViewModel">
-                    <Border BorderBrush="{DynamicResource line}" BorderThickness="0,0,0,1" AutomationProperties.Name="{Binding SpokenName}">
-                      <Grid ColumnDefinitions="132,*">
-                        <Border Classes="mxcell">
-                          <TextBlock Theme="{StaticResource code}" Foreground="{DynamicResource ink}" VerticalAlignment="Center" Text="{Binding Word}"/>
-                        </Border>
-                        <ItemsControl Grid.Column="1" ItemsSource="{Binding Cells}" Focusable="False">
-                          <ItemsControl.ItemsPanel>
-                            <ItemsPanelTemplate>
-                              <UniformGrid Rows="1"/>
-                            </ItemsPanelTemplate>
-                          </ItemsControl.ItemsPanel>
-                          <ItemsControl.ItemTemplate>
-                            <DataTemplate DataType="screen:StrictnessCellViewModel" x:DataType="screen:StrictnessCellViewModel">
-                              <Panel>
-                                <Border IsVisible="{Binding IsInForce}" Background="{DynamicResource hover}"/>
-                                <Border Classes="mxcell">
-                                  <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
-                                    <parts:EffectMark Classes.block="{Binding IsBlock}" Classes.warn="{Binding IsWarn}" Classes.off="{Binding IsOff}"
-                                                      Kind="{Binding Kind}" Width="16" Height="16" VerticalAlignment="Center"/>
-                                    <TextBlock Classes.off="{Binding IsOff}" Theme="{StaticResource type-body}" Foreground="{DynamicResource ink}"
-                                               VerticalAlignment="Center" Text="{Binding Word}">
-                                      <TextBlock.Styles>
-                                        <Style Selector="TextBlock.off">
-                                          <Setter Property="Foreground" Value="{DynamicResource ink-2}"/>
-                                        </Style>
-                                      </TextBlock.Styles>
-                                    </TextBlock>
-                                  </StackPanel>
-                                </Border>
-                              </Panel>
-                            </DataTemplate>
-                          </ItemsControl.ItemTemplate>
-                        </ItemsControl>
+            <StackPanel IsVisible="{Binding HasStrictness}">
+              <Grid ColumnDefinitions="116,*">
+                <TextBlock Theme="{StaticResource type-meta}" Foreground="{DynamicResource ink-2}" VerticalAlignment="Center"
+                           Margin="12,0,0,0" Text="The file says"/>
+                <parts:SegmentedList Grid.Column="1" Name="StrictnessChoice" Classes="segmented strictness" ItemsSource="{Binding Choices}"
+                                     Padding="2,4" ExplicitChoice="True" SelectedItem="{Binding SelectedChoice, Mode=TwoWay}"
+                                     AutomationProperties.Name="Strictness">
+                  <parts:SegmentedList.ItemTemplate>
+                    <DataTemplate DataType="screen:StrictnessChoiceViewModel" x:DataType="screen:StrictnessChoiceViewModel">
+                      <Grid ColumnDefinitions="*,Auto" HorizontalAlignment="Center">
+                        <TextBlock Classes="segment" Theme="{StaticResource type-note}" Text="{Binding Label}"
+                                   TextAlignment="Center" TextWrapping="Wrap" VerticalAlignment="Center"/>
+                        <parts:Icon Grid.Column="1" IsVisible="{Binding IsCurrent}" Data="{StaticResource i-check}" Width="15" Height="15"
+                                    StrokeThickness="2" Stroke="{DynamicResource ink}" Margin="6,0,0,0" VerticalAlignment="Center"/>
                       </Grid>
-                    </Border>
-                  </DataTemplate>
-                </ItemsControl.ItemTemplate>
-              </ItemsControl>
+                    </DataTemplate>
+                  </parts:SegmentedList.ItemTemplate>
+                </parts:SegmentedList>
+              </Grid>
+              <Border BorderBrush="{DynamicResource line}" BorderThickness="0,0,0,1" Margin="0,8,0,8" Padding="12,0,0,8">
+                <TextBlock Theme="{StaticResource type-meta}" Foreground="{DynamicResource ink-2}" Text="{Binding PresetNote}" TextWrapping="Wrap"/>
+              </Border>
+              <Grid ColumnDefinitions="116,4,*,4,*,4,*,4,*,4" AutomationProperties.Name="What each word of the file does, by strictness">
+                <ItemsControl Grid.ColumnSpan="10" ItemsSource="{Binding Rows}" Focusable="False">
+                  <ItemsControl.ItemTemplate>
+                    <DataTemplate DataType="screen:StrictnessRowViewModel" x:DataType="screen:StrictnessRowViewModel">
+                      <Border BorderBrush="{DynamicResource line}" BorderThickness="0,0,0,1" Height="45" AutomationProperties.Name="{Binding SpokenName}">
+                        <Grid ColumnDefinitions="116,*">
+                          <TextBlock Theme="{StaticResource code}" Foreground="{DynamicResource ink}" Margin="12,0,0,0"
+                                     VerticalAlignment="Center" Text="{Binding Word}"/>
+                          <ItemsControl Grid.Column="1" ItemsSource="{Binding Cells}" Margin="2,0" Focusable="False">
+                            <ItemsControl.ItemsPanel>
+                              <ItemsPanelTemplate>
+                                <UniformGrid Rows="1" Columns="4"/>
+                              </ItemsPanelTemplate>
+                            </ItemsControl.ItemsPanel>
+                            <ItemsControl.ItemTemplate>
+                              <DataTemplate DataType="screen:StrictnessCellViewModel" x:DataType="screen:StrictnessCellViewModel">
+                                <Panel Margin="2,0">
+                                  <Border IsVisible="{Binding IsInForce}" Background="{DynamicResource hover}"/>
+                                  <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center" HorizontalAlignment="Center">
+                                    <parts:EffectMark IsVisible="{Binding !IsPreview}" Classes.block="{Binding IsBlock}" Classes.warn="{Binding IsWarn}"
+                                                      Classes.off="{Binding IsOff}" Kind="{Binding Kind}" Width="14" Height="14" VerticalAlignment="Center"/>
+                                    <TextBlock Classes.off="{Binding IsOff}" Classes.preview="{Binding IsPreview}" Classes="effectword"
+                                               Theme="{StaticResource type-body}" VerticalAlignment="Center" Text="{Binding Word}"/>
+                                  </StackPanel>
+                                </Panel>
+                              </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                          </ItemsControl>
+                        </Grid>
+                      </Border>
+                    </DataTemplate>
+                  </ItemsControl.ItemTemplate>
+                </ItemsControl>
+                <ItemsControl Grid.Column="8" IsVisible="{Binding IsCustom}" ItemsSource="{Binding EffectEditors}" VerticalAlignment="Top">
+                  <ItemsControl.ItemTemplate>
+                    <DataTemplate x:DataType="screen:EffectEditorViewModel">
+                      <Border Background="{DynamicResource hover}" BorderBrush="{DynamicResource line}" BorderThickness="0,0,0,1"
+                              Height="45" Padding="4,0">
+                        <screen:EffectPicker MaxWidth="112" VerticalAlignment="Center"/>
+                      </Border>
+                    </DataTemplate>
+                  </ItemsControl.ItemTemplate>
+                </ItemsControl>
+              </Grid>
             </StackPanel>
 
-            <screen:MarkedText Theme="{StaticResource type-meta}" Foreground="{DynamicResource ink-2}" FontFeatures="+tnum" MaxWidth="640"
-                               HorizontalAlignment="Left" Margin="0,12,0,0" Marked="{Binding Sentence}"/>
+            <Border IsVisible="{Binding HasWriteFailure}" Classes="strictness-status">
+              <Grid ColumnDefinitions="16,*,Auto" ColumnSpacing="12">
+                <parts:EffectMark Classes="block" Kind="Block" Width="16" Height="16" VerticalAlignment="Center"/>
+                <TextBlock Grid.Column="1" Theme="{StaticResource type-meta}" TextWrapping="Wrap" VerticalAlignment="Center">
+                  <Run Text="{Binding WriteFailure}" FontWeight="Medium" Foreground="{DynamicResource block-ink}"/><Run Text=" "/><Run Text="{Binding FailureDetail}"/>
+                </TextBlock>
+                <Button Grid.Column="2" Classes="cf outlined small" Command="{Binding RetryStrictnessCommand}" AutomationProperties.Name="Try again">
+                  <StackPanel Orientation="Horizontal" Spacing="6">
+                    <parts:Icon Data="{StaticResource i-refresh}" Width="14" Height="14" VerticalAlignment="Center" Stroke="{DynamicResource ink-2}"/>
+                    <TextBlock Theme="{StaticResource type-meta-strong}" Text="Try again"/>
+                  </StackPanel>
+                </Button>
+              </Grid>
+            </Border>
+            <Border IsVisible="{Binding ShowsUndo}" Classes="strictness-status">
+              <Grid ColumnDefinitions="16,*,Auto" ColumnSpacing="12">
+                <parts:Icon Data="{StaticResource i-info}" Width="16" Height="16" Stroke="{DynamicResource ink-2}" VerticalAlignment="Center"/>
+                <TextBlock Grid.Column="1" Theme="{StaticResource type-meta}" Text="{Binding UndoText}" TextWrapping="Wrap" VerticalAlignment="Center"/>
+                <Button Grid.Column="2" Classes="cf outlined small" Command="{Binding UndoCommand}" AutomationProperties.Name="Undo">
+                  <StackPanel Orientation="Horizontal" Spacing="6">
+                    <parts:Icon Data="{StaticResource i-refresh}" Width="14" Height="14" VerticalAlignment="Center" Stroke="{DynamicResource ink-2}"/>
+                    <TextBlock Theme="{StaticResource type-meta-strong}" Text="Undo"/>
+                  </StackPanel>
+                </Button>
+              </Grid>
+            </Border>
+            <Border Name="StrictnessAnnouncement" AutomationProperties.LiveSetting="Polite" AutomationProperties.AccessibilityView="Content"
+                    IsHitTestVisible="False"/>
+
+            <screen:MarkedText Theme="{StaticResource type-body}" Foreground="{DynamicResource ink-2}" FontFeatures="+tnum" MaxWidth="640"
+                               HorizontalAlignment="Left" Margin="0,12,0,0" IsVisible="{Binding HasStrictness}" Marked="{Binding Sentence}"/>
           </StackPanel>
 
           <!-- Languages: a card per language, no switch. -->

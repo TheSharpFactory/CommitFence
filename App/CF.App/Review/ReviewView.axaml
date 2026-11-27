@@ -317,7 +317,7 @@
                   <ItemsControl.ItemTemplate>
                     <DataTemplate DataType="review:FolderPickerEntryViewModel" x:DataType="review:FolderPickerEntryViewModel">
                       <StackPanel>
-                        <Border IsVisible="{Binding StartsDialogs}" BorderBrush="{DynamicResource line}" BorderThickness="0,1,0,0" Margin="0,4,0,4"/>
+                        <Separator Classes="menu-divider" IsVisible="{Binding StartsDialogs}"/>
                         <Button Classes="pickerentry" Command="{Binding $parent[review:ReviewView].((review:ReviewViewModel)DataContext).PickEntryCommand}"
                                 CommandParameter="{Binding}" AutomationProperties.Name="{Binding SpokenName}">
                           <Grid ColumnDefinitions="*,Auto,20" ColumnSpacing="8">
@@ -452,7 +452,7 @@
                        Text="{Binding Verdict.LeadCode}"/><Run Text="{Binding Verdict.LeadAfter}"/>
             </TextBlock>
 
-            <review:FilesPanel Margin="0,20,0,0" IsVisible="{Binding IsOnePane}" DataContext="{Binding}"/>
+            <review:FilesPanel Classes="inline-other" Margin="0,20,0,0" IsVisible="{Binding IsOnePane}" DataContext="{Binding}"/>
           </StackPanel>
         </Border>
         <review:FilesPanel HorizontalAlignment="Right" VerticalAlignment="Top" Width="340" IsVisible="{Binding !IsOnePane}" DataContext="{Binding}"/>
@@ -667,7 +667,7 @@
                   </StackPanel>
 
                   <!-- In one pane the panel is one line under the verdict. -->
-                  <review:FilesPanel Margin="0,20,0,0" IsVisible="{Binding IsOnePane}" DataContext="{Binding}"/>
+                  <review:FilesPanel Classes="inline-other" Margin="0,20,0,0" IsVisible="{Binding IsOnePane}" DataContext="{Binding}"/>
 
                   <!-- An incomplete review: the reasons, in the form of findings; the tool's own message opens. -->
                   <StackPanel IsVisible="{Binding HasReasons}" Margin="0,20,0,0">
@@ -722,29 +722,9 @@
                     </Button>
                   </StackPanel>
 
-                  <!-- A clean push: the files it holds, each with a tick. They are not buttons. -->
-                  <StackPanel IsVisible="{Binding HasCleanPush}" Margin="0,20,0,0">
-                    <TextBlock Theme="{StaticResource type-meta}" Foreground="{DynamicResource ink-2}" VerticalAlignment="Center" MinHeight="36" Margin="8,0,0,0"
-                               Text="{Binding CleanPushLine}"/>
-                    <ItemsControl ItemsSource="{Binding CleanPushFiles}">
-                      <ItemsControl.ItemTemplate>
-                        <DataTemplate DataType="sys:String" x:DataType="sys:String">
-                          <Border BorderBrush="{DynamicResource line}" BorderThickness="0,1,0,0">
-                            <Grid ColumnDefinitions="Auto,Auto,*" ColumnSpacing="10" Height="44" Margin="8,0,12,0">
-                              <parts:Icon Data="{StaticResource i-check}" Width="16" Height="16" Stroke="{DynamicResource req-ink}" VerticalAlignment="Center"/>
-                              <parts:Icon Grid.Column="1" Data="{StaticResource i-file}" Width="16" Height="16" Stroke="{DynamicResource ink-3}" VerticalAlignment="Center"/>
-                              <TextBlock Grid.Column="2" Theme="{StaticResource code}" TextTrimming="PrefixCharacterEllipsis" VerticalAlignment="Center" Text="{Binding}"/>
-                            </Grid>
-                          </Border>
-                        </DataTemplate>
-                      </ItemsControl.ItemTemplate>
-                    </ItemsControl>
-                    <Border BorderBrush="{DynamicResource line}" BorderThickness="0,1,0,0"/>
-                    <StackPanel Orientation="Horizontal" Spacing="8" Margin="8,16,0,0" IsVisible="{Binding HasCleanPushMore}">
-                      <parts:Icon Data="{StaticResource i-check}" Width="15" Height="15" Stroke="{DynamicResource req-ink}"/>
-                      <TextBlock Theme="{StaticResource type-body}" Foreground="{DynamicResource ink-2}" Text="{Binding CleanPushMore}"/>
-                    </StackPanel>
-                  </StackPanel>
+                  <!-- A review with no findings: one line in the main column; every file is in the Files panel. -->
+                  <TextBlock IsVisible="{Binding HasCleanPush}" Theme="{StaticResource type-body}" Foreground="{DynamicResource ink-2}" TextWrapping="Wrap"
+                             MaxWidth="640" HorizontalAlignment="Left" Margin="0,20,0,0" Text="{Binding CleanPushLine}"/>
 
                   <!-- The files with their findings: the line above them. -->
                   <StackPanel IsVisible="{Binding HasFiles}" Margin="0,20,0,0">
@@ -933,12 +913,9 @@
                 <StackPanel DataContext="{Binding Model}" x:DataType="review:ReviewViewModel">
                   <Border IsVisible="{Binding HasFiles}" BorderBrush="{DynamicResource line}" BorderThickness="0,1,0,0"/>
 
-                  <!-- A folder review: the files without findings, after the list. -->
-                  <StackPanel Orientation="Horizontal" Spacing="8" Margin="8,16,0,0" IsVisible="{Binding HasFolderClean}">
-                    <parts:Icon Data="{StaticResource i-check}" Width="15" Height="15" Stroke="{DynamicResource req-ink}" VerticalAlignment="Top" Margin="0,2,0,0"/>
-                    <TextBlock Theme="{StaticResource type-body}" Foreground="{DynamicResource ink-2}" TextWrapping="Wrap" Text="{Binding FolderCleanLead}"/>
-                    <TextBlock Theme="{StaticResource code}" Foreground="{DynamicResource ink-2}" TextWrapping="Wrap" VerticalAlignment="Center" Text="{Binding FolderCleanNames}"/>
-                  </StackPanel>
+                  <Panel IsVisible="{Binding HasPanel}">
+                    <review:FilesPanel Classes="inline-result" Margin="0,32,0,0" IsVisible="{Binding IsOnePane}" DataContext="{Binding}"/>
+                  </Panel>
                 </StackPanel>
               </Border>
             </Border>

@@ -1,3 +1,4 @@
+using CF.Core.Findings;
 using CF.App.Parts;
 using CF.App.Shell;
 using CF.App.Updates;
@@ -32,9 +33,9 @@ internal sealed partial class SettingsViewModel : ObservableObject, IScreenModel
 
     private Task _choosing = Task.CompletedTask;
 
-    // the choices that have been made and not yet saved or refused: the table is drawn once the last of them has been
-    private int _choicesWaiting;
+    private StrictnessChange? _undo;
     private StrictnessReport? _report;
+    private StrictnessWrite? _refusedWrite;
 
     public SettingsViewModel(CommitFenceServices services, OpenedFolder folder, UpdatesViewModel updates, string installFolder, bool? followsSystemMotion = null)
     {
@@ -47,6 +48,12 @@ internal sealed partial class SettingsViewModel : ObservableObject, IScreenModel
         _followsSystemMotion = followsSystemMotion ?? OperatingSystem.IsWindows();
         VersionTitle = services.ProductInfo.Name + " " + services.ProductInfo.Version;
         Updates = updates;
+        EffectEditors = new List<EffectEditorViewModel>
+        {
+            new EffectEditorViewModel("error", ChangeEffect),
+            new EffectEditorViewModel("warning", ChangeEffect),
+            new EffectEditorViewModel("suggestion", ChangeEffect)
+        };
         Status = new UpdateStatusViewModel(updates, services.UpdateChecks, services.Clock);
         Notes = new ReleaseNotesViewModel(updates, services.ProductInfo);
         Facts = FactsOf(installFolder);
@@ -83,16 +90,37 @@ internal sealed partial class SettingsViewModel : ObservableObject, IScreenModel
     public IReadOnlyList<FactRowViewModel> Facts { get; }
 
     /// <summary>
-    /// The segments of the strictness choice: the three presets, and "Custom" while the file holds a mapping of its own.
+    /// The three presets and the choice to edit the mapping.
     /// </summary>
+    public IReadOnlyList<StrictnessChoiceViewModel> Choices { get; } =
+        Enum.GetValues<StrictnessPreset>().Select(preset => new StrictnessChoiceViewModel(preset)).ToList();
+
+    public IReadOnlyList<EffectEditorViewModel> EffectEditors { get; }
+
     [ObservableProperty]
-    public partial IReadOnlyList<StrictnessChoiceViewModel> Choices { get; private set; } = [];
+    public partial string PresetNote { get; private set; } = string.Empty;
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasWriteFailure))]
+    [NotifyPropertyChangedFor(nameof(ShowsUndo))]
+    public partial string? WriteFailure { get; private set; }
+
+    [ObservableProperty]
+    public partial string? FailureDetail { get; private set; }
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasUndo))]
+    [NotifyPropertyChangedFor(nameof(ShowsUndo))]
+    public partial string? UndoText { get; private set; }
+
+    public bool HasWriteFailure { get { return WriteFailure != null; } }
+    public bool HasUndo { get { return UndoText != null; } }
+    public bool ShowsUndo { get { return HasUndo && !HasWriteFailure; } }
+
+    public event Action<string>? StrictnessAnnounced;
 
     [ObservableProperty]
     public partial StrictnessChoiceViewModel? SelectedChoice { get; set; }
-
-    [ObservableProperty]
-    public partial IReadOnlyList<StrictnessColumnViewModel> Columns { get; private set; } = [];
 
     [ObservableProperty]
     public partial IReadOnlyList<StrictnessRowViewModel> Rows { get; private set; } = [];
@@ -132,19 +160,10 @@ internal sealed partial class SettingsViewModel : ObservableObject, IScreenModel
         get { return _report != null; }
     }
 
-    /// <summary>
-    /// Whether "Custom" is the strictness in force: the file's own mapping, which this screen does not edit.
-    /// </summary>
     public bool IsCustom
     {
         get { return _report?.Current.Preset == StrictnessPreset.Custom; }
     }
-
-    /// <summary>
-    /// Said under the choice while the file holds a mapping of its own: the presets are off until it is removed there. The words
-    /// never change; <see cref="IsCustom"/> decides whether they show.
-    /// </summary>
-    public string CustomNote { get; } = "This repository has a mapping of its own in commitfence.json. Remove it there to choose a preset.";
 
     /// <summary>
     /// Whether the "Reduce motion" switch stands (Linux and macOS); Windows says it itself and the row is text.
@@ -170,6 +189,12 @@ internal sealed partial class SettingsViewModel : ObservableObject, IScreenModel
     public async Task ShownAsync()
     {
         ShowsNotes = false;
+        await _choosing;
+        _undo = null;
+        _refusedWrite = null;
+        UndoText = null;
+        WriteFailure = null;
+        FailureDetail = null;
         await RefreshAsync();
     }
 
@@ -216,70 +241,149 @@ internal sealed partial class SettingsViewModel : ObservableObject, IScreenModel
 
     partial void OnSelectedChoiceChanged(StrictnessChoiceViewModel? value)
     {
-        foreach(var choice in Choices)
-        {
-            choice.IsCurrent = ReferenceEquals(choice, value);
-        }
-
         if(_showingChoice || value == null)
             return;
 
-        _choicesWaiting++;
-        _choosing = ChooseAfterAsync(_choosing, value);
+        QueueWrite(current => value.Preset == StrictnessPreset.Custom
+            ? current with { Preset = StrictnessPreset.Custom }
+            : Strictness.For(value.Preset));
     }
 
-    /// <summary>
-    /// The choices are saved one after the other, in the order they were made, each against what the file says once the one before is
-    /// in: the last choice is the one left in the file.
-    /// </summary>
-    private async Task ChooseAfterAsync(Task before, StrictnessChoiceViewModel choice)
+    private void ChangeEffect(string word, Severity? effect)
     {
-        await before;
-        try
-        {
-            await ChooseAsync(choice);
-        }
-        finally
-        {
-            _choicesWaiting--;
-        }
+        QueueWrite(current => EditEffect(current, word, effect), word);
     }
 
-    /// <summary>
-    /// The person chose a strictness: it is saved at once through the settings service, and the table, the sentence and the choice
-    /// follow. A refusal shows as a banner and the choice goes back to what the file says. While the file holds a mapping of its own,
-    /// a preset is not applied: it would replace that mapping, and the choice goes back.
-    /// </summary>
-    private async Task ChooseAsync(StrictnessChoiceViewModel choice)
+    [RelayCommand]
+    private void Undo()
     {
-        if(_report == null || choice.Preset == _report.Current.Preset)
+        _choosing = UndoAfterAsync(_choosing);
+    }
+
+    [RelayCommand]
+    private void RetryStrictness()
+    {
+        if(_refusedWrite is not { } write)
             return;
 
-        if(choice.IsCustom || IsCustom)
-        {
-            ShowReport(_report);
-            return;
-        }
+        _refusedWrite = null;
+        _choosing = WriteAfterAsync(_choosing, write);
+    }
 
-        BannerText = null;
+    private void QueueWrite(Func<Strictness, Strictness> change, string? word = null)
+    {
+        _choosing = WriteAfterAsync(_choosing, new StrictnessWrite(change, word));
+    }
+
+    private async Task UndoAfterAsync(Task previous)
+    {
+        await previous;
+        if(_undo is { } undo)
+            await WriteAfterAsync(Task.CompletedTask, new StrictnessWrite(_ => undo.Before, null, undo.Revision));
+    }
+
+    private async Task WriteAfterAsync(Task previous, StrictnessWrite write)
+    {
+        await previous;
+        string? failure = null;
         try
         {
-            await Task.Run(() => _settings.SetStrictness(_folderPath, choice.Preset));
+            var saved = await Task.Run(() => _settings.ChangeStrictness(_folderPath, write.Change, write.UndoRevision));
+            RememberUndo(saved, write.UndoRevision != null);
         }
         catch(SettingsException exception)
         {
-            BannerText = SettingsFileName.FormatError(_settingsPath, exception);
+            failure = SettingsFileName.FormatError(_settingsPath, exception);
         }
         catch(RuleChangeException exception)
         {
-            BannerText = exception.Message;
+            failure = exception.Message;
         }
 
-        var saved = await ReadReportAsync();
-        if(_choicesWaiting > 1)
-            _report = saved;
-        else
-            ShowReport(saved);
+        BannerText = null;
+        var report = await ReadReportAsync();
+        ShowReport(report);
+        UndoText = _undo is { } retained && report != null && !IsCustom ? DescribeUndo(retained.Before, report.Current) : null;
+        _refusedWrite = failure == null ? null : write;
+        FailureDetail = failure == null ? null : DescribeRefusal(report?.Current, write.Word);
+        WriteFailure = failure;
+
+        if(failure != null)
+        {
+            StrictnessAnnounced?.Invoke($"{failure} {FailureDetail}");
+            return;
+        }
+
+        if(report == null)
+        {
+            StrictnessAnnounced?.Invoke($"Saved at once. {BannerText}");
+            return;
+        }
+
+        var announcement = write.Word == null
+            ? $"{ChoiceName(report.Current.Preset)}. Saved at once."
+            : $"{EffectSentence(write.Word, report.Current.EffectOf(write.Word))}. Saved at once.";
+        StrictnessAnnounced?.Invoke(UndoText ?? announcement);
+    }
+
+    private sealed record StrictnessWrite(Func<Strictness, Strictness> Change, string? Word, string? UndoRevision = null);
+
+    private void RememberUndo(StrictnessChange saved, bool restored)
+    {
+        if(restored)
+            _undo = null;
+        else if(saved.Before.Preset == StrictnessPreset.Custom && saved.After.Preset != StrictnessPreset.Custom)
+            _undo = saved;
+        else if(_undo is { } undo && undo.Revision == saved.PreviousRevision)
+            _undo = undo with { Revision = saved.Revision };
+    }
+
+    private static Strictness EditEffect(Strictness current, string word, Severity? effect)
+    {
+        if(current.Preset != StrictnessPreset.Custom)
+            throw new RuleChangeException("Could not write commitfence.json: Your own is no longer chosen.");
+
+        return word switch
+        {
+            "error" => current with { Error = effect },
+            "warning" => current with { Warning = effect },
+            "suggestion" => current with { Suggestion = effect },
+            _ => throw new ArgumentOutOfRangeException(nameof(word))
+        };
+    }
+
+    private static string DescribeRefusal(Strictness? current, string? word)
+    {
+        if(current == null)
+            return "Your change was not kept.";
+
+        return word == null
+            ? $"Your change was not kept: {ChoiceName(current.Preset)} is still in force."
+            : $"Your change was not kept: {EffectSentence(word, current.EffectOf(word), " still")}.";
+    }
+
+    private string DescribeUndo(Strictness previous, Strictness current)
+    {
+        var differences = EffectEditors.Where(editor => previous.EffectOf(editor.Word) != current.EffectOf(editor.Word))
+            .Select(editor => EffectSentence(editor.Word, previous.EffectOf(editor.Word), past: true)).ToList();
+        var lead = $"{ChoiceName(current.Preset)} replaced your own";
+        return differences.Count == 0 ? lead + "." : $"{lead}, in which {string.Join(", ", differences)}.";
+    }
+
+    private static string EffectSentence(string word, Severity? effect, string still = "", bool past = false)
+    {
+        var verb = effect switch
+        {
+            Severity.Block => past ? "blocked a push" : "blocks a push",
+            Severity.Warn => past ? "warned" : "warns",
+            _ => past ? "was off" : "is off"
+        };
+        return word + still + " " + verb;
+    }
+
+    public static string ChoiceName(StrictnessPreset preset)
+    {
+        return preset == StrictnessPreset.Custom ? "Your own" : preset.ToString();
     }
 
     /// <summary>
@@ -324,26 +428,27 @@ internal sealed partial class SettingsViewModel : ObservableObject, IScreenModel
 
     private void ShowTable(StrictnessReport? report)
     {
+        SelectedChoice = report == null ? null : Choices.Single(choice => choice.Preset == report.Current.Preset);
+        foreach(var choice in Choices)
+            choice.IsCurrent = ReferenceEquals(choice, SelectedChoice);
+
         if(report == null)
-        {
-            Choices = [];
-            SelectedChoice = null;
-            Columns = [];
-            Rows = [];
-            Sentence = string.Empty;
             return;
-        }
 
-        var presets = new List<StrictnessPreset> { StrictnessPreset.Quiet, StrictnessPreset.Standard, StrictnessPreset.Strict };
-        if(report.Current.Preset == StrictnessPreset.Custom)
-            presets.Add(StrictnessPreset.Custom);
+        var current = report.Current;
+        var custom = current.Preset == StrictnessPreset.Custom;
+        Rows = report.Rows.Select(row => new StrictnessRowViewModel(row.Word, row.Effects.Take(3).Select((effect, column) =>
+            new StrictnessCellViewModel(effect, report.Columns[column] == current.Preset))
+            .Append(new StrictnessCellViewModel(current.EffectOf(row.Word), custom, isPreview: !custom, isAlwaysOff: custom && row.Word == "silent, none")).ToList())).ToList();
+        foreach(var editor in EffectEditors)
+            editor.Cell = new StrictnessCellViewModel(current.EffectOf(editor.Word), custom);
 
-        var custom = report.Current.Preset == StrictnessPreset.Custom;
-        Choices = presets.Select(preset => new StrictnessChoiceViewModel(preset, preset == StrictnessPreset.Custom || !custom)).ToList();
-        SelectedChoice = Choices.Single(choice => choice.Preset == report.Current.Preset);
-        Columns = report.Columns.Select(preset => new StrictnessColumnViewModel(preset.ToString(), preset == report.Current.Preset)).ToList();
-        Rows = report.Rows.Select(row => new StrictnessRowViewModel(row.Word, row.Effects.Select((effect, column) => new StrictnessCellViewModel(effect, report.Columns[column] == report.Current.Preset)).ToList())).ToList();
-        Sentence = $"With {report.Current.Preset}, **{report.Blocking}** rules of the file block a push, **{report.Warning}** only warn and **{report.Off}** are off. A rule whose effect was changed on Rules keeps it, and team rules keep the effect they were given. Saved at once.";
+        PresetNote = custom
+            ? "Your own: choose what each word does, in its column. Saved at once."
+            : $"Your own would start as {ChoiceName(current.Preset)}, shown in grey. Choose it to set each word yourself.";
+        var name = custom ? "your own" : ChoiceName(current.Preset);
+        var off = custom ? "silent and none mean a rule is never reported, so they stay off in your own too. " : string.Empty;
+        Sentence = $"{off}With {name}, **{report.Blocking}** rules of the file block a push, **{report.Warning}** only warn and **{report.Off}** are off. A rule whose effect was changed on Rules keeps it, and team rules keep the effect they were given.";
     }
 
     /// <summary>

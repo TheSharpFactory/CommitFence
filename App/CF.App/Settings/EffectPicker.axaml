@@ -1,0 +1,87 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:converters="using:Avalonia.Data.Converters"
+             xmlns:parts="using:CF.App.Parts"
+             xmlns:screen="using:CF.App.Settings"
+             x:Class="CF.App.Settings.EffectPicker"
+             x:ClassModifier="internal"
+             x:DataType="screen:EffectEditorViewModel">
+  <UserControl.Styles>
+    <Style Selector="Button.effect-box">
+      <Setter Property="ClipToBounds" Value="False"/>
+      <Setter Property="Template">
+        <ControlTemplate>
+          <Panel>
+            <Border Background="{DynamicResource page}" BorderBrush="{DynamicResource line-strong}" BorderThickness="1" CornerRadius="8"
+                    Padding="8,0">
+              <ContentPresenter Content="{TemplateBinding Content}" VerticalContentAlignment="Center" HorizontalContentAlignment="Stretch"/>
+            </Border>
+          </Panel>
+        </ControlTemplate>
+      </Setter>
+    </Style>
+    <Style Selector="Button.effect-option">
+      <Setter Property="Template">
+        <ControlTemplate>
+          <Border Name="OptionBackground" Padding="8,0" Background="Transparent" CornerRadius="8">
+            <ContentPresenter Content="{TemplateBinding Content}" HorizontalContentAlignment="Stretch" VerticalContentAlignment="Center"/>
+          </Border>
+        </ControlTemplate>
+      </Setter>
+    </Style>
+    <Style Selector="Button.effect-option:pointerover /template/ Border#OptionBackground, Button.effect-option:focus /template/ Border#OptionBackground">
+      <Setter Property="Background" Value="{DynamicResource hover}"/>
+    </Style>
+  </UserControl.Styles>
+
+  <Panel MinHeight="38">
+    <Border BorderBrush="{DynamicResource focus}" BorderThickness="2" CornerRadius="12" IsHitTestVisible="False">
+      <Border.IsVisible>
+        <MultiBinding Converter="{x:Static converters:BoolConverters.Or}">
+          <Binding Path="#Trigger.IsFocused"/>
+          <Binding Path="#Picker.IsOpen"/>
+        </MultiBinding>
+      </Border.IsVisible>
+      <Border BorderBrush="{DynamicResource focus-gap}" BorderThickness="2" CornerRadius="10"/>
+    </Border>
+    <screen:EffectPickerButton Name="Trigger" Classes="effect-box" Height="30" Margin="4"
+                               HorizontalAlignment="Stretch" FocusAdorner="{x:Null}" Click="OpenPicker"
+                               AutomationProperties.Name="{Binding Name}" EffectValue="{Binding Cell.Word}">
+      <Grid ColumnDefinitions="14,*,12" ColumnSpacing="6">
+        <parts:EffectMark Kind="{Binding Cell.Kind}" Classes.block="{Binding Cell.IsBlock}" Classes.warn="{Binding Cell.IsWarn}"
+                          Classes.off="{Binding Cell.IsOff}" Width="14" Height="14" VerticalAlignment="Center"/>
+        <TextBlock Grid.Column="1" Theme="{StaticResource type-body}" FontWeight="Medium" Text="{Binding Cell.Word}" TextTrimming="CharacterEllipsis"/>
+        <parts:Icon Grid.Column="2" Data="{StaticResource i-down}" Width="12" Height="12" Stroke="{DynamicResource ink-2}" VerticalAlignment="Center"/>
+      </Grid>
+    </screen:EffectPickerButton>
+
+    <Popup Name="Picker" PlacementTarget="{Binding #Trigger}" Placement="Custom"
+           ShouldUseOverlayLayer="True" IsLightDismissEnabled="True"
+           Opened="PickerOpened">
+      <Border Name="PickerSurface" Width="300" Background="{DynamicResource page}" BorderBrush="{DynamicResource line-strong}" BorderThickness="1"
+              CornerRadius="12" Padding="6" BoxShadow="{DynamicResource shadow-popup}">
+        <ScrollViewer HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
+          <ItemsControl Name="PickerOptions">
+            <ItemsControl.ItemTemplate>
+              <DataTemplate x:DataType="screen:EffectPickerOption">
+                <Button Classes="effect-option" Height="44" HorizontalAlignment="Stretch" FocusAdorner="{x:Null}" Click="ChooseEffect"
+                        AutomationProperties.Name="{Binding SpokenName}">
+                  <Grid ColumnDefinitions="14,*,14" ColumnSpacing="10">
+                    <parts:EffectMark Kind="{Binding Cell.Kind}" Classes.block="{Binding Cell.IsBlock}" Classes.warn="{Binding Cell.IsWarn}"
+                                      Classes.off="{Binding Cell.IsOff}" Width="14" Height="14" VerticalAlignment="Center"/>
+                    <StackPanel Grid.Column="1">
+                      <TextBlock Theme="{StaticResource type-body-strong}" Text="{Binding Cell.Word}"/>
+                      <TextBlock Theme="{StaticResource type-meta}" Foreground="{DynamicResource ink-2}" Text="{Binding Description}"/>
+                    </StackPanel>
+                    <parts:Icon Grid.Column="2" IsVisible="{Binding IsCurrent}" Data="{StaticResource i-check}"
+                                Width="14" Height="14" Stroke="{DynamicResource ink}" VerticalAlignment="Center"/>
+                  </Grid>
+                </Button>
+              </DataTemplate>
+            </ItemsControl.ItemTemplate>
+          </ItemsControl>
+        </ScrollViewer>
+      </Border>
+    </Popup>
+  </Panel>
+</UserControl>

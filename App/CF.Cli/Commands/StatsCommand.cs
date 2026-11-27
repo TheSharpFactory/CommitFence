@@ -1,4 +1,5 @@
 using CF.Core.Findings;
+using CF.Core.Ports;
 using CF.Core.Review;
 using CF.Core.Services;
 
@@ -54,6 +55,9 @@ internal sealed class StatsCommand(IStatsService stats, CommandEnvironment envir
     {
         output.WriteLine(report.Period);
         output.WriteLine($"{report.Totals.ReviewsText} in 30 days");
+        if(report.Sources.Count > 0)
+            output.WriteLine(string.Join(" ", report.Sources.Select(DescribeSource)));
+
         if(report.Totals.Total > 0)
             output.WriteLine(report.Totals.CountsText());
 
@@ -69,6 +73,17 @@ internal sealed class StatsCommand(IStatsService stats, CommandEnvironment envir
 
         foreach(var day in report.Days.Where(day => day.Total > 0))
             output.WriteLine($"  {day.Label(day.Date == report.Days[^1].Date)}: {day.ReviewsText}, {day.CountsText()}");
+    }
+
+    private static string DescribeSource(StatsSourceCount count)
+    {
+        return count.Source switch
+        {
+            ReviewSource.Hook => $"From the hook: {count.Total} {(count.Total == 1 ? "review" : "reviews")}, {count.Blocked} blocked.",
+            ReviewSource.CommandLine => $"From the command line: {count.Total}.",
+            ReviewSource.App => $"From Review: {count.Total}.",
+            _ => throw new ArgumentOutOfRangeException(nameof(count))
+        };
     }
 
     private static void WriteRules(TextWriter output, StatsReport report, bool showAll)

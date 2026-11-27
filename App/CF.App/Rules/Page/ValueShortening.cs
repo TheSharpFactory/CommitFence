@@ -1,3 +1,5 @@
+using System.Globalization;
+
 namespace CF.App.Rules.Page;
 
 /// <summary>
@@ -65,11 +67,15 @@ internal static class ValueShortening
         if(measure(text) <= room)
             return text;
 
-        var kept = text.Length - 1;
-        while(kept > 0 && measure(text[..kept] + _ellipsis) > room)
-            kept--;
+        var elements = StringInfo.ParseCombiningCharacters(text);
+        for(var kept = elements.Length - 1; kept > 0; kept--)
+        {
+            var cut = text[..elements[kept]] + _ellipsis;
+            if(measure(cut) <= room)
+                return cut;
+        }
 
-        return kept == 0 ? _ellipsis : text[..kept] + _ellipsis;
+        return _ellipsis;
     }
 
     /// <summary>
@@ -81,35 +87,37 @@ internal static class ValueShortening
         if(measure(text) <= room)
             return text;
 
-        var head = FirstFolder(text);
-        var tail = LastName(text);
-        if(head.Length > 0 && tail.Length > 0 && head.Length + tail.Length < text.Length && measure(head + _ellipsis + tail) <= room)
-            return head + _ellipsis + tail;
+        var elements = StringInfo.ParseCombiningCharacters(text);
+        var headEnd = FirstFolderEnd(text);
+        var tailStart = text.LastIndexOfAny(_separators);
+        if(headEnd > 0 && headEnd < tailStart && Array.BinarySearch(elements, headEnd) >= 0 && Array.BinarySearch(elements, tailStart) >= 0)
+        {
+            var path = text[..headEnd] + _ellipsis + text[tailStart..];
+            if(measure(path) <= room)
+                return path;
+        }
 
-        var kept = text.Length - 1;
-        while(kept > 0 && measure(Join(text, kept)) > room)
-            kept--;
+        for(var kept = elements.Length - 1; kept > 0; kept--)
+        {
+            var cut = Join(text, elements, kept);
+            if(measure(cut) <= room)
+                return cut;
+        }
 
-        return kept == 0 ? _ellipsis : Join(text, kept);
+        return _ellipsis;
     }
 
-    private static string Join(string text, int kept)
+    private static string Join(string text, int[] elements, int kept)
     {
         var front = (kept + 1) / 2;
         var back = kept / 2;
-        return text[..front] + _ellipsis + text[^back..];
+        var tailStart = back == 0 ? text.Length : elements[^back];
+        return text[..elements[front]] + _ellipsis + text[tailStart..];
     }
 
-    private static string FirstFolder(string text)
+    private static int FirstFolderEnd(string text)
     {
         var start = text.Length > 2 && text[1] == ':' ? 3 : 0;
-        var end = text.IndexOfAny(_separators, start);
-        return end < 0 || end >= text.Length - 1 ? string.Empty : text[..(end + 1)];
-    }
-
-    private static string LastName(string text)
-    {
-        var cut = text.LastIndexOfAny(_separators);
-        return cut <= 0 ? string.Empty : text[cut..];
+        return text.IndexOfAny(_separators, start) + 1;
     }
 }

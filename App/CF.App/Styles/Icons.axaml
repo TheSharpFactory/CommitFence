@@ -24,6 +24,8 @@
   <StreamGeometry x:Key="i-circle">M8 2.5a5.5 5.5 0 1 1 0 11a5.5 5.5 0 1 1 0-11z</StreamGeometry>
   <StreamGeometry x:Key="i-copy">M5.5 5.5h8v8h-8zM3 10.5h-.5v-8h8V3</StreamGeometry>
   <StreamGeometry x:Key="i-branch">M5 2.5a1.5 1.5 0 1 0 0 3 1.5 1.5 0 0 0 0-3zM5 10.5a1.5 1.5 0 1 0 0 3 1.5 1.5 0 0 0 0-3zM11 4.5a1.5 1.5 0 1 0 0 3 1.5 1.5 0 0 0 0-3zM5 5.5v5M11 7.5c0 2-6 1.5-6 3</StreamGeometry>
+  <StreamGeometry x:Key="i-varies">M8 2.5a5.5 5.5 0 1 0 0 11a5.5 5.5 0 1 0 0-11z</StreamGeometry>
+  <StreamGeometry x:Key="i-varies-fill">M8 2.5a5.5 5.5 0 0 0 0 11z</StreamGeometry>
   <StreamGeometry x:Key="i-off">M8 2.5a5.5 5.5 0 1 0 0 11 5.5 5.5 0 0 0 0-11zM5.5 8h5</StreamGeometry>
   <StreamGeometry x:Key="i-folder">M2 3.5h4.5l1.5 2h6v7H2z</StreamGeometry>
   <StreamGeometry x:Key="i-time">M8 2.5a5.5 5.5 0 1 0 0 11 5.5 5.5 0 0 0 0-11zM8 5v3l2 1.5</StreamGeometry>

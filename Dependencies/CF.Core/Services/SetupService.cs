@@ -74,7 +74,7 @@ public sealed class SetupService : ISetupService
 
     private void DescribeHook(HookEdit edit, bool print, List<string> lines)
     {
-        var path = edit.Path;
+        var path = DisplayPath(edit.Path);
         if(edit.HasReviewLine)
         {
             lines.Add($"{path} already contains the CommitFence line and was left as it is.");
@@ -109,7 +109,7 @@ public sealed class SetupService : ISetupService
         }
         catch(Exception exception) when(IsSetupFailure(exception))
         {
-            throw new IOException(Failure(edit.Path, exception), exception);
+            throw new IOException(Failure(path, exception), exception);
         }
 
         lines.Add($"Added the CommitFence line to {path} at line {edit.InsertionLine}.");
@@ -123,14 +123,15 @@ public sealed class SetupService : ISetupService
     private void DescribeInactiveHook(string path, List<string> lines)
     {
         if(_fileSystem.FileExists(path) && !_fileSystem.IsExecutable(path))
-            lines.Add($"{path} is inactive because it is not executable.");
+            lines.Add($"{DisplayPath(path)} is inactive because it is not executable.");
     }
 
     private static List<string> ManualHookInstructions(HookEdit edit)
     {
+        var path = DisplayPath(edit.Path);
         if(edit.ManualReason == null && edit.Manager == "lefthook")
         {
-            var advice = new List<string> { $"lefthook generated {edit.Path}.", LefthookAdvice.For(edit.ShownPath).ToString(), LefthookAdvice.Entry(edit.Kind) };
+            var advice = new List<string> { $"lefthook generated {path}.", LefthookAdvice.For(edit.ShownPath).ToString(), LefthookAdvice.Entry(edit.Kind) };
             if(edit.Kind == HookKind.PrePush)
                 advice.Add(LefthookAdvice.MergeHint.ToString());
 
@@ -142,8 +143,8 @@ public sealed class SetupService : ISetupService
             lines.Add(edit.ManualReason);
 
         lines.Add(edit.RunsGitLfs
-            ? $"To use this line in {edit.Path}, arrange for both commands to get the hook input:"
-            : $"Add this line as the first command of {edit.Path}:");
+            ? $"To use this line in {path}, arrange for both commands to get the hook input:"
+            : $"Add this line as the first command of {path}:");
         lines.Add(HookLine.For(edit.Kind));
         return lines;
     }
@@ -196,14 +197,14 @@ public sealed class SetupService : ISetupService
     /// <inheritdoc />
     public SetupReport AddHookLine(string folder, HookAddition addition)
     {
-        var shown = addition.Before.Path;
+        var shown = DisplayPath(addition.Before.Path);
         try
         {
             var repository = _git.FindRepository(folder);
             if(repository == null)
                 return new SetupReport([$"Could not write {shown}: the folder is not in a Git repository.", "Nothing was changed. Open a Git repository, then check again."], true);
 
-            shown = Path.GetRelativePath(repository.WorkFolder, shown).Replace('\\', '/');
+            shown = Path.GetRelativePath(repository.WorkFolder, addition.Before.Path).Replace('\\', '/');
             var edit = _hooks.Inspect(repository, addition.Kind);
             if(edit.ManualReason != null)
                 return new SetupReport([$"Could not write {shown}: the hook can no longer be edited here.", $"Nothing was changed. {edit.ManualReason} Check again."], true);
@@ -229,6 +230,11 @@ public sealed class SetupService : ISetupService
     private static string Failure(string name, Exception exception)
     {
         return $"Could not write {name}: {DoctorCheck.Message(exception).TrimEnd('.')}. Nothing was changed.";
+    }
+
+    private static string DisplayPath(string path)
+    {
+        return path.Replace(Path.AltDirectorySeparatorChar, Path.DirectorySeparatorChar);
     }
 
     private (string Message, bool Created) WriteStarterSettings(string repositoryFolder, bool print = false)

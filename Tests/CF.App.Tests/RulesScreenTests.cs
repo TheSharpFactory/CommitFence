@@ -1,5 +1,11 @@
 using System.Windows.Input;
+using Avalonia.Automation;
+using Avalonia.Automation.Peers;
+using Avalonia.Controls;
 using Avalonia.Headless.XUnit;
+using Avalonia.Input;
+using Avalonia.VisualTree;
+using CF.App.Parts;
 using CF.App.Rules;
 using CF.App.Rules.Page;
 using CF.App.Tests.Support;
@@ -60,6 +66,113 @@ public sealed class RulesScreenTests
         model.SearchText = string.Empty;
         model.SelectedFilter = model.Filters.First(segment => segment.Filter == RuleFilter.Off);
         Assert.Equal(new[] { "TEAM003", "IDE0005" }, host.RowIds());
+    }
+
+    [AvaloniaFact]
+    public void ScopedOnlyRuleShowsItsEffectAndScope()
+    {
+        var production = new FileRulePlace("src/**.cs", "error", FileRuleState.On, Severity.Block, 7, [], _ => true);
+        var rule = new FileRule("CA1822", "Mark members as static", ".editorconfig", "C#", null, [production]);
+        var row = new FileRuleRowViewModel(rule, _ => { });
+
+        Assert.Equal("Blocks", row.EffectWord);
+        Assert.False(row.IsUnset);
+        Assert.Equal("Blocks only in src/**.cs; not set elsewhere", Assert.Single(row.OtherEffects).Spoken);
+        Assert.Equal("CA1822, Mark members as static. Blocks only in src/**.cs; not set elsewhere. Set at line 7.", row.SpokenName);
+
+        row.Update(new FileRule(rule.Id, rule.Title, rule.File, rule.Language, null, [production, production with { Pattern = "tests/**.cs", Line = 10 }]));
+        Assert.Equal(2, row.VisiblePlaces.Count);
+        Assert.False(row.Varies);
+        Assert.Equal("not set elsewhere", row.ElsewhereText);
+        Assert.Contains("not set elsewhere", row.SpokenName, StringComparison.Ordinal);
+    }
+
+    [AvaloniaFact]
+    public void TwoWarningPlacesOpenTheirOwnLines()
+    {
+        var main = new FileRulePlace("*.cs", "warning", FileRuleState.On, Severity.Warn, 4, [], _ => true);
+        var payments = main with { Pattern = "src/Payments/**", Line = 9 };
+        var opened = new List<int>();
+        var rule = new FileRule("CA2007", "Consider calling ConfigureAwait", ".editorconfig", "C#", main, [payments]);
+        var row = new FileRuleRowViewModel(rule, opened.Add);
+
+        Assert.Equal("Warns", row.EffectWord);
+        Assert.False(row.Varies);
+        Assert.Equal(2, row.VisiblePlaces.Count);
+        Assert.False(row.ShowsLine);
+        Assert.Null(row.ElsewhereText);
+        row.MoveRight();
+        row.OpenFileCommand.Execute(null);
+        row.MoveRight();
+        row.OpenFileCommand.Execute(null);
+        Assert.Collection(opened, line => Assert.Equal(9, line), line => Assert.Equal(4, line));
+    }
+
+    [AvaloniaFact]
+    public void PlaceLinksFollowKeyboardOrderAndOpenTheirOwnLines()
+    {
+        var main = new FileRulePlace("*.cs", "warning", FileRuleState.On, Severity.Warn, 4, [], _ => true);
+        var production = new FileRulePlace("src/**.cs", "error", FileRuleState.On, Severity.Block, 7, [], _ => true);
+        var other = Enumerable.Range(8, 4).Select(line => production with { Line = line }).Prepend(production).ToList();
+        var rule = new FileRule("CA1822", "Mark members as static", ".editorconfig", "C#", main, other);
+        var opened = new List<int>();
+        var row = new FileRuleRowViewModel(rule, opened.Add);
+        var opensPage = false;
+        row.OpenPageRequested += () => opensPage = true;
+
+        Assert.Equal("line 7, line 8, line 4", string.Join(", ", row.VisiblePlaces.Select(place => place.LineText)));
+        Assert.Equal("3 more places", row.MorePlacesText);
+        for(var index = 0; index < row.VisiblePlaces.Count; index++)
+        {
+            row.MoveRight();
+            row.OpenFileCommand.Execute(null);
+        }
+
+        Assert.Equal("7, 8, 4", string.Join(", ", opened));
+        row.MoveRight();
+        row.OpenFileCommand.Execute(null);
+        Assert.True(opensPage);
+        row.MoveLeft();
+        row.OpenFileCommand.Execute(null);
+        Assert.Equal(4, opened[^1]);
+        row.ResetPart();
+        Assert.Equal(RowPart.Row, row.Part);
+    }
+
+    [AvaloniaFact]
+    public async Task AFilterDimsNonMatchingPlacesWithoutChangingTheRow()
+    {
+        var rule = RulesHost.ScopedRule();
+        using var host = new RulesHost(fileRules: [rule]);
+        await host.Loaded;
+        var model = host.Model;
+        var row = Assert.Single(model.Items.OfType<FileRuleRowViewModel>());
+        var places = row.VisiblePlaces;
+        var spoken = row.SpokenName;
+
+        Assert.Equal("line 18, line 21, line 24, line 14", string.Join(", ", places.Select(place => place.LineText)));
+        Assert.Contains("blocks everywhere else, line 14", spoken, StringComparison.Ordinal);
+        foreach(var filter in model.Filters)
+        {
+            Assert.True(filter.Count > 0);
+            model.SelectedFilter = filter;
+            Assert.Same(row, Assert.Single(model.Items.OfType<FileRuleRowViewModel>()));
+            Assert.Equal("Varies", row.EffectWord);
+            Assert.False(row.MarkIsBlock);
+            Assert.Same(places, row.VisiblePlaces);
+            Assert.Equal(filter.Filter switch
+            {
+                RuleFilter.All => [false, false, false, false],
+                RuleFilter.Blocks => [true, true, true, false],
+                RuleFilter.Warns => [false, true, true, true],
+                RuleFilter.Off => [true, false, false, true],
+                _ => throw new InvalidOperationException()
+            }, row.VisiblePlaces.Select(place => place.IsDimmed));
+            if(filter.Filter == RuleFilter.All)
+                Assert.Equal(spoken, row.SpokenName);
+            else
+                Assert.Contains(" Also: ", row.SpokenName, StringComparison.Ordinal);
+        }
     }
 
     [AvaloniaFact]
@@ -299,6 +412,178 @@ public sealed class RulesScreenTests
     }
 
     [AvaloniaFact]
+    public async Task DraftStaysFirstAndDoesNotCountUnderAnyFilterOrSearch()
+    {
+        using var host = new RulesHost();
+        await host.Loaded;
+        var model = host.Model;
+        var previous = model.SelectedItem;
+        var counts = model.Filters.Select(filter => filter.Count).ToArray();
+        var custom = model.Items.OfType<GroupHeadingViewModel>().First();
+        model.NewRule();
+        var draft = Assert.IsType<DraftRuleRowViewModel>(model.Items[1]);
+        draft.Page.Id = "  SEC-004";
+        Assert.Same(draft, model.Items[1]);
+        foreach(var filter in model.Filters)
+        {
+            model.SelectedFilter = filter;
+            model.SearchText = "does not match";
+            Assert.Same(draft, model.Items[1]);
+            Assert.Equal(0, custom.Count);
+            Assert.Equal(counts, model.Filters.Select(segment => segment.Count));
+        }
+
+        model.SearchText = "";
+        model.SelectedFilter = model.Filters[0];
+        model.DiscardDraft();
+        Assert.DoesNotContain(draft, model.Items);
+        Assert.Same(previous, model.SelectedItem);
+    }
+
+    [AvaloniaFact]
+    public async Task DraftIdIsCheckedWhileTypingAndAgainstTheFileWhenSaved()
+    {
+        using var host = new RulesHost();
+        await host.Loaded;
+        var model = host.Model;
+        using var window = new ViewHost(new RulesView { DataContext = model }, 1440, 900);
+        model.DuplicateRule("TEAM001");
+        window.Pump();
+
+        var page = Assert.IsType<RulePageViewModel>(model.CurrentPage);
+        var field = Assert.IsType<TextBox>(window.Find<TextBox>(box => AutomationProperties.GetName(box) == "Rule ID" && box.IsEffectivelyVisible));
+        Assert.True(field.IsFocused);
+        Assert.Equal(page.Id, field.SelectedText);
+        window.Type("team001");
+        Assert.Equal("Save adds it to commitfence.json. Until then it checks nothing.", page.HeadLine);
+        Assert.Empty(page.SaveBlockerText);
+        Assert.Null(page.SaveTip);
+        Assert.Null(window.Find<TextBlock>(text => text.Name == "IdText" && text.IsEffectivelyVisible));
+        Assert.Contains("TEAM001 is taken by", page.IdLine, StringComparison.Ordinal);
+        Assert.Contains("TEAM001", AutomationProperties.GetHelpText(field), StringComparison.Ordinal);
+        Assert.False(page.SaveCommand.CanExecute(null));
+        Assert.True(field.IsFocused);
+
+        page.Id = "";
+        Assert.Equal("A rule needs an ID.", page.IdLine);
+        page.Id = "SEC 004";
+        Assert.Equal("An ID uses letters, digits, - and _ only.", page.IdLine);
+        page.Id = "SEC/004";
+        Assert.Equal("An ID uses letters, digits, - and _ only.", page.IdLine);
+
+        page.Id = "SEC_004-v2";
+        Assert.True(page.SaveCommand.CanExecute(null));
+        host.Service.CopyRule(host.SettingsPath, "TEAM002", "sec_004-v2");
+        var before = host.SettingsBytes();
+        page.SaveCommand.Execute(null);
+
+        Assert.Same(page, model.CurrentPage);
+        Assert.Equal("sec_004-v2 is taken by “Copy of Methods are documented”.", page.IdLine);
+        Assert.False(page.SaveCommand.CanExecute(null));
+        Assert.Equal(before, host.SettingsBytes());
+
+        page.Id = "SEC-005";
+        page.SaveCommand.Execute(null);
+        Assert.Contains(host.StoredRules(), rule => rule.Id == "SEC-005");
+        Assert.False(model.CurrentPage!.IsDraft);
+    }
+
+    [AvaloniaFact]
+    public async Task GroupCountsAndNamesFollowFilterAndSearch()
+    {
+        using var host = new RulesHost(fileRules: [RulesHost.ScopedRule()]);
+        await host.Loaded;
+        var model = host.Model;
+        var groups = model.Items.OfType<GroupHeadingViewModel>().ToList();
+        Assert.Equal("Custom, 4 rules, expanded", groups[0].SpokenName);
+        model.SelectedFilter = model.Filters.Single(filter => filter.Filter == RuleFilter.Blocks);
+        Assert.Equal("Custom, 1 of 4 rules shown, expanded", groups[0].SpokenName);
+        Assert.Equal(".editorconfig, 1 of 1 rules shown, expanded", groups[1].SpokenName);
+        model.SearchText = "IDE0055";
+        Assert.Equal(0, groups[0].Count);
+        Assert.Equal(1, groups[1].Count);
+        Assert.Equal("Custom, 0 of 4 rules shown, expanded", groups[0].SpokenName);
+        groups[1].Toggle();
+        Assert.Equal(".editorconfig, 1 of 1 rules shown, collapsed", groups[1].SpokenName);
+        groups[1].Toggle();
+        Assert.Equal(".editorconfig, 1 of 1 rules shown, expanded", groups[1].SpokenName);
+    }
+
+    [AvaloniaFact]
+    public async Task TakenIdCanBeRepairedFromTheFieldOrLink()
+    {
+        using var host = new RulesHost();
+        await host.Loaded;
+        var model = host.Model;
+        using var window = new ViewHost(new RulesView { DataContext = model }, 1440, 900);
+        model.DuplicateRule("TEAM001");
+        window.Pump();
+        var page = model.CurrentPage!;
+        var field = window.Find<TextBox>(box => box.Name == "IdBox" && box.IsEffectivelyVisible)!;
+        var fix = window.Find<Button>(button => button.Name == "IdFix" && button.IsEffectivelyVisible);
+        Assert.Null(fix);
+
+        page.Id = "TEAM001";
+        window.Pump();
+        Assert.True(host.Row("TEAM001").HasIdClash);
+        Assert.Equal("Use TEAM005", page.IdFixLabel);
+        Assert.True(field.Focus(NavigationMethod.Tab));
+        window.Press(PhysicalKey.Tab);
+        fix = window.Find<Button>(button => button.Name == "IdFix" && button.IsEffectivelyVisible)!;
+        Assert.True(fix.IsFocused);
+        window.Press(PhysicalKey.Tab, RawInputModifiers.Shift);
+        Assert.True(field.IsFocused);
+        window.Press(PhysicalKey.Enter, RawInputModifiers.Alt);
+        Assert.Equal("TEAM005", page.Id);
+        Assert.False(host.Row("TEAM001").HasIdClash);
+        Assert.True(field.IsFocused);
+        Assert.Equal(page.Id.Length, field.CaretIndex);
+
+        page.Id = "SEC 004";
+        window.Pump();
+        window.Press(PhysicalKey.Tab);
+        window.Press(PhysicalKey.Space);
+        Assert.Equal("SEC-004", page.Id);
+        Assert.True(field.IsFocused);
+    }
+
+    [AvaloniaFact]
+    public async Task RefusedSaveFocusesTheIdAndTheSavedIdIsPlainText()
+    {
+        using var host = new RulesHost();
+        await host.Loaded;
+        var model = host.Model;
+        using var window = new ViewHost(new RulesView { DataContext = model }, 1440, 900);
+        model.DuplicateRule("TEAM001");
+        window.Pump();
+        var page = model.CurrentPage!;
+        page.Id = string.Empty;
+        var title = window.Find<TextBox>(box => box.Name == "TitleBox" && box.IsEffectivelyVisible)!;
+        Assert.True(title.Focus(NavigationMethod.Tab));
+        model.SaveOpenRule();
+        var field = window.Find<TextBox>(box => box.Name == "IdBox" && box.IsEffectivelyVisible)!;
+        Assert.True(field.IsFocused);
+        var save = window.Find<Button>(button => button.IsEffectivelyVisible && AutomationProperties.GetName(button) == "Save rule")!;
+        var peer = ControlAutomationPeer.CreatePeerForElement(save);
+        Assert.True(peer.IsEnabled());
+        Assert.Equal("A rule needs an ID. Press Save rule to go there.", peer.GetHelpText());
+        Assert.True(save.Focus(NavigationMethod.Tab));
+        window.Pump();
+        Assert.True(save.FindDescendantOfType<FocusRing>()!.IsVisible);
+        window.Press(PhysicalKey.Space);
+        Assert.True(field.IsFocused);
+
+        page.Id = "SEC-004";
+        model.SaveOpenRule();
+        window.Pump();
+        var label = window.Find<TextBlock>(text => text.Name == "IdText" && text.IsEffectivelyVisible)!;
+        Assert.Equal("SEC-004", label.Text);
+        Assert.False(label.Focusable);
+        Assert.True(string.IsNullOrEmpty(AutomationProperties.GetHelpText(label)));
+        Assert.Null(ToolTip.GetTip(label));
+    }
+
+    [AvaloniaFact]
     public async Task DuplicatingDisabledRulePreservesItsContentsAndPosition()
     {
         using var host = new RulesHost();
@@ -327,7 +612,7 @@ public sealed class RulesScreenTests
         Assert.Equal(source.ArtifactType, saved.ArtifactType);
         Assert.Equal(Conditions(source), Conditions(saved));
         Assert.Equal("TEAM005", model.SelectedRule?.Id);
-        Assert.Equal("TEAM005", host.RowIds()[host.RowIds().ToList().IndexOf("TEAM003") + 1]);
+        Assert.Equal("TEAM005", host.RowIds()[^1]);
     }
 
     [AvaloniaFact]
@@ -367,7 +652,11 @@ public sealed class RulesScreenTests
         using var host = new RulesHost(fileRules: [RulesHost.ScopedRule()]);
         await host.Loaded;
         var row = Assert.Single(host.Model.Items.OfType<FileRuleRowViewModel>());
-        Assert.Equal(new List<string> { "Warns for tests/**/*.cs, line 18", "Off for **/Generated/*.cs, line 21, and *.Designer.cs, line 24" }, row.ExceptionLines.Select(line => line.Text));
+        Assert.Collection(row.VisiblePlaces,
+            place => Assert.Equal("warns in tests/**/*.cs, line 18", place.SpokenName),
+            place => Assert.Equal("off in **/Generated/*.cs, line 21", place.SpokenName),
+            place => Assert.Equal("off in *.Designer.cs, line 24", place.SpokenName),
+            place => Assert.Equal("blocks everywhere else, line 14", place.SpokenName));
         host.Model.SelectedItem = row;
         Assert.Equal(new List<string> { "Open at line 14", "Open at line 18", "Open at line 21", "Open at line 24" }, host.Model.FilePage.Places.Select(place => place.ButtonText));
         var opened = 0;
@@ -399,9 +688,9 @@ public sealed class RulesScreenTests
         row.OpenFileCommand.Execute(null);
         Assert.Equal(Path.Combine(host.RepositoryPath, ".editorconfig") + ":4", Assert.Single(opened));
 
-        // the product does not change that file: the row has no command but the one that opens it, and a change asked for anyway is refused
+        // The row can open the source or the rule page, and the file still refuses a change.
         var commands = typeof(FileRuleRowViewModel).GetProperties().Where(property => typeof(ICommand).IsAssignableFrom(property.PropertyType)).Select(property => property.Name);
-        Assert.Equal(new[] { nameof(FileRuleRowViewModel.OpenFileCommand) }, commands);
+        Assert.Equal("OpenFileCommand, OpenPageCommand", string.Join(", ", commands.OrderBy(name => name, StringComparer.Ordinal)));
         var before = host.SettingsBytes();
         model.SetEnabled("CA1000", false);
         Assert.NotNull(model.BannerText);

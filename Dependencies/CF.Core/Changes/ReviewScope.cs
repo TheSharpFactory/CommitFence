@@ -30,10 +30,21 @@ public sealed class ReviewScope
     /// <summary>Whether to review without running the build.</summary>
     public bool Quick { get; private init; }
 
+    /// <summary>Whether a push review contributes to the review history.</summary>
+    public bool RecordsHistory { get; private init; } = true;
+
     /// <summary>Supplies the entry point without changing what is under review.</summary>
     public ReviewScope WithSource(ReviewSource source)
     {
-        return new ReviewScope(Kind, RemoteName, RemoteUrl, PushedRefs, BaseRevision, HeadRevision, TargetPath) { Source = source, Quick = Quick };
+        return new ReviewScope(Kind, RemoteName, RemoteUrl, PushedRefs, BaseRevision, HeadRevision, TargetPath)
+        { Source = source, Quick = Quick, RecordsHistory = RecordsHistory };
+    }
+
+    /// <summary>Uses the same scope for a fix lookup without recording a review.</summary>
+    public ReviewScope WithoutHistory()
+    {
+        return new ReviewScope(Kind, RemoteName, RemoteUrl, PushedRefs, BaseRevision, HeadRevision, TargetPath)
+        { Source = Source, Quick = Quick, RecordsHistory = false };
     }
 
     /// <summary>

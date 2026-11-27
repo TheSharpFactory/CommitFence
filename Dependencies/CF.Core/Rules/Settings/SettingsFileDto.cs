@@ -9,6 +9,9 @@ namespace CF.Core.Rules.Settings;
 /// </summary>
 internal sealed class SettingsFileDto
 {
+    [JsonPropertyName("$schema")]
+    public string? Schema { get; set; }
+
     [JsonPropertyName("requires")]
     public string? Requires { get; set; }
 

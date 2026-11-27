@@ -18,7 +18,7 @@ internal sealed class ReviewState
 
     public required string PanelHead { get; init; }
 
-    public required string CleanFilesText { get; init; }
+    public required CleanFilesViewModel? PanelClean { get; init; }
 
     public required string FilesLine { get; init; }
 
@@ -31,10 +31,6 @@ internal sealed class ReviewState
     public required string? ChosenRule { get; init; }
 
     public required string ShowAllText { get; init; }
-
-    public required string FolderCleanLead { get; init; }
-
-    public required string FolderCleanNames { get; init; }
 
     public required ReviewResult? Result { get; init; }
 
@@ -52,9 +48,5 @@ internal sealed class ReviewState
 
     public required bool AllReasonsShown { get; init; }
 
-    public required IReadOnlyList<string> CleanPushFiles { get; init; }
-
     public required string CleanPushLine { get; init; }
-
-    public required string CleanPushMore { get; init; }
 }

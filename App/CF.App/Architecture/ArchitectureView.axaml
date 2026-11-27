@@ -200,7 +200,7 @@
             <Button.Flyout>
               <MenuFlyout>
                 <MenuItem Header="Rename module" Click="OnRename"/>
-                <Separator/>
+                <Separator Classes="menu-divider"/>
                 <MenuItem Header="Remove module" Command="{Binding RemoveModuleCommand}">
                   <MenuItem.Icon><parts:Icon Data="{StaticResource i-bin}" Width="16" Height="16" Stroke="{DynamicResource block-ink}"/></MenuItem.Icon>
                 </MenuItem>

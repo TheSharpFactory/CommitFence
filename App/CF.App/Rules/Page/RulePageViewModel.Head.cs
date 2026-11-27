@@ -3,8 +3,7 @@ using CommunityToolkit.Mvvm.Input;
 namespace CF.App.Rules.Page;
 
 /// <summary>
-/// What the head of the page says in each of its three states. The head is one row in all of them: the state word, Discard, Save
-/// rule and the menu are always there, and the line under the title is never empty.
+/// What the head of the page says about saving the rule.
 /// </summary>
 internal enum SaveStateKind
 {
@@ -59,18 +58,67 @@ internal sealed partial class RulePageViewModel
             if(!IsUnsaved)
                 return SaveStateKind.Saved;
 
-            return SaveBlocker == null ? SaveStateKind.Unsaved : SaveStateKind.CannotSave;
+            return HasLocalRefusal || SaveBlocker == null ? SaveStateKind.Unsaved : SaveStateKind.CannotSave;
         }
     }
 
+    private bool HasLocalRefusal
+    {
+        get
+        {
+            return HasIdProblem || Paths.Any(path => path.HasInvalidDraft || path.IsInvalid)
+                || WhereFlow.OfType<ConditionViewModel>().Concat(RequireFlow).Any(condition => condition.IsConflicted)
+                || PendingRanges().Any(range => range.ComparisonPicker.PendingProblem != null);
+        }
+    }
+
+    public string? IdProblem
+    {
+        get { return IsDraft ? _changes.NewRuleIdProblem(Id) : null; }
+    }
+
+    public bool HasIdProblem
+    {
+        get { return IdProblem != null; }
+    }
+
+    public string IdStatus { get { return HasIdProblem ? "invalid" : string.Empty; } }
+
+    public string IdLine
+    {
+        get
+        {
+            return IdProblem ?? "The ID can be changed until the rule is saved.";
+        }
+    }
+
+    public string? SuggestedId { get { return IsDraft ? _changes.SuggestedRuleId(Id) : null; } }
+    public string? IdFixLabel { get { return SuggestedId is { } id ? $"Use {id}" : null; } }
+    public string? IdFixDescription { get { return IsDraft ? _changes.TakenRule(Id)?.Title : null; } }
+    public string? SaveButtonHelp { get { return SaveBlocker is { } blocker ? $"{blocker} Press Save rule to go there." : null; } }
+
+    public event Action<string>? IdFixed;
+
+    [RelayCommand]
+    private void UseSuggestedId()
+    {
+        if(SuggestedId is not { } id)
+            return;
+
+        Id = id;
+        IdFixed?.Invoke(id);
+    }
+
     /// <summary>
-    /// What prevents saving now, in the words the line under the title shows: the field and the reason. Nothing exactly when Save can
-    /// work. The state word, the reason and Save all read it, so they never disagree.
+    /// Why Save is unavailable, or null when the draft can be saved.
     /// </summary>
     public string? SaveBlocker
     {
         get
         {
+            if(IdProblem is { } idProblem)
+                return idProblem;
+
             var draft = Paths.FirstOrDefault(candidate => candidate.HasInvalidDraft);
             if(draft != null)
                 return $"Path {draft.FieldText.Trim()}: {draft.Problem}";
@@ -100,6 +148,9 @@ internal sealed partial class RulePageViewModel
     {
         get
         {
+            if(HasIdProblem)
+                return this;
+
             var draft = Paths.FirstOrDefault(candidate => candidate.HasInvalidDraft);
             if(draft != null)
                 return draft;
@@ -114,7 +165,7 @@ internal sealed partial class RulePageViewModel
 
             var conditions = WhereFlow.OfType<ConditionViewModel>().Concat(RequireFlow).ToList();
             var condition = conditions.FirstOrDefault(candidate => candidate.IsInvalid) ?? conditions.FirstOrDefault(candidate => candidate.IsConflicted);
-            return condition ?? conditions.FirstOrDefault(candidate => !candidate.IsComplete);
+            return condition ?? (HasTitle ? conditions.FirstOrDefault(candidate => !candidate.IsComplete) : null);
         }
     }
 
@@ -160,7 +211,7 @@ internal sealed partial class RulePageViewModel
 
     public string SaveStateSpoken
     {
-        get { return IsUnsavedState ? "Unsaved changes" : SaveStateWord; }
+        get { return IsUnsaved ? "Unsaved changes" : "Saved"; }
     }
 
     /// <summary>
@@ -170,6 +221,9 @@ internal sealed partial class RulePageViewModel
     {
         get
         {
+            if(IsDraft)
+                return "Save adds it to commitfence.json. Until then it checks nothing.";
+
             var saved = _changes.SavedWhen(Id);
             switch(SaveState)
             {
@@ -183,9 +237,16 @@ internal sealed partial class RulePageViewModel
         }
     }
 
+    public bool HeadLineShowsFile { get { return IsDraft || IsSavedState; } }
+
+    public bool HeadLineShowsPen
+    {
+        get { return IsUnsavedState && !IsDraft; }
+    }
+
     public bool HeadLineIsBad
     {
-        get { return IsCannotSaveState; }
+        get { return IsCannotSaveState && !IsDraft; }
     }
 
     /// <summary>
@@ -193,14 +254,11 @@ internal sealed partial class RulePageViewModel
     /// </summary>
     public string SaveBlockerText
     {
-        get { return IsUnsaved ? SaveBlocker ?? string.Empty : string.Empty; }
+        get { return IsUnsaved && !HasLocalRefusal ? SaveBlocker ?? string.Empty : string.Empty; }
     }
 
-    private string UnsavedLine(string? saved)
+    private static string UnsavedLine(string? saved)
     {
-        if(IsDraft)
-            return "Not saved yet. Save writes it to commitfence.json.";
-
         return saved == null
             ? "Changed since it was saved. Save writes it to commitfence.json."
             : $"Changed since it was saved {saved}. Save writes it to commitfence.json.";
@@ -212,11 +270,17 @@ internal sealed partial class RulePageViewModel
     public void DraftChanged()
     {
         RefreshHead();
-        SaveCommand.NotifyCanExecuteChanged();
     }
 
     private void RefreshHead()
     {
+        OnPropertyChanged(nameof(IdProblem));
+        OnPropertyChanged(nameof(HasIdProblem));
+        OnPropertyChanged(nameof(IdLine));
+        OnPropertyChanged(nameof(IdFixLabel));
+        OnPropertyChanged(nameof(IdFixDescription));
+        OnPropertyChanged(nameof(SaveButtonHelp));
+        OnPropertyChanged(nameof(IdStatus));
         OnPropertyChanged(nameof(HasOpenDraft));
         OnPropertyChanged(nameof(HasPendingEdit));
         OnPropertyChanged(nameof(IsUnsaved));
@@ -228,11 +292,14 @@ internal sealed partial class RulePageViewModel
         OnPropertyChanged(nameof(SaveStateSpoken));
         OnPropertyChanged(nameof(HeadLine));
         OnPropertyChanged(nameof(HeadLineIsBad));
+        OnPropertyChanged(nameof(HeadLineShowsPen));
+        OnPropertyChanged(nameof(HeadLineShowsFile));
         OnPropertyChanged(nameof(SaveBlocker));
         RefreshReasons();
         OnPropertyChanged(nameof(SaveBlockerText));
         OnPropertyChanged(nameof(SaveTip));
         OnPropertyChanged(nameof(CanSave));
+        SaveCommand.NotifyCanExecuteChanged();
     }
 
     /// <summary>
@@ -272,6 +339,5 @@ internal sealed partial class RulePageViewModel
     partial void OnIsSetupWritingChanged(bool value)
     {
         RefreshHead();
-        SaveCommand.NotifyCanExecuteChanged();
     }
 }

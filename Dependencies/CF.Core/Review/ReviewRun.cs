@@ -247,7 +247,7 @@ internal sealed class ReviewRun
         _advice.Add(sentence);
     }
 
-    public ReviewResult ToResult(TimeSpan duration, StructureJudgment? judgment = null, RepositoryLocation? repository = null, ChangeSet? onlyChange = null)
+    public ReviewResult ToResult(TimeSpan duration, StructureJudgment? judgment = null, RepositoryLocation? repository = null, ChangeSet? onlyChange = null, string remoteAddress = "")
     {
         ApplyPolicies(Strictness.Standard);
         var outcome = DecideOutcome();
@@ -271,6 +271,7 @@ internal sealed class ReviewRun
             TreeReviewed = onlyChange?.Tree ?? string.Empty,
             BaseTreeReviewed = onlyChange?.BeforeTree ?? string.Empty,
             CommitReviewed = onlyChange?.Commit ?? string.Empty,
+            RemoteAddress = remoteAddress,
             FindingTrees = _findingTrees.ToDictionary(entry => _findings[_findingPositions[entry.Key]], entry => (IReadOnlyList<string>)entry.Value)
         };
     }

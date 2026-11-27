@@ -1,0 +1,124 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:review="using:CF.App.Review"
+             xmlns:parts="using:CF.App.Parts"
+             x:Class="CF.App.Review.CleanFilesDisclosure"
+             x:ClassModifier="internal"
+             ClipToBounds="False"
+             x:DataType="review:CleanFilesViewModel">
+
+  <!-- The count of the clean files, a quiet control: a row 36 high with a 1 outline and no fill. Opened, the outline goes round the
+       whole card: the row, a filter when the list is longer than it can show, the list in whole rows, and the line that ends it. -->
+  <UserControl.Styles>
+    <Style Selector="ToggleButton.disclosure">
+      <Setter Property="MinHeight" Value="34"/>
+      <Setter Property="HorizontalAlignment" Value="Stretch"/>
+      <Setter Property="Background" Value="Transparent"/>
+      <Setter Property="Cursor" Value="Hand"/>
+      <Setter Property="Template">
+        <ControlTemplate>
+          <Border Name="Surface" Background="{TemplateBinding Background}" CornerRadius="9" Padding="10,0,12,0">
+            <ContentPresenter Content="{TemplateBinding Content}" HorizontalContentAlignment="Stretch" VerticalContentAlignment="Center"/>
+          </Border>
+        </ControlTemplate>
+      </Setter>
+    </Style>
+    <Style Selector="ToggleButton.disclosure:checked /template/ Border#Surface">
+      <Setter Property="CornerRadius" Value="9,9,0,0"/>
+    </Style>
+    <Style Selector="ToggleButton.disclosure:pointerover /template/ Border#Surface">
+      <Setter Property="Background" Value="{DynamicResource hover}"/>
+    </Style>
+    <Style Selector="Border.list-ring">
+      <Setter Property="IsVisible" Value="False"/>
+    </Style>
+    <Style Selector="Border.clean-region:focus-within Border.list-ring">
+      <Setter Property="IsVisible" Value="True"/>
+    </Style>
+    <Style Selector="Border.filter-box Border.filter-ring">
+      <Setter Property="IsVisible" Value="False"/>
+    </Style>
+    <Style Selector="Border.filter-box:focus-within Border.filter-ring">
+      <Setter Property="IsVisible" Value="True"/>
+    </Style>
+  </UserControl.Styles>
+
+  <Panel Name="Card" Margin="0,6,0,0" IsVisible="{Binding Name, FallbackValue='', Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
+    <parts:FocusRing Name="Ring" IsVisible="False" ControlRadius="10" GapBrush="{DynamicResource focus-gap}" LineBrush="{DynamicResource focus}"/>
+    <Border BorderBrush="{DynamicResource line-strong}" BorderThickness="1" CornerRadius="10" ClipToBounds="True">
+      <Expander Name="Disclosure" MinHeight="0" HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch"
+                IsExpanded="{Binding IsExpanded, Mode=TwoWay}" AutomationProperties.Name="{Binding Name}"
+                Collapsing="OnCollapsing">
+        <Expander.Template>
+          <ControlTemplate>
+            <StackPanel x:DataType="review:CleanFilesViewModel">
+              <ToggleButton Name="PART_Header" Classes="disclosure" IsChecked="{TemplateBinding IsExpanded, Mode=TwoWay}"
+                            AutomationProperties.Name="{Binding Name}">
+                <Grid ColumnDefinitions="14,*,14" ColumnSpacing="10">
+                  <parts:Icon IsVisible="{Binding !IsExpanded}" Data="{StaticResource i-right}" Width="14" Height="14"
+                              Stroke="{DynamicResource ink-2}" VerticalAlignment="Center"/>
+                  <parts:Icon IsVisible="{Binding IsExpanded}" Data="{StaticResource i-down}" Width="14" Height="14"
+                              Stroke="{DynamicResource ink-2}" VerticalAlignment="Center"/>
+                  <TextBlock Grid.Column="1" Theme="{StaticResource type-body}" FontWeight="Medium" VerticalAlignment="Center">
+                    <Run Text="{Binding CountText}" FontWeight="SemiBold" FontFeatures="+tnum"/><Run Text="{Binding CountSuffix}"/>
+                  </TextBlock>
+                  <parts:Icon Grid.Column="2" Data="{StaticResource i-check}" Width="14" Height="14"
+                              Stroke="{DynamicResource req-ink}" VerticalAlignment="Center"/>
+                </Grid>
+              </ToggleButton>
+              <ContentPresenter Content="{TemplateBinding Content}" IsVisible="{TemplateBinding IsExpanded}" HorizontalContentAlignment="Stretch"/>
+            </StackPanel>
+          </ControlTemplate>
+        </Expander.Template>
+        <StackPanel Name="OpenBody">
+          <Border BorderBrush="{DynamicResource line}" BorderThickness="0,1,0,0"/>
+
+          <Border Name="FilterBox" Classes="filter-box" IsVisible="{Binding FilterShown}" Height="32" Margin="6,6,6,2" CornerRadius="8"
+                  Background="{DynamicResource page}" BorderBrush="{DynamicResource line-strong}" BorderThickness="1" Padding="10,0,10,0">
+            <Panel>
+              <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="8">
+                <parts:Icon Data="{StaticResource i-search}" Width="14" Height="14" Stroke="{DynamicResource ink-3}" VerticalAlignment="Center"/>
+                <TextBox Name="Filter" Grid.Column="1" Classes="bare" Text="{Binding FilterText, Mode=TwoWay}" PlaceholderText="{Binding FilterPlaceholder}"
+                         FontSize="13" FontFamily="{Binding FilterText, Converter={x:Static review:CleanFilesDisclosure.QueryFont}}"
+                         AutomationProperties.Name="{Binding FilterName}" KeyDown="OnFilterKey"/>
+                <TextBlock Grid.Column="2" Theme="{StaticResource type-meta}" Foreground="{DynamicResource ink-2}" FontFeatures="+tnum" VerticalAlignment="Center"
+                           IsVisible="{Binding FilterText, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"
+                           AutomationProperties.LiveSetting="Polite" Text="{Binding FilterCountText}"/>
+              </Grid>
+              <Border Classes="filter-ring" IsHitTestVisible="False" BorderThickness="2" BorderBrush="{DynamicResource focus}" CornerRadius="8" Margin="-11,-1"/>
+            </Panel>
+          </Border>
+
+          <Border Name="ListRegion" Classes="clean-region" Margin="4,4,4,0" MaxHeight="28" IsVisible="{Binding HasRowsShown}">
+            <Panel>
+              <ItemsControl ItemsSource="{Binding VisibleRows}">
+                <ItemsControl.Template>
+                  <ControlTemplate>
+                    <ScrollViewer Name="CleanScroller" Focusable="True" IsTabStop="True"
+                                  HorizontalScrollBarVisibility="Disabled"
+                                  VerticalScrollBarVisibility="Auto" AllowAutoHide="False" IsScrollChainingEnabled="False"
+                                  AutomationProperties.Name="{Binding ListName, DataType=review:CleanFilesViewModel}">
+                      <ItemsPresenter ItemsPanel="{TemplateBinding ItemsPanel}"/>
+                    </ScrollViewer>
+                  </ControlTemplate>
+                </ItemsControl.Template>
+                <ItemsControl.ItemsPanel>
+                  <ItemsPanelTemplate><VirtualizingStackPanel/></ItemsPanelTemplate>
+                </ItemsControl.ItemsPanel>
+                <ItemsControl.ItemTemplate>
+                  <DataTemplate DataType="review:PanelFileViewModel" x:DataType="review:PanelFileViewModel">
+                    <review:FileRow/>
+                  </DataTemplate>
+                </ItemsControl.ItemTemplate>
+              </ItemsControl>
+              <Border Classes="list-ring" IsHitTestVisible="False" BorderThickness="2" BorderBrush="{DynamicResource focus}" CornerRadius="8"/>
+            </Panel>
+          </Border>
+
+          <TextBlock Name="Closing" Theme="{StaticResource type-meta}" Foreground="{DynamicResource ink-3}" Margin="14,6,12,8" TextWrapping="Wrap"
+                     AutomationProperties.LiveSetting="Polite" Text="{Binding ClosingText}"/>
+        </StackPanel>
+      </Expander>
+    </Border>
+  </Panel>
+</UserControl>

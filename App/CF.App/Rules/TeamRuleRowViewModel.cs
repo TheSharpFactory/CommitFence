@@ -15,6 +15,10 @@ internal sealed partial class TeamRuleRowViewModel : RuleListItemViewModel
     private readonly IRuleChanges _changes;
 
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(SpokenName))]
+    public partial bool HasIdClash { get; set; }
+
+    [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(RuleIsOff), nameof(SpokenName), nameof(EffectSpokenName), nameof(MarkIsBlock), nameof(MarkIsWarn), nameof(OffEffectWord))]
     public partial bool IsOn { get; set; }
 
@@ -185,7 +189,7 @@ internal sealed partial class TeamRuleRowViewModel : RuleListItemViewModel
     {
         get
         {
-            return $"{Id}, {Title}. Custom, for {ArtifactText} in {LanguageName}. {(IsOn ? "On" : "Off")}. {PushWords}.{(HasUnsavedEdits ? " Unsaved changes." : string.Empty)}";
+            return $"{Id}, {Title}. Custom, for {ArtifactText} in {LanguageName}. {(IsOn ? "On" : "Off")}. {PushWords}.{(HasUnsavedEdits ? " Unsaved changes." : string.Empty)}{(HasIdClash ? ", same ID as the new rule" : string.Empty)}";
         }
     }
 

@@ -1,3 +1,5 @@
+using System.Security.Cryptography;
+using System.Text;
 using CF.Core.Code;
 using CF.Core.Findings;
 using CF.Core.Ports;
@@ -48,12 +50,27 @@ public sealed class SettingsService : ISettingsService
     /// <inheritdoc />
     public Strictness SetStrictness(string folder, StrictnessPreset preset)
     {
+        return ChangeStrictness(folder, _ => Strictness.For(preset)).After;
+    }
+
+    /// <inheritdoc />
+    public StrictnessChange ChangeStrictness(string folder, Func<Strictness, Strictness> change, string? expectedRevision = null)
+    {
         var path = SettingsFileName.PathIn(folder);
-        var strictness = Strictness.For(preset);
         using var held = SettingsSaver.TakeLock(_settingsLock, path);
-        var text = _file.ReadText(path);
+        var (text, previousRevision) = _file.ReadVersion(path);
+        if(expectedRevision != null && expectedRevision != previousRevision)
+            throw new RuleChangeException("Could not undo: commitfence.json changed on disk.");
+
         var settings = _file.Parse(text);
-        _saver.Save(path, text, new RuleSettings(settings.Requires, settings.Rules, settings.Structure, strictness));
-        return strictness;
+        var before = settings.Strictness;
+        var after = change(before);
+        if(after == settings.ConfiguredStrictness)
+            return new StrictnessChange(before, after, previousRevision, previousRevision);
+
+        var saved = _saver.SaveStrictness(path, text, new RuleSettings(settings.Requires, settings.Rules, settings.Structure, after, settings.Schema), previousRevision);
+        // The file system port writes UTF-8 without a byte order mark.
+        var revision = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(saved)));
+        return new StrictnessChange(before, after, previousRevision, revision);
     }
 }

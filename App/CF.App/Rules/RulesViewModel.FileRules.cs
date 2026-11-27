@@ -1,6 +1,5 @@
 using Avalonia.Threading;
 using CF.Core.Code;
-using CF.Core.Findings;
 using CF.Core.Rules;
 using CF.Core.Rules.Settings;
 
@@ -93,7 +92,15 @@ internal sealed partial class RulesViewModel
             if(_fileRows.TryGetValue(rule.Id, out var row))
                 row.Update(rule);
             else
-                _fileRows[rule.Id] = new FileRuleRowViewModel(rule, OpenEditorConfigLine);
+            {
+                row = new FileRuleRowViewModel(rule, OpenEditorConfigLine);
+                row.OpenPageRequested += () =>
+                {
+                    SelectedItem = row;
+                    OpenSelectedRule();
+                };
+                _fileRows[rule.Id] = row;
+            }
         }
 
         if(SelectedItem is FileRuleRowViewModel selected && _fileRows.TryGetValue(selected.Id, out var current))
@@ -118,7 +125,8 @@ internal sealed partial class RulesViewModel
     {
         var hasFile = FileRulesAreRead && _fileProblem == null && _fileName != null;
         _fileHeading.ShowsCount = hasFile;
-        _fileHeading.Count = _fileRules.Count;
+        _fileHeading.TotalCount = _fileRules.Count;
+        _fileHeading.IsFiltered = IsListFiltered;
         _fileHeading.HasOpenFile = hasFile;
         _fileHeading.NoteHasLock = FileRulesAreRead;
         _fileHeading.Note = FileRulesAreRead ? _fileNote : _readingNote;
@@ -126,6 +134,8 @@ internal sealed partial class RulesViewModel
 
     private IEnumerable<RuleListItemViewModel> CreateFileGroupItems()
     {
+        var shown = _fileRules.Where(rule => PassesFile(SelectedFilter.Filter, rule) && MatchesFileSearch(rule)).ToList();
+        _fileHeading.Count = shown.Count;
         yield return _fileHeading;
         if(!_fileHeading.IsExpanded || !FileRulesAreRead)
             yield break;
@@ -145,23 +155,23 @@ internal sealed partial class RulesViewModel
         foreach(var note in _fileNotes)
             yield return new GroupNoteViewModel(note, true);
 
-        var shown = _fileRules.Where(rule => PassesFile(SelectedFilter.Filter, rule) && MatchesFileSearch(rule)).ToList();
         if(shown.Count == 0 && SearchText.Trim().Length == 0)
             yield return new GroupNoteViewModel(EmptyFileGroupText(), _fileRules.Count > 0);
 
         foreach(var rule in shown)
-            yield return _fileRows[rule.Id];
+        {
+            var row = _fileRows[rule.Id];
+            row.ApplyFilter(SelectedFilter.Filter);
+            yield return row;
+        }
     }
 
     private static bool PassesFile(RuleFilter filter, FileRule rule)
     {
-        var place = rule.ListedPlace;
         return filter switch
         {
             RuleFilter.All => true,
-            RuleFilter.Blocks => place?.State == FileRuleState.On && place.Severity == Severity.Block,
-            RuleFilter.Warns => place?.State == FileRuleState.On && place.Severity == Severity.Warn,
-            RuleFilter.Off => place?.State == FileRuleState.Off,
+            RuleFilter.Blocks or RuleFilter.Warns or RuleFilter.Off => rule.Places.Any(place => FileRuleRowViewModel.MatchesEffect(place, filter)),
             _ => throw new ArgumentOutOfRangeException(nameof(filter), filter, null)
         };
     }

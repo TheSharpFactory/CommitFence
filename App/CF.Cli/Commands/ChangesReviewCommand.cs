@@ -20,6 +20,7 @@ internal sealed class ChangesReviewCommand
     private readonly string _programFolder;
     private readonly string? _settingsPath;
     private readonly ReviewArguments _arguments;
+    private readonly CommandEnvironment _environment;
 
     public ChangesReviewCommand(IProductInfoService productInfo, IReviewService reviewService, CommandEnvironment environment, string? settingsPath, ReviewArguments arguments)
     {
@@ -32,11 +33,12 @@ internal sealed class ChangesReviewCommand
         _programFolder = environment.ProgramFolder;
         _settingsPath = settingsPath;
         _arguments = arguments;
+        _environment = environment;
     }
 
     public ExitCode Run()
     {
-        if(!_arguments.AsPrompt)
+        if(!_arguments.ReplacesConsoleText)
             _output.WriteLine($"{_productInfo.Name} {_productInfo.Version} ({_programFolder})");
 
         var scope = CreateScope();
@@ -44,17 +46,13 @@ internal sealed class ChangesReviewCommand
             return ExitCode.BadSettingsOrUsage;
 
         var result = _reviewService.ReviewChanges(_currentFolder, scope, _settingsPath);
-        Report(result);
 
-        return result.ExitCode;
+        return Report(result);
     }
 
-    private void Report(ReviewResult result)
+    private ExitCode Report(ReviewResult result)
     {
-        if(_arguments.AsPrompt)
-            new PromptReporter(_output).Write(result);
-        else
-            new PlainTextReporter(_output, countByRule: _arguments.Mode == ReviewMode.All).Write(result);
+        return new ReviewReportWriter(_arguments, _environment, _arguments.AsSarif ? _productInfo.Version : string.Empty, _currentFolder, countByRule: _arguments.Mode == ReviewMode.All).Write(result);
     }
 
     private ReviewScope? CreateScope()
@@ -78,7 +76,7 @@ internal sealed class ChangesReviewCommand
     {
         var answer = _reviewService.FindPushScope(_currentFolder);
         if(!answer.HasPush)
-            (_arguments.AsPrompt ? _error : _output).WriteLine("No push to review: " + answer.Reason);
+            (_arguments.ReplacesConsoleText ? _error : _output).WriteLine("No push to review: " + answer.Reason);
 
         return answer.Scope;
     }

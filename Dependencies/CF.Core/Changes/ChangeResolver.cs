@@ -75,6 +75,6 @@ public sealed class ChangeResolver
         var tree = _git.ResolveTree(repository, headCommit)
             ?? throw new ScopeException($"'{scope.HeadRevision}' has no tree");
 
-        return builder.Build($"{scope.BaseRevision}..{scope.HeadRevision}", baseCommit, tree);
+        return builder.Build($"{scope.BaseRevision}..{scope.HeadRevision}", baseCommit, tree).WithCommit(headCommit);
     }
 }

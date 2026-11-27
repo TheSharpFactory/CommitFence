@@ -31,6 +31,12 @@ internal interface IRuleChanges
     /// </summary>
     string? AddRule(RuleDraft draft, string? afterRuleId);
 
+    string? NewRuleIdProblem(string id);
+
+    string? SuggestedRuleId(string id);
+
+    RuleDefinition? TakenRule(string id);
+
     /// <summary>
     /// Opens the page of a new rule that is a copy of this one, not saved yet. Saving it puts it right after the rule.
     /// </summary>

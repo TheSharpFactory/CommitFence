@@ -3,6 +3,68 @@
 What changed in each published release of CommitFence, newest first. Each section is also the text of that release on
 GitHub, with its downloads.
 
+## 1.0.0.7 — 2026-11-27
+
+### Build servers and editors
+
+- **A SARIF report:** `commitfence review ... --format sarif` prints the findings as a SARIF 2.1.0 log for build servers
+  and GitHub code scanning; `--output <file>` writes the report to a file and keeps the plain text on the console. The
+  log names the reviewed commit and the remote, names files by their repository paths, shows no path of the machine,
+  keeps findings set aside as accepted suppressions, and says when the review could not cover everything. A report
+  that cannot be written fails a review that would have passed (exit code 3). The README shows a GitHub Actions job.
+- **A JSON Schema for `commitfence.json`**, at `https://commitfence.com/schema/commitfence.schema.json`: an editor
+  completes and checks the keys, the things a rule can be about and each one's properties. The file may name it with
+  a `"$schema"` key, kept first when the file is saved; such a file asks for CommitFence 1.0.0.7.
+
+### The app
+
+- **Settings sets your own strictness:** "Your own" chooses what `error`, `warning` and `suggestion` do to a push, each
+  in its column, saved at once; going back to a preset can be undone, and a refused save can be tried again.
+- **Rules:**
+  - A new rule's ID is chosen before saving. A refused ID is said once, beside the field, with a way out
+    ("Use TEAM006"). A rule of the same ID in the list is marked.
+  - A new rule is first in the list, marked "Not saved yet", until it is saved.
+  - A rule of `.editorconfig` set in several places lists every place on its own line, with its effect and a link to
+    its line. When the places differ, its effect reads "Varies" and the row looks the same under every filter. Under
+    a filter, the places that do not match are dimmed.
+  - A rule of `.editorconfig` is listed under every effect it has.
+  - "Save rule", while a rule cannot be saved, says why and takes you to what is in the way.
+  - Every tooltip in the app is dark.
+- **Review lists every file a review covered,** one row each, long paths cut at folder boundaries. The files without
+  findings open in a list you can filter. A review with no findings shows its files in the Files panel.
+- `commitfence stats` says where reviews came from: the hook, the command line or the app's Review.
+
+### Fixes
+
+- A review no longer stops when the address of the remote cannot be read.
+- Applying a fix is no longer recorded as a review.
+- A finding with no file is no longer counted or listed as a file; a rule chosen in a folder review keeps every file
+  listed.
+- Review no longer shows an empty card under the files when every clean file is already listed.
+- Changing the structure of a file that has a `"$schema"` line or newer rule features raises the version it asks for.
+- Strictness saves and Undo are protected from changes made to the file meanwhile.
+- Rule tooltips stay inside the window and clear of the condition they describe; shortened values keep whole
+  characters.
+- Setup paths use one kind of separator.
+
+### Known limits
+
+- The copied setup commands use `&&`: they run in PowerShell 7 and in git's own shells, not in Windows PowerShell 5.1.
+- lefthook does not escape the hook's arguments: a remote name or URL holding `"`, `$` or a backtick is read by the shell.
+- A copied Windows command whose hook path holds an apostrophe does not run as copied.
+- The GitHub code scanning upload has not been tried on a hosted runner yet.
+
+### Downloads
+
+| Download | What |
+|---|---|
+| `CommitFence-win-x64.zip`, `CommitFence-win-arm64.zip` | The app for Windows, with the command line beside it |
+| `CommitFence-osx-arm64.zip`, `CommitFence-osx-x64.zip` | The app for macOS (Apple silicon, Intel) |
+| `CommitFence-linux-x64.tar.gz` | The app for Linux |
+| `commitfence-cli-*` | The command line, `commitfence`, for the same systems |
+
+---
+
 ## 1.0.0.6 — 2026-11-26
 
 ### Rules

@@ -4,9 +4,11 @@ using System.IO.Compression;
 using System.Net;
 using System.Security.Cryptography;
 using System.Text;
+using System.Text.Json;
 using CF.Adapters.Updates;
 using CF.Core.Ports;
 using CF.Core.Updates;
+using CF.Tests.Wire;
 
 namespace CF.Tests;
 
@@ -401,17 +403,19 @@ internal static class ReleaseFixtures
     /// </summary>
     public static string ComposeReleaseJson(string tag, string packageName, bool withChecksums, string body = "Better things.")
     {
-        var assets = new StringBuilder();
-        assets.Append($"{{\"name\":\"{packageName}\",\"browser_download_url\":\"{LocalFeed.Address}{packageName}\"}}");
-        assets.Append($",{{\"name\":\"other-download.zip\",\"browser_download_url\":\"{LocalFeed.Address}other-download.zip\"}}");
+        var assets = new List<ReleaseAssetWire>
+        {
+            new ReleaseAssetWire(packageName, LocalFeed.Address + packageName),
+            new ReleaseAssetWire("other-download.zip", LocalFeed.Address + "other-download.zip")
+        };
         if(withChecksums)
         {
-            assets.Append($",{{\"name\":\"SHA256SUMS.txt\",\"browser_download_url\":\"{LocalFeed.Address}SHA256SUMS.txt\"}}");
-            assets.Append($",{{\"name\":\"SHA256SUMS.txt.sig\",\"browser_download_url\":\"{LocalFeed.Address}SHA256SUMS.txt.sig\"}}");
+            assets.Add(new ReleaseAssetWire("SHA256SUMS.txt", LocalFeed.Address + "SHA256SUMS.txt"));
+            assets.Add(new ReleaseAssetWire("SHA256SUMS.txt.sig", LocalFeed.Address + "SHA256SUMS.txt.sig"));
         }
 
-        var bodyJson = System.Text.Json.JsonSerializer.Serialize(body);
-        return $"{{\"tag_name\":\"{tag}\",\"html_url\":\"https://github.com/TheSharpFactory/CommitFence/releases/tag/{tag}\",\"body\":{bodyJson},\"assets\":[{assets}]}}";
+        var release = new ReleaseWire(tag, "https://github.com/TheSharpFactory/CommitFence/releases/tag/" + tag, body, assets);
+        return JsonSerializer.Serialize(release, WireJsonContext.Default.ReleaseWire);
     }
 
     /// <summary>

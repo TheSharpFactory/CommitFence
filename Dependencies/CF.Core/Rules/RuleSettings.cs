@@ -10,13 +10,14 @@ public sealed class RuleSettings
     /// <summary>
     /// Creates the settings.
     /// </summary>
-    public RuleSettings(string? requires, IReadOnlyList<RuleDefinition> rules, StructureRules structure, Strictness? configuredStrictness = null)
+    public RuleSettings(string? requires, IReadOnlyList<RuleDefinition> rules, StructureRules structure, Strictness? configuredStrictness = null, string? schema = null)
     {
         Requires = requires;
         Rules = rules;
         ActiveRules = rules.Where(rule => rule.Enabled).ToList();
         Structure = structure;
         ConfiguredStrictness = configuredStrictness;
+        Schema = schema;
     }
 
     /// <summary>The strictness in force, including the default when no key was written.</summary>
@@ -27,6 +28,9 @@ public sealed class RuleSettings
 
     /// <summary>The strictness explicitly written in the settings file, if any.</summary>
     public Strictness? ConfiguredStrictness { get; }
+
+    /// <summary>The address of the JSON schema the file names for editors, as written; nothing when the file has no $schema key.</summary>
+    public string? Schema { get; }
 
     /// <summary>
     /// The lowest version of the product the repository accepts, as written; nothing when not stated.

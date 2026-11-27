@@ -1,6 +1,11 @@
+using Avalonia;
+using Avalonia.Automation;
+using Avalonia.Automation.Peers;
+using Avalonia.Automation.Provider;
 using Avalonia.Controls;
 using Avalonia.Headless.XUnit;
 using Avalonia.Input;
+using Avalonia.Layout;
 using Avalonia.Threading;
 using Avalonia.VisualTree;
 using CF.App.Parts;
@@ -25,7 +30,7 @@ public sealed class SettingsScreenTests
     private Task? _running;
 
     [AvaloniaFact]
-    public async Task ChoosingStrictCallsTheServiceAndTheTableFollowsARefusalShowsTheBannerAndCustomStandsOnlyForACustomMapping()
+    public async Task MovingThroughPresetsDoesNotWriteUntilTheChoiceIsActivated()
     {
         using var shell = new ShellHost();
         var model = shell.Model.Settings;
@@ -33,61 +38,165 @@ public sealed class SettingsScreenTests
         await model.RefreshAsync();
         host.Pump();
 
-        // the choice, the column in force, the sentence with its three counts, and the card of the one language
-        Assert.Equal(["Quiet", "Standard", "Strict"], model.Choices.Select(choice => choice.Label));
+        Assert.Equal(["Quiet", "Standard", "Strict", "Your own"], model.Choices.Select(choice => choice.Label));
         Assert.Equal("Standard", model.SelectedChoice?.Label);
-        Assert.Equal(["Standard"], model.Columns.Where(column => column.IsInForce).Select(column => column.Name));
+        Assert.Equal(["Standard"], model.Choices.Where(choice => choice.IsCurrent).Select(choice => choice.Label));
+        Assert.StartsWith("Your own would start as Standard, shown in grey.", model.PresetNote, StringComparison.Ordinal);
         Assert.StartsWith("With Standard, **41** rules of the file block a push, **26** only warn and **11** are off.", model.Sentence, StringComparison.Ordinal);
         Assert.Equal("Files ending in .cs: 502 in invoicing. A full review builds them with the repository's .NET SDK.", Assert.Single(model.LanguageCards).Detail);
         Assert.Equal("Each language comes as a plug-in. This version has one.", model.LanguagesNote);
 
-        // "Strict" is saved at once through the service, and the marked column, the cells and the sentence follow
-        model.SelectedChoice = model.Choices[2];
+        var segments = host.Find<SegmentedList>(list => list.Name == "StrictnessChoice")!;
+        Assert.True(segments.ContainerFromIndex(1)!.Focus(NavigationMethod.Tab));
+        host.Press(PhysicalKey.ArrowRight);
+        Assert.True(host.HasFocusWithin(segments.ContainerFromIndex(2)!));
+        Assert.Empty(shell.SettingsService.Saved);
+        Assert.Equal("Standard", model.SelectedChoice?.Label);
+
+        host.Press(PhysicalKey.Enter);
         await model.ChoiceSettledAsync();
-        host.Pump();
         Assert.Equal([StrictnessPreset.Strict], shell.SettingsService.Saved);
-        Assert.Equal(["Strict"], model.Columns.Where(column => column.IsInForce).Select(column => column.Name));
         Assert.Equal(["Strict"], model.Choices.Where(choice => choice.IsCurrent).Select(choice => choice.Label));
-        Assert.Equal("Blocks", model.Rows[1].Cells[2].Word);
         Assert.True(model.Rows[1].Cells[2].IsInForce);
+        Assert.StartsWith("Your own would start as Strict, shown in grey.", model.PresetNote, StringComparison.Ordinal);
         Assert.StartsWith("With Strict, **47** rules of the file block a push, **20** only warn and **11** are off.", model.Sentence, StringComparison.Ordinal);
-        Assert.False(model.HasBanner);
 
-        // the file cannot be written: the banner says why and the choice goes back to what the file says
-        shell.SettingsService.SaveFailure = new RuleChangeException("commitfence.json changed since it was read, so nothing was written.");
-        model.SelectedChoice = model.Choices[0];
+        host.Press(PhysicalKey.ArrowLeft);
+        host.Press(PhysicalKey.ArrowLeft);
+        host.Press(PhysicalKey.Space);
         await model.ChoiceSettledAsync();
-        host.Pump();
-        Assert.Equal("commitfence.json changed since it was read, so nothing was written.", model.BannerText);
-        Assert.Equal("Strict", model.SelectedChoice?.Label);
-        Assert.Equal([StrictnessPreset.Strict], shell.SettingsService.Saved);
+        Assert.Equal([StrictnessPreset.Strict, StrictnessPreset.Quiet], shell.SettingsService.Saved);
+        Assert.StartsWith("Your own would start as Quiet, shown in grey.", model.PresetNote, StringComparison.Ordinal);
 
-        // the note's words never change; whether it shows is decided by IsCustom alone, so a screen bound early shows it when the report arrives
-        Assert.False(model.IsCustom);
-        Assert.Equal("This repository has a mapping of its own in commitfence.json. Remove it there to choose a preset.", model.CustomNote);
+        shell.SettingsService.SaveFailure = new RuleChangeException("The file could not be written.");
+        host.Press(PhysicalKey.ArrowRight);
+        host.Press(PhysicalKey.Enter);
+        await model.ChoiceSettledAsync();
+        Assert.Equal("Quiet", model.SelectedChoice?.Label);
+        Assert.True(host.HasFocusWithin(segments.ContainerFromIndex(1)!));
+        Assert.Equal("The file could not be written.", model.WriteFailure);
+    }
 
-        // "Custom" stands only while the file holds a mapping of its own; a preset is not applied over it
-        shell.SettingsService.SaveFailure = null;
-        shell.SettingsService.Custom = new Strictness(StrictnessPreset.Custom, null, Severity.Block, Severity.Warn);
+    [AvaloniaFact]
+    public async Task UndoRestoresTheOwnMappingAcrossPresetsAndRefusesAnOutsideChange()
+    {
+        using var shell = new ShellHost();
+        var original = new Strictness(StrictnessPreset.Custom, Severity.Block, Severity.Block, null);
+        shell.SettingsService.Custom = original;
+        var model = shell.Model.Settings;
         await model.RefreshAsync();
-        host.Pump();
-        Assert.Equal(["Quiet", "Standard", "Strict", "Custom"], model.Choices.Select(choice => choice.Label));
-        Assert.Equal("Custom", model.SelectedChoice?.Label);
-        Assert.Equal("Set in commitfence.json", model.Choices[3].Tip);
-        Assert.Equal(["Custom"], model.Columns.Where(column => column.IsInForce).Select(column => column.Name));
-        Assert.StartsWith("With Custom, **6** rules of the file block a push, **20** only warn and **52** are off.", model.Sentence, StringComparison.Ordinal);
-        model.SelectedChoice = model.Choices[0];
-        await model.ChoiceSettledAsync();
-        Assert.Equal("Custom", model.SelectedChoice?.Label);
-        Assert.Equal([StrictnessPreset.Strict], shell.SettingsService.Saved);
 
-        // while the mapping is in force the presets are off, not ignored in silence, and the choice says why; Custom keeps its tip
+        await ChoosePreset(model, StrictnessPreset.Standard);
+        Assert.True(model.HasUndo);
+        await ChoosePreset(model, StrictnessPreset.Quiet);
+        Assert.Equal("Quiet replaced your own, in which warning blocked a push.", model.UndoText);
+        model.UndoCommand.Execute(null);
+        await model.ChoiceSettledAsync();
+        Assert.Equal(original, shell.SettingsService.Custom);
+        Assert.Equal("Your own", model.SelectedChoice?.Label);
+        Assert.Equal("Blocks", model.EffectEditors[1].Cell.Word);
+        Assert.False(model.HasUndo);
+
+        await ChoosePreset(model, StrictnessPreset.Quiet);
+        shell.SettingsService.OutsideEdit();
+        await ChoosePreset(model, StrictnessPreset.Standard);
+        model.UndoCommand.Execute(null);
+        await model.ChoiceSettledAsync();
+        Assert.Equal(Strictness.Standard, shell.SettingsService.Show(shell.RepositoryPath).Current);
+        Assert.Equal("Could not undo: commitfence.json changed on disk.", model.WriteFailure);
+        Assert.Equal("Standard", model.SelectedChoice?.Label);
+        Assert.True(model.HasUndo);
+        await model.ShownAsync();
+        Assert.False(model.HasUndo);
+    }
+
+    [AvaloniaFact]
+    public async Task RefusedEffectWriteRestoresTheValueAndAnnouncesWithoutMovingFocus()
+    {
+        using var shell = new ShellHost();
+        var model = shell.Model.Settings;
+        using var host = new ViewHost(new SettingsView { DataContext = model }, 1440, 900);
+        await model.RefreshAsync();
+        await ChoosePreset(model, StrictnessPreset.Custom);
         host.Pump();
-        Assert.Equal([false, false, false, true], model.Choices.Select(choice => choice.IsEnabled));
-        Assert.Equal("This repository has a mapping of its own in commitfence.json. Remove it there to choose a preset.", model.CustomNote);
-        var segments = host.Window.GetVisualDescendants().OfType<ListBoxItem>().Where(item => item.FindAncestorOfType<SegmentedList>()?.Name == "StrictnessChoice").ToList();
-        Assert.Equal([false, false, false, true], segments.Select(segment => segment.IsEnabled));
-        Assert.Contains(host.Window.GetVisualDescendants().OfType<TextBlock>(), block => block.Name == "CustomNote" && block.IsEffectivelyVisible);
+        shell.SettingsService.SaveFailure = new RuleChangeException("Could not write commitfence.json: the file is read-only.");
+        var trigger = host.Find<EffectPickerButton>(button => AutomationProperties.GetName(button) == "warning effect")!;
+        Assert.True(trigger.Focus(NavigationMethod.Tab));
+        host.Press(PhysicalKey.Enter);
+        Assert.False(host.HasFocusWithin(trigger));
+        host.Press(PhysicalKey.ArrowUp);
+        host.Press(PhysicalKey.Enter);
+        await model.ChoiceSettledAsync();
+        host.Pump();
+
+        Assert.Equal("Warns", Assert.IsType<IValueProvider>(ControlAutomationPeer.CreatePeerForElement(trigger), exactMatch: false).Value);
+        Assert.Equal("Could not write commitfence.json: the file is read-only.", model.WriteFailure);
+        Assert.Equal("Your change was not kept: warning still warns.", model.FailureDetail);
+        Assert.True(host.HasFocusWithin(trigger));
+        var live = host.Find<Border>(border => border.Name == "StrictnessAnnouncement")!;
+        Assert.Equal(AutomationLiveSetting.Assertive, AutomationProperties.GetLiveSetting(live));
+        Assert.Contains("Could not write commitfence.json", AutomationProperties.GetName(live), StringComparison.Ordinal);
+
+        var editor = new EffectPicker { DataContext = model.EffectEditors[1], Width = 124, VerticalAlignment = VerticalAlignment.Bottom };
+        using var shortHost = new ViewHost(new Panel { Children = { editor } }, 320, 200);
+        Assert.True(shortHost.Find<EffectPickerButton>(_ => true)!.Focus(NavigationMethod.Tab));
+        shortHost.Press(PhysicalKey.Space);
+        var picker = shortHost.Find<Border>(border => border.Name == "PickerSurface" && border.IsEffectivelyVisible)!;
+        var top = picker.TranslatePoint(default, shortHost.Window);
+        var anchor = editor.TranslatePoint(default, shortHost.Window);
+        Assert.NotNull(top);
+        Assert.NotNull(anchor);
+        Assert.InRange(top.Value.X, 0, shortHost.Window.Bounds.Width - picker.Bounds.Width);
+        Assert.InRange(top.Value.Y, 0, anchor.Value.Y - picker.Bounds.Height);
+        shortHost.Press(PhysicalKey.Escape);
+        Assert.True(shortHost.HasFocusWithin(editor));
+    }
+
+    [AvaloniaFact]
+    public async Task TryAgainRepeatsTheRefusedEditAgainstTheCurrentMapping()
+    {
+        using var shell = new ShellHost();
+        var model = shell.Model.Settings;
+        using var host = new ViewHost(new SettingsView { DataContext = model }, 1440, 900);
+        await model.RefreshAsync();
+        await ChoosePreset(model, StrictnessPreset.Custom);
+        host.Pump();
+
+        var choice = host.Find<SegmentedList>(list => list.Name == "StrictnessChoice")!;
+        var selection = Assert.IsType<ISelectionProvider>(ControlAutomationPeer.CreatePeerForElement(choice), exactMatch: false);
+        Assert.False(selection.CanSelectMultiple);
+        Assert.Equal("Your own", Assert.Single(selection.GetSelection()).GetName());
+        var chosen = choice.ContainerFromIndex(3)!;
+        var chosenOrigin = chosen.TranslatePoint(default, choice)!.Value;
+        Assert.InRange(chosenOrigin.X + chosen.Bounds.Width, 0, choice.Bounds.Width);
+
+        shell.SettingsService.SaveFailure = new RuleChangeException("The file is read-only.");
+        model.EffectEditors[1].Choose(Severity.Block);
+        await model.ChoiceSettledAsync();
+        host.Pump();
+        var retry = host.Find<Button>(button => AutomationProperties.GetName(button) == "Try again" && button.IsEffectivelyVisible)!;
+
+        shell.SettingsService.SaveFailure = new RuleChangeException("Another program is writing the file.");
+        Assert.True(retry.Focus(NavigationMethod.Tab));
+        host.Press(PhysicalKey.Enter);
+        await model.ChoiceSettledAsync();
+        Assert.Equal("Another program is writing the file.", model.WriteFailure);
+
+        shell.SettingsService.SaveFailure = null;
+        shell.SettingsService.Custom = shell.SettingsService.Custom! with { Suggestion = null };
+        host.Press(PhysicalKey.Enter);
+        await model.ChoiceSettledAsync();
+        Assert.False(model.HasWriteFailure);
+        Assert.Equal(Severity.Block, shell.SettingsService.Custom!.Warning);
+        Assert.Null(shell.SettingsService.Custom.Suggestion);
+        var live = host.Find<Border>(border => border.Name == "StrictnessAnnouncement")!;
+        Assert.Equal("warning blocks a push. Saved at once.", AutomationProperties.GetName(live));
+    }
+
+    private static async Task ChoosePreset(SettingsViewModel model, StrictnessPreset preset)
+    {
+        model.SelectedChoice = model.Choices.Single(choice => choice.Preset == preset);
+        await model.ChoiceSettledAsync();
     }
 
     [AvaloniaFact]
@@ -106,7 +215,7 @@ public sealed class SettingsScreenTests
         await model.ChoiceSettledAsync();
         Assert.Equal([StrictnessPreset.Strict, StrictnessPreset.Standard], shell.SettingsService.Saved);
         Assert.Equal("Standard", model.SelectedChoice?.Label);
-        Assert.Equal(["Standard"], model.Columns.Where(column => column.IsInForce).Select(column => column.Name));
+        Assert.Equal(["Standard"], model.Choices.Where(choice => choice.IsCurrent).Select(choice => choice.Label));
         Assert.StartsWith("With Standard, ", model.Sentence, StringComparison.Ordinal);
     }
 

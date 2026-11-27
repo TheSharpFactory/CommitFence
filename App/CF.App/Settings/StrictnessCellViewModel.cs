@@ -8,7 +8,7 @@ namespace CF.App.Settings;
 /// </summary>
 internal sealed class StrictnessCellViewModel
 {
-    public StrictnessCellViewModel(Severity? effect, bool isInForce)
+    public StrictnessCellViewModel(Severity? effect, bool isInForce, bool isPreview = false, bool isAlwaysOff = false)
     {
         Kind = effect switch
         {
@@ -17,11 +17,15 @@ internal sealed class StrictnessCellViewModel
             _ => EffectKind.Off
         };
         IsInForce = isInForce;
+        IsPreview = isPreview;
+        IsAlwaysOff = isAlwaysOff;
     }
 
     public EffectKind Kind { get; }
 
     public bool IsInForce { get; }
+    public bool IsPreview { get; }
+    public bool IsAlwaysOff { get; }
 
     public string Word
     {
@@ -31,7 +35,7 @@ internal sealed class StrictnessCellViewModel
             {
                 EffectKind.Block => "Blocks",
                 EffectKind.Warn => "Warns",
-                EffectKind.Off or EffectKind.Unset => "Off",
+                EffectKind.Off or EffectKind.Unset => IsAlwaysOff ? "Off, always" : "Off",
                 _ => throw new ArgumentOutOfRangeException(nameof(Kind))
             };
         }

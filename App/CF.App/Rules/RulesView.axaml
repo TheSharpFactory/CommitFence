@@ -1,6 +1,8 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:local="using:CF.App.Rules"
+             xmlns:page="using:CF.App.Rules.Page"
+             xmlns:shell="using:CF.App.Shell"
              xmlns:parts="using:CF.App.Parts"
              xmlns:review="using:CF.App.Review"
              xmlns:doctor="using:CF.App.Doctor"
@@ -165,7 +167,32 @@
     <Style Selector="Grid#RowRoot.scoped">
       <Setter Property="Margin" Value="12,12,12,8"/>
     </Style>
-
+    <Style Selector="ListBoxItem.draft-rule" x:DataType="local:DraftRuleRowViewModel">
+      <Setter Property="AutomationProperties.Name" Value="{Binding Page.DraftSpokenName}"/>
+    </Style>
+    <Style Selector="ListBoxItem.file-rule" x:DataType="local:FileRuleRowViewModel">
+      <Setter Property="AutomationProperties.Name" Value="{Binding SpokenName}"/>
+    </Style>
+    <Style Selector="ListBoxItem.heading" x:DataType="local:GroupHeadingViewModel">
+      <Setter Property="AutomationProperties.Name" Value="{Binding SpokenName}"/>
+    </Style>
+    <Style Selector="local|FilePlacePattern">
+      <Setter Property="AutomationProperties.AccessibilityView" Value="Raw"/>
+    </Style>
+    <Style Selector="Grid.dimmed parts|EffectMark">
+      <Setter Property="Shape" Value="{DynamicResource ink-3}"/>
+      <Setter Property="Sign" Value="{DynamicResource side}"/>
+    </Style>
+    <Style Selector="TextBlock.place-where">
+      <Setter Property="Foreground" Value="{DynamicResource ink-2}"/>
+    </Style>
+    <Style Selector="Grid.dimmed TextBlock.place-effect, Grid.dimmed TextBlock.place-where, Grid.dimmed local|FilePlacePattern TextBlock#Text">
+      <Setter Property="Foreground" Value="{DynamicResource ink-3}"/>
+      <Setter Property="FontWeight" Value="Normal"/>
+    </Style>
+    <Style Selector="Grid.dimmed Button.linelink:not(:pointerover):not(.ring)">
+      <Setter Property="Foreground" Value="{DynamicResource ink-3}"/>
+    </Style>
 
     <!-- The container of every entry of the list: a row, a heading or a line of words. Rest: no background; under the pointer
          hover; pressed line; selected page with the raised shadow and a bar of here. The ring is a line of 2 inside the edge. -->
@@ -266,32 +293,6 @@
     <Style Selector="ContentControl#StickyHeading Button">
       <Setter Property="Focusable" Value="False"/>
     </Style>
-    <Style Selector="Button.linelink">
-      <Setter Property="Focusable" Value="False"/>
-      <Setter Property="Padding" Value="0,0,12,0"/>
-      <Setter Property="Cursor" Value="Hand"/>
-      <Setter Property="Template">
-        <ControlTemplate>
-          <Panel Background="Transparent">
-            <Border Name="Ring" IsVisible="False" IsHitTestVisible="False" CornerRadius="8" BorderThickness="2"
-                    BorderBrush="{DynamicResource focus}"/>
-            <ContentPresenter Content="{TemplateBinding Content}" Padding="{TemplateBinding Padding}"
-                              HorizontalContentAlignment="Right" VerticalContentAlignment="Center"/>
-          </Panel>
-        </ControlTemplate>
-      </Setter>
-    </Style>
-    <Style Selector="Button.linelink TextBlock.line-text">
-      <Setter Property="Foreground" Value="{DynamicResource ink-3}"/>
-    </Style>
-    <Style Selector="Button.linelink:pointerover TextBlock.line-text">
-      <Setter Property="Foreground" Value="{DynamicResource ink}"/>
-      <Setter Property="TextDecorations" Value="Underline"/>
-    </Style>
-    <Style Selector="Button.linelink.ring /template/ Border#Ring">
-      <Setter Property="IsVisible" Value="True"/>
-    </Style>
-
     <!-- The groups' fold arrow turns a quarter towards the left while folded (motion 11). -->
     <Style Selector="parts|Icon.fold-arrow">
       <Setter Property="RenderTransform" Value="rotate(0deg)"/>
@@ -448,6 +449,7 @@
                              IsVisible="{Binding !HasNoMatch}"
                              Padding="8,0,12,12" Background="Transparent" BorderThickness="0"
                              ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                             ScrollViewer.VerticalScrollBarVisibility="Visible"
                              ScrollViewer.AllowAutoHide="False"
                              AutomationProperties.Name="Rules">
             <local:RuleListBox.ItemsPanel>
@@ -481,12 +483,41 @@
                 </Border>
               </DataTemplate>
 
+              <DataTemplate DataType="local:DraftRuleRowViewModel" x:DataType="local:DraftRuleRowViewModel">
+                <Grid Margin="12,12,12,8" ColumnDefinitions="56,*,148,Auto" RowDefinitions="Auto,Auto"
+                      AutomationProperties.AccessibilityView="Raw">
+                  <TextBlock IsVisible="{Binding Page.HasId}" Theme="{StaticResource code}" Foreground="{DynamicResource ink-2}"
+                             TextWrapping="NoWrap" TextTrimming="CharacterEllipsis" Text="{Binding Page.Id}"/>
+                  <TextBlock IsVisible="{Binding !Page.HasId}" Theme="{StaticResource type-meta}" Foreground="{DynamicResource ink-3}" Text="no ID"/>
+                  <TextBlock Grid.Column="1" Margin="12,0,0,0" IsVisible="{Binding Page.HasTitle}" Theme="{StaticResource type-body-strong}"
+                             TextWrapping="Wrap" MaxLines="2" TextTrimming="CharacterEllipsis" Text="{Binding Page.Title}"/>
+                  <TextBlock Grid.Column="1" Margin="12,0,0,0" IsVisible="{Binding !Page.HasTitle}" Theme="{StaticResource type-body}"
+                             Foreground="{DynamicResource ink-3}" Text="Name the rule"/>
+                  <StackPanel Grid.Row="1" Grid.Column="1" Orientation="Horizontal" Spacing="5" Height="20" Margin="12,4,0,0">
+                    <Border IsVisible="{Binding !Page.ArtifactIsEmpty}" Background="{DynamicResource for}" CornerRadius="6" Padding="7,0">
+                      <TextBlock Theme="{StaticResource type-label}" Foreground="{DynamicResource for-ink}" VerticalAlignment="Center" Text="{Binding Page.ArtifactWords}"/>
+                    </Border>
+                    <TextBlock IsVisible="{Binding !Page.ArtifactIsEmpty}" Theme="{StaticResource type-meta}" Foreground="{DynamicResource ink-2}"
+                               VerticalAlignment="Center" Text="in"/>
+                    <Border Background="{DynamicResource for}" CornerRadius="6" Padding="7,0">
+                      <TextBlock Theme="{StaticResource type-label}" Foreground="{DynamicResource for-ink}" VerticalAlignment="Center" Text="{Binding Page.LanguageText}"/>
+                    </Border>
+                  </StackPanel>
+                  <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="8" VerticalAlignment="Top" Margin="4,2,0,0">
+                    <Ellipse Width="7" Height="7" Fill="{DynamicResource ink}" VerticalAlignment="Center"/>
+                    <TextBlock Theme="{StaticResource type-meta-strong}" Text="Not saved yet"/>
+                  </StackPanel>
+                </Grid>
+              </DataTemplate>
+
               <!-- The row of a team rule: id, title and what it is for, the effect control, the switch. Four columns 12 apart:
                    56, the rest, 84, 52; in one pane a fifth, 16, with the arrow that opens the rule. -->
               <DataTemplate DataType="local:TeamRuleRowViewModel" x:DataType="local:TeamRuleRowViewModel">
                 <Grid Name="RowRoot" Margin="12,12,12,8" ColumnDefinitions="56,*,96,64,Auto" RowDefinitions="Auto,Auto"
                       AutomationProperties.Name="{Binding SpokenName}">
 
+                  <Border Grid.ColumnSpan="5" Grid.RowSpan="2" Margin="-12,-12,-12,-8" IsVisible="{Binding HasIdClash}"
+                          IsHitTestVisible="False" BorderBrush="{DynamicResource block}" BorderThickness="2" CornerRadius="12"/>
                   <TextBlock Grid.Column="0" Theme="{StaticResource code}" TextWrapping="NoWrap">
                     <Run Text="{Binding IdFamily}" FontWeight="SemiBold"/><Run Text="{Binding IdNumber}" Foreground="{DynamicResource ink-2}"/>
                   </TextBlock>
@@ -506,6 +537,12 @@
                       <TextBlock Theme="{StaticResource type-label}" Foreground="{DynamicResource for-ink}"
                                  VerticalAlignment="Center" Text="{Binding LanguageText}"/>
                     </Border>
+                    <StackPanel Orientation="Horizontal" Spacing="6" Margin="5,0,0,0" IsVisible="{Binding HasIdClash}"
+                                AutomationProperties.AccessibilityView="Raw">
+                      <parts:EffectMark Classes="block" Kind="Block" Width="13" Height="13" VerticalAlignment="Center"/>
+                      <TextBlock Theme="{StaticResource type-meta}" Foreground="{DynamicResource block-ink}"
+                                 VerticalAlignment="Center" Text="Same ID as the new rule"/>
+                    </StackPanel>
                     <StackPanel Orientation="Horizontal" Spacing="6" Margin="5,0,0,0" IsVisible="{Binding ShowsUnsaved}">
                       <Ellipse Width="7" Height="7" Fill="{DynamicResource ink}" VerticalAlignment="Center"/>
                       <TextBlock Theme="{StaticResource type-meta}" FontWeight="Medium" Foreground="{DynamicResource ink}"
@@ -586,66 +623,101 @@
 
               <!-- File rows grow to fit the narrower settings beneath the title. -->
               <DataTemplate DataType="local:FileRuleRowViewModel" x:DataType="local:FileRuleRowViewModel">
-                <Grid Name="RowRoot" Classes.scoped="{Binding HasExceptions}" RowDefinitions="Auto,Auto" ColumnDefinitions="56,*,96,64,Auto" AutomationProperties.Name="{Binding SpokenName}">
+                <Grid Name="RowRoot" Classes.scoped="{Binding HasDetails}" RowDefinitions="Auto,Auto" ColumnDefinitions="56,*,96,64,Auto">
 
-                  <TextBlock Grid.Column="0" Theme="{StaticResource code}" TextWrapping="NoWrap">
+                  <TextBlock Grid.Column="0" AutomationProperties.AccessibilityView="Raw" Theme="{StaticResource code}" TextWrapping="NoWrap">
                     <Run Text="{Binding IdFamily}" FontWeight="SemiBold"/><Run Text="{Binding IdNumber}" Foreground="{DynamicResource ink-2}"/>
                   </TextBlock>
 
-                  <TextBlock Grid.Column="1" Classes="rule-title" Classes.off="{Binding RuleIsOff}"
+                  <TextBlock Grid.Column="1" Classes="rule-title" AutomationProperties.AccessibilityView="Raw" Classes.off="{Binding RuleIsOff}"
                              Theme="{StaticResource type-body-strong}" LineHeight="20" Margin="12,0,0,0" TextWrapping="Wrap" MaxLines="2"
                              TextTrimming="CharacterEllipsis" Text="{Binding Title}" ToolTip.Tip="{Binding Title}"/>
 
-                  <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="6" Margin="16,3,0,0" VerticalAlignment="Top"
+                  <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="6" Margin="16,0,0,0" Height="20" VerticalAlignment="Top"
                               IsVisible="{Binding ShowsEffect}">
-                    <parts:EffectMark Classes.block="{Binding MarkIsBlock}" Classes.warn="{Binding MarkIsWarn}"
-                                      Kind="{Binding EffectKind}" Width="14" Height="14"/>
-                    <TextBlock Theme="{StaticResource type-effect}" Text="{Binding EffectWord}"/>
+                    <parts:EffectMark Classes.block="{Binding MarkIsBlock}" Classes.warn="{Binding MarkIsWarn}" Classes.off="{Binding MarkIsOff}"
+                                      IsVisible="{Binding !Varies}" Kind="{Binding EffectKind}" Width="14" Height="14" VerticalAlignment="Center"/>
+                    <parts:Icon IsVisible="{Binding Varies}" Data="{StaticResource i-varies}" FillData="{StaticResource i-varies-fill}"
+                                Stroke="{DynamicResource ink-2}" Width="14" Height="14" VerticalAlignment="Center"/>
+                    <TextBlock Theme="{StaticResource type-effect}" Text="{Binding EffectWord}" AutomationProperties.AccessibilityView="Raw"/>
                   </StackPanel>
 
                   <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="6" Margin="16,3,0,0"
                               VerticalAlignment="Top" IsVisible="{Binding IsOffInFile}" ToolTip.Tip="{Binding OffToolTip}">
                     <parts:EffectMark Classes="off" Kind="Off" Width="14" Height="14"/>
-                    <TextBlock Theme="{StaticResource type-meta}" Foreground="{DynamicResource ink-2}" VerticalAlignment="Center"
+                    <TextBlock Theme="{StaticResource type-meta}" Foreground="{DynamicResource ink-2}" VerticalAlignment="Center" AutomationProperties.AccessibilityView="Raw"
                                Text="Off"/>
                   </StackPanel>
 
-                  <TextBlock Grid.Column="2" Theme="{StaticResource type-meta}" Foreground="{DynamicResource ink-2}"
+                  <TextBlock Grid.Column="2" Theme="{StaticResource type-meta}" AutomationProperties.AccessibilityView="Raw" Foreground="{DynamicResource ink-2}"
                              Margin="16,1,0,0" VerticalAlignment="Top" TextTrimming="CharacterEllipsis"
                              IsVisible="{Binding ShowsStateWord}" Text="{Binding StateWord}" ToolTip.Tip="{Binding StateToolTip}"/>
 
                   <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="6" Margin="16,3,0,0"
                               VerticalAlignment="Top" IsVisible="{Binding IsUnset}" ToolTip.Tip="{Binding UnsetTip}">
                     <parts:EffectMark Classes="off" Kind="Unset" Width="14" Height="14"/>
-                    <TextBlock Theme="{StaticResource type-meta}" Foreground="{DynamicResource ink-2}" Text="Not set"/>
+                    <TextBlock Theme="{StaticResource type-meta}" Foreground="{DynamicResource ink-2}" Text="Not set" AutomationProperties.AccessibilityView="Raw"/>
                   </StackPanel>
-                  <ItemsControl Grid.Row="1" Grid.Column="1" Margin="12,4,0,0" IsVisible="{Binding HasExceptions}" ItemsSource="{Binding ExceptionLines}">
-                    <ItemsControl.ItemTemplate>
-                      <DataTemplate x:DataType="local:ExceptionLine">
-                        <Grid ColumnDefinitions="13,*" ColumnSpacing="5">
-                          <parts:EffectMark Kind="{Binding Kind}" Width="13" Height="13" Margin="0,3.5,0,0" VerticalAlignment="Top"
-                                            Shape="{DynamicResource ink-3}" Sign="{DynamicResource page}"/>
-                          <ItemsControl Grid.Column="1" ItemsSource="{Binding Parts}">
-                            <ItemsControl.ItemsPanel>
-                              <ItemsPanelTemplate><WrapPanel ItemSpacing="4"/></ItemsPanelTemplate>
-                            </ItemsControl.ItemsPanel>
-                            <ItemsControl.ItemTemplate>
-                              <DataTemplate x:DataType="local:ExceptionLocation">
-                                <TextBlock Theme="{StaticResource type-meta}" LineHeight="20" TextWrapping="Wrap" Foreground="{DynamicResource ink-2}">
-                                  <Run FontWeight="Medium" Text="{Binding Effect}"/><Run Text="{Binding Join}"/><Run FontFamily="Cascadia Mono, Consolas, Menlo, DejaVu Sans Mono, monospace" Text="{Binding Pattern}"/><Run Foreground="{DynamicResource ink-3}" Text="{Binding Location}"/>
-                                </TextBlock>
-                              </DataTemplate>
-                            </ItemsControl.ItemTemplate>
-                          </ItemsControl>
-                        </Grid>
-                      </DataTemplate>
-                    </ItemsControl.ItemTemplate>
-                  </ItemsControl>
+                  <DockPanel Grid.Row="1" Grid.Column="1" Grid.ColumnSpan="3" Margin="12,4,0,0"
+                             IsVisible="{Binding IsScopedOnly}" AutomationProperties.AccessibilityView="Raw">
+                    <local:FileEffectText Theme="{StaticResource type-meta}" Foreground="{DynamicResource ink-2}"
+                                          Scopes="{Binding OtherEffects}" TextTrimming="CharacterEllipsis" AutomationProperties.AccessibilityView="Raw"/>
+                  </DockPanel>
 
-                  <Button Grid.Column="3" Classes="linelink" Classes.ring="{Binding RingOnLine}" Width="72" Height="36"
-                          HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,-8,0,-8"
+                  <StackPanel Grid.Row="1" Grid.Column="1" Grid.ColumnSpan="3" Margin="12,4,0,0"
+                              IsVisible="{Binding HasPlaces}">
+                    <ItemsControl ItemsSource="{Binding VisiblePlaces}" ClipToBounds="False">
+                      <ItemsControl.ItemTemplate>
+                        <DataTemplate DataType="local:FileRowPlace" x:DataType="local:FileRowPlace">
+                          <Grid Height="24" Classes.dimmed="{Binding IsDimmed}" ColumnDefinitions="*,96,64">
+                            <Grid Name="PlaceWords" ColumnDefinitions="Auto,Auto,Auto,*" ColumnSpacing="5" VerticalAlignment="Center"
+                                  AutomationProperties.AccessibilityView="Raw">
+                              <parts:EffectMark Kind="{Binding Kind}" Classes.block="{Binding IsBlock}" Classes.warn="{Binding IsWarn}" Classes.off="{Binding IsOff}" Width="12" Height="12" VerticalAlignment="Center"/>
+                              <TextBlock Grid.Column="1" Classes="place-effect" Theme="{StaticResource type-effect}" Text="{Binding Effect}"/>
+                              <TextBlock Grid.Column="2" Classes="place-where" Theme="{StaticResource type-meta}" Text="{Binding Where}"/>
+                              <local:FilePlacePattern Grid.Column="3" IsVisible="{Binding !IsEverywhereElse}" Classes="compact"
+                                                      Values="{Binding Pattern}" HorizontalAlignment="Left" VerticalAlignment="Center"/>
+                            </Grid>
+                            <Button Grid.Column="2" Classes="linelink" Classes.ring="{Binding IsFocused}" Name="PlaceLine"
+                                    shell:ToolTipBehavior.LineLink="True" shell:ToolTipBehavior.LineWords="{Binding #PlaceWords}"
+                                    shell:ToolTipBehavior.RowFocus="{Binding IsFocused}" AutomationProperties.Name="{Binding LinkName}"
+                                    Margin="0,0,-6,0" HorizontalAlignment="Right" Focusable="False" Command="{Binding OpenCommand}">
+                              <ToolTip.Tip>
+                                <ToolTip>
+                                  <TextBlock Theme="{StaticResource type-meta}" Foreground="{DynamicResource ink}" TextWrapping="Wrap">
+                                    <Run FontFamily="{StaticResource code-font}" Text="{Binding Section}"/><Run Text="{Binding TipEnd}"/>
+                                  </TextBlock>
+                                </ToolTip>
+                              </ToolTip.Tip>
+                              <TextBlock Classes="line-text" Theme="{StaticResource type-meta}" FontFeatures="+tnum" Text="{Binding LineText}"/>
+                            </Button>
+                          </Grid>
+                        </DataTemplate>
+                      </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                    <Button Classes="linelink" Classes.ring="{Binding RingOnMorePlaces}" Name="MorePlaces"
+                            HorizontalAlignment="Left" Focusable="False"
+                            IsVisible="{Binding ShowsMorePlaces}" Command="{Binding OpenPageCommand}"
+                            AutomationProperties.Name="{Binding MorePlacesName}">
+                      <TextBlock Classes="line-text" Theme="{StaticResource type-meta-strong}" Text="{Binding MorePlacesText}"/>
+                    </Button>
+                    <TextBlock IsVisible="{Binding ElsewhereText, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"
+                               Text="{Binding ElsewhereText}" Theme="{StaticResource type-meta}"
+                               Foreground="{DynamicResource ink-2}" Margin="0,2,0,0" AutomationProperties.AccessibilityView="Raw"/>
+                  </StackPanel>
+
+                  <Button Grid.Column="3" Classes="linelink" Classes.ring="{Binding RingOnLine}"
+                          shell:ToolTipBehavior.LineLink="True" shell:ToolTipBehavior.RowFocus="{Binding RingOnLine}"
+                          Focusable="False" HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,-2,-6,-2"
                           IsVisible="{Binding ShowsLine}" Command="{Binding OpenFileCommand}"
-                          ToolTip.Tip="{Binding LineToolTip}" AutomationProperties.Name="{Binding LineSpokenName}">
+                          AutomationProperties.Name="{Binding LineSpokenName}">
+                    <ToolTip.Tip>
+                      <ToolTip>
+                        <TextBlock Theme="{StaticResource type-meta}" Foreground="{DynamicResource ink}" TextWrapping="Wrap">
+                          <Run FontFamily="{StaticResource code-font}" Text="{Binding LineSection}"/><Run Text="{Binding LineTipEnd}"/>
+                        </TextBlock>
+                      </ToolTip>
+                    </ToolTip.Tip>
                     <TextBlock Classes="line-text" Theme="{StaticResource type-meta}" FontFeatures="+tnum" Text="{Binding LineText}"/>
                   </Button>
 
@@ -660,7 +732,7 @@
 
           <!-- The heading of the group whose rules are at the top stays in view while they scroll under it, and leaves with
                its last rule. It is drawn over the list, 44 high, on the list column's colour. -->
-          <ContentControl Name="StickyHeading" IsVisible="False" VerticalAlignment="Top" Margin="8,0,12,0" Background="{DynamicResource side}"/>
+          <ContentControl Name="StickyHeading" IsVisible="False" VerticalAlignment="Top" Margin="8,0,24,0" Background="{DynamicResource side}"/>
 
           <!-- The search finds nothing: in place of the rows, 48 from the top, centred. -->
           <StackPanel IsVisible="{Binding HasNoMatch}" Margin="16,48,16,0" Spacing="12" HorizontalAlignment="Center"

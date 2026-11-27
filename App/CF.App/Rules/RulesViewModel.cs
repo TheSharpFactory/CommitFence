@@ -42,6 +42,8 @@ internal sealed partial class RulesViewModel : ObservableObject, IRuleChanges, I
     private readonly Dictionary<string, FileRuleRowViewModel> _fileRows = new Dictionary<string, FileRuleRowViewModel>();
     private IReadOnlyList<RuleDefinition> _definitions = new List<RuleDefinition>();
     private RulePageViewModel? _draft;
+    private DraftRuleRowViewModel? _draftRow;
+    private RuleListItemViewModel? _beforeDraft;
 
     // the page of the rule that was sent here from another screen to be narrowed, while its strip stands
     private RulePageViewModel? _narrowed;
@@ -359,12 +361,17 @@ internal sealed partial class RulesViewModel : ObservableObject, IRuleChanges, I
         var rows = Items.Where(item => item is TeamRuleRowViewModel or FileRuleRowViewModel).ToList();
         if(open != null && StillExists(open))
         {
-            if(SelectedItem == null && !rows.Contains(open))
+            if(SelectedItem != null)
+                return;
+
+            if(rows.Contains(open))
             {
-                HiddenOpen = open;
-                NotifyOpenChanged();
+                SelectedItem = open;
+                return;
             }
 
+            HiddenOpen = open;
+            NotifyOpenChanged();
             return;
         }
 
@@ -461,6 +468,10 @@ internal sealed partial class RulesViewModel : ObservableObject, IRuleChanges, I
 
             OpenSaved(draft.Id);
         }
+        else
+        {
+            Reload();
+        }
 
         return message;
     }
@@ -499,6 +510,61 @@ internal sealed partial class RulesViewModel : ObservableObject, IRuleChanges, I
     }
 
     /// <inheritdoc />
+    public string? NewRuleIdProblem(string id)
+    {
+        if(id.Length == 0)
+            return "A rule needs an ID.";
+
+        if(!id.All(IsIdCharacter))
+            return "An ID uses letters, digits, - and _ only.";
+
+        var taken = TakenRule(id);
+        return taken == null ? null : $"{taken.Id} is taken by “{taken.Title}”.";
+    }
+
+    public RuleDefinition? TakenRule(string id)
+    {
+        return id.Length > 0 && id.All(IsIdCharacter) ? RuleId.FindTaken(id, _definitions) : null;
+    }
+
+    public string? SuggestedRuleId(string id)
+    {
+        if(NewRuleIdProblem(id) == null)
+            return null;
+
+        var cleaned = new string(id.Where(letter => IsIdCharacter(letter) || char.IsWhiteSpace(letter))
+            .Select(letter => char.IsWhiteSpace(letter) ? '-' : letter).ToArray());
+        if(cleaned.Length == 0)
+            return NextId();
+
+        if(TakenRule(cleaned) == null)
+            return cleaned;
+
+        var numberStart = cleaned.Length;
+        while(numberStart > 0 && char.IsAsciiDigit(cleaned[numberStart - 1]))
+            numberStart--;
+
+        var family = cleaned[..numberStart];
+        var digits = cleaned[numberStart..];
+        var number = digits.Length == 0 ? System.Numerics.BigInteger.Zero : System.Numerics.BigInteger.Parse(digits, CultureInfo.InvariantCulture);
+        var width = digits.Length == 0 ? 3 : digits.Length;
+        string next;
+        do
+        {
+            number++;
+            next = family + number.ToString(CultureInfo.InvariantCulture).PadLeft(width, '0');
+        }
+        while(TakenRule(next) != null);
+
+        return next;
+    }
+
+    private static bool IsIdCharacter(char letter)
+    {
+        return char.IsAsciiLetterOrDigit(letter) || letter is '-' or '_';
+    }
+
+    /// <inheritdoc />
     public void DuplicateRule(string ruleId)
     {
         var source = _definitions.FirstOrDefault(rule => rule.Id == ruleId);
@@ -515,9 +581,7 @@ internal sealed partial class RulesViewModel : ObservableObject, IRuleChanges, I
 
         _draft = new RulePageViewModel(_catalog, this, NextId(), null);
         _draft.FillFrom(source);
-        SelectedItem = null;
-        IsDraftOpen = true;
-        IsPageOpen = true;
+        ShowDraft(_draft);
     }
 
     /// <summary>
@@ -540,11 +604,16 @@ internal sealed partial class RulesViewModel : ObservableObject, IRuleChanges, I
     /// <inheritdoc />
     public void DiscardDraft()
     {
-        _draft = null;
+        ReleaseDraft();
         ClearUnfinishedDraftBanner();
         IsDraftOpen = false;
         IsPageOpen = false;
-        EnsureRuleOpen();
+        Rebuild();
+        var previous = _beforeDraft;
+        _beforeDraft = null;
+        SelectedItem = previous != null && Items.Contains(previous) ? previous
+            : Items.FirstOrDefault(item => item is TeamRuleRowViewModel or FileRuleRowViewModel);
+        IsPageOpen = IsOnePane && ReferenceEquals(SelectedItem, previous) && previous != null;
     }
 
     /// <summary>
@@ -557,9 +626,48 @@ internal sealed partial class RulesViewModel : ObservableObject, IRuleChanges, I
             return;
 
         _draft ??= new RulePageViewModel(_catalog, this, NextId(), null);
-        SelectedItem = null;
+        ShowDraft(_draft);
+    }
+
+    private void ShowDraft(RulePageViewModel page)
+    {
+        if(_draftRow == null)
+            _beforeDraft = OpenItem;
+
+        _customHeading.Open();
+        if(_draftRow?.Page != page)
+        {
+            _draftRow = new DraftRuleRowViewModel(page);
+            page.PropertyChanged += OnDraftPropertyChanged;
+        }
+
+        var row = _draftRow;
         IsDraftOpen = true;
+        Rebuild();
+        SelectedItem = Items.Contains(row) ? row : null;
         IsPageOpen = true;
+    }
+
+    private void OnDraftPropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
+    {
+        if(e.PropertyName == nameof(RulePageViewModel.Id))
+            RefreshIdClash();
+    }
+
+    private void RefreshIdClash()
+    {
+        var taken = _draft == null ? null : TakenRule(_draft.Id);
+        foreach(var row in _rows.Values)
+            row.HasIdClash = row.Id == taken?.Id;
+    }
+
+    private void ReleaseDraft()
+    {
+        if(_draft != null)
+            _draft.PropertyChanged -= OnDraftPropertyChanged;
+
+        _draft = null;
+        _draftRow = null;
     }
 
     /// <summary>
@@ -567,7 +675,7 @@ internal sealed partial class RulesViewModel : ObservableObject, IRuleChanges, I
     /// </summary>
     public void OpenSelectedRule()
     {
-        if(SelectedRule != null || SelectedFileRule != null)
+        if(IsDraftOpen || SelectedRule != null || SelectedFileRule != null)
             IsPageOpen = true;
     }
 
@@ -576,9 +684,7 @@ internal sealed partial class RulesViewModel : ObservableObject, IRuleChanges, I
     /// </summary>
     public void SaveOpenRule()
     {
-        var page = CurrentPage;
-        if(page != null && page.SaveCommand.CanExecute(null))
-            page.SaveCommand.Execute(null);
+        CurrentPage?.AttemptSaveCommand.Execute(null);
     }
 
     /// <summary>
@@ -604,6 +710,7 @@ internal sealed partial class RulesViewModel : ObservableObject, IRuleChanges, I
         }
 
         Rebuild();
+        _draft?.DraftChanged();
     }
 
     private void ReloadSettings()
@@ -625,7 +732,7 @@ internal sealed partial class RulesViewModel : ObservableObject, IRuleChanges, I
     partial void OnSelectedItemChanged(RuleListItemViewModel? value)
     {
         if(value != null)
-            IsDraftOpen = false;
+            IsDraftOpen = value is DraftRuleRowViewModel;
 
         // another rule is opened: the strip of the rule that was sent here goes
         if(_narrowed != null && !ReferenceEquals(CurrentPage, _narrowed))
@@ -814,19 +921,36 @@ internal sealed partial class RulesViewModel : ObservableObject, IRuleChanges, I
         }
     }
 
+    public event Action<TeamRuleRowViewModel>? DraftSaved;
+
     private void OpenSaved(string ruleId)
     {
-        if(_draft != null && _draft.Id == ruleId)
+        var savedDraft = _draft?.Id == ruleId;
+        if(savedDraft)
         {
-            _draft = null;
+            ReleaseDraft();
+            _beforeDraft = null;
             ClearUnfinishedDraftBanner();
+            Rebuild();
         }
 
         IsDraftOpen = false;
         if(_rows.TryGetValue(ruleId, out var row))
         {
+            if(savedDraft)
+            {
+                var definition = _definitions.First(rule => rule.Id == ruleId);
+                if(!MatchesSearch(definition))
+                    SearchText = string.Empty;
+
+                if(!Passes(SelectedFilter.Filter, definition))
+                    SelectedFilter = Filters[0];
+            }
+
             SelectedItem = row;
             IsPageOpen = IsOnePane;
+            if(savedDraft && !IsOnePane)
+                DraftSaved?.Invoke(row);
         }
     }
 
@@ -904,6 +1028,7 @@ internal sealed partial class RulesViewModel : ObservableObject, IRuleChanges, I
             SetupWrittenAt = null;
 
         UpdateRows();
+        RefreshIdClash();
         UpdateCounts();
         var desired = new List<RuleListItemViewModel>();
         if(_hasLoaded)
@@ -958,9 +1083,12 @@ internal sealed partial class RulesViewModel : ObservableObject, IRuleChanges, I
         foreach(var segment in Filters)
             segment.Count = _definitions.Count(rule => Passes(segment.Filter, rule)) + _fileRules.Count(rule => PassesFile(segment.Filter, rule));
 
-        _customHeading.Count = _definitions.Count;
+        _customHeading.TotalCount = _definitions.Count;
+        _customHeading.IsFiltered = IsListFiltered;
         UpdateFileHeading();
     }
+
+    private bool IsListFiltered { get { return SelectedFilter.Filter != RuleFilter.All || SearchText.Trim().Length > 0; } }
 
     private static bool Passes(RuleFilter filter, RuleDefinition rule)
     {
@@ -985,14 +1113,19 @@ internal sealed partial class RulesViewModel : ObservableObject, IRuleChanges, I
 
     private IEnumerable<RuleListItemViewModel> CreateGroupItems()
     {
+        var shown = _definitions.Where(rule => Passes(SelectedFilter.Filter, rule) && MatchesSearch(rule))
+            .OrderBy(rule => rule.Id, StringComparer.OrdinalIgnoreCase).ToList();
+        _customHeading.Count = shown.Count;
         yield return _customHeading;
         if(!_customHeading.IsExpanded)
             yield break;
 
-        var shown = _definitions.Where(rule => Passes(SelectedFilter.Filter, rule) && MatchesSearch(rule)).ToList();
+        if(_draftRow != null)
+            yield return _draftRow;
+
         if(NeedsSetup || (_startedHere && _definitions.Count == 0 && SelectedFilter.Filter == RuleFilter.All && SearchText.Trim().Length == 0))
             yield return _setupNote;
-        else if(shown.Count == 0 && SearchText.Trim().Length == 0)
+        else if(shown.Count == 0 && _draftRow == null && SearchText.Trim().Length == 0)
             yield return new GroupNoteViewModel(EmptyGroupText(), SelectedFilter.Filter != RuleFilter.All);
 
         foreach(var rule in shown)
@@ -1043,7 +1176,7 @@ internal sealed partial class RulesViewModel : ObservableObject, IRuleChanges, I
     private void UpdateNoMatch(IReadOnlyList<RuleListItemViewModel> desired)
     {
         var searching = SearchText.Trim().Length > 0;
-        var anyRow = desired.Any(item => item is TeamRuleRowViewModel);
+        var anyRow = desired.Any(item => item is TeamRuleRowViewModel or DraftRuleRowViewModel);
         var anyFileRow = desired.Any(item => item is FileRuleRowViewModel);
         HasNoMatch = _hasLoaded && !NeedsSetup && searching && !anyRow && !anyFileRow && _customHeading.IsExpanded && _fileHeading.IsExpanded && FileRulesAreRead;
         NoMatchText = HasNoMatch ? $"No rule matches “{SearchText.Trim()}”" : string.Empty;

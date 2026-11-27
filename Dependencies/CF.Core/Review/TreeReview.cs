@@ -81,7 +81,7 @@ public sealed class TreeReview
             result = CreateIncompleteResult(FailureText.Describe(exception), started, ended);
         }
 
-        if(scope.Kind == ScopeKind.Push && _history != null)
+        if(scope.Kind == ScopeKind.Push && scope.RecordsHistory && _history != null)
             Record(repository, scope.Source, result, ended, run.RanBuild);
 
         return result;
@@ -128,7 +128,24 @@ public sealed class TreeReview
         if(judgment != null)
             _structureJudgments?.Save(repository, judgment);
 
-        return run.ToResult(ended - started, judgment, repository, changeSets.Count == 1 ? changeSets[0] : null);
+        return run.ToResult(ended - started, judgment, repository, changeSets.Count == 1 ? changeSets[0] : null, FindRemoteAddress(repository, scope));
+    }
+
+    // the remote a push goes to, otherwise origin, otherwise the first one: where the reviewed commit is hosted
+    private string FindRemoteAddress(RepositoryLocation repository, ReviewScope scope)
+    {
+        try
+        {
+            var names = _git.RemoteNames(repository);
+            var name = scope.Kind == ScopeKind.Push && names.Contains(scope.RemoteName) ? scope.RemoteName : names.Contains("origin") ? "origin" : names.Count > 0 ? names[0] : null;
+            var address = name == null ? null : _git.RemoteUrl(repository, name);
+            return RemoteAddress.PublicOf(string.IsNullOrEmpty(address) && scope.Kind == ScopeKind.Push ? scope.RemoteUrl : address);
+        }
+        catch(Exception)
+        {
+            // only a line of the report depends on the address: a remote that cannot be read must never change the review
+            return string.Empty;
+        }
     }
 
     private ReviewResult CreateIncompleteResult(string reason, DateTimeOffset started, DateTimeOffset? ended = null)

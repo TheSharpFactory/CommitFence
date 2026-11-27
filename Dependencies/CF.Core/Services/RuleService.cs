@@ -110,6 +110,7 @@ public sealed class RuleService : IRuleService
     {
         var text = ReadSettingsText(settingsPath);
         var settings = ParseSettings(text);
+        CheckIdAvailable(draft.Id, settings.Rules);
         var rules = settings.Rules.Append(_ruleEditor.Create(draft)).ToList();
 
         Save(settingsPath, text, settings, rules);
@@ -134,6 +135,13 @@ public sealed class RuleService : IRuleService
         WhileHoldingLock(settingsPath, () => AddNextTo(settingsPath, ruleId, true, source => CopyOf(source, newRuleId)));
     }
 
+    private static void CheckIdAvailable(string id, IReadOnlyList<RuleDefinition> rules)
+    {
+        var existing = RuleId.FindTaken(id, rules);
+        if(existing != null)
+            throw new RuleChangeException($"The rule id '{id}' is already used by “{existing.Title}”.");
+    }
+
     private static RuleDefinition CopyOf(RuleDefinition source, string newRuleId)
     {
         return new RuleDefinition(newRuleId, source.Language, source.ArtifactType, source.Severity, $"Copy of {source.Title}", source.Where, source.Require, source.Forbid, source.Paths, source.Message, source.Why, source.Enabled);
@@ -145,7 +153,9 @@ public sealed class RuleService : IRuleService
         var settings = ParseSettings(text);
         var anchor = FindExistingRule(settingsPath, settings, anchorId);
         var rules = settings.Rules.ToList();
-        rules.Insert(rules.FindIndex(rule => rule.Id == anchorId) + (after ? 1 : 0), build(anchor));
+        var added = build(anchor);
+        CheckIdAvailable(added.Id, rules);
+        rules.Insert(rules.FindIndex(rule => rule.Id == anchorId) + (after ? 1 : 0), added);
 
         Save(settingsPath, text, settings, rules);
     }
@@ -188,6 +198,7 @@ public sealed class RuleService : IRuleService
     {
         var text = ReadSettingsText(settingsPath);
         var settings = ParseSettings(text);
+        CheckIdAvailable(draft.Id, settings.Rules);
         var created = _ruleEditor.Create(draft);
         var rules = settings.Rules.Append(created).ToList();
 
@@ -203,7 +214,7 @@ public sealed class RuleService : IRuleService
 
     private RuleTryResult TryAfterChecking(string currentText, RuleSettings settings, IReadOnlyList<RuleDefinition> rules, RuleDefinition rule, string sourceText, string? fileName)
     {
-        _settingsSaver.CheckWouldSave(new RuleSettings(settings.Requires, rules, settings.Structure, settings.ConfiguredStrictness), NewlineOf(currentText));
+        _settingsSaver.CheckWouldSave(new RuleSettings(settings.Requires, rules, settings.Structure, settings.ConfiguredStrictness, settings.Schema), NewlineOf(currentText));
 
         return Try(rule, sourceText, fileName);
     }
@@ -271,7 +282,7 @@ public sealed class RuleService : IRuleService
 
     private void Save(string settingsPath, string currentText, RuleSettings settings, IReadOnlyList<RuleDefinition> rules)
     {
-        _settingsSaver.Save(settingsPath, currentText, new RuleSettings(settings.Requires, rules, settings.Structure, settings.ConfiguredStrictness));
+        _settingsSaver.Save(settingsPath, currentText, new RuleSettings(settings.Requires, rules, settings.Structure, settings.ConfiguredStrictness, settings.Schema));
     }
 
     private static string NewlineOf(string text)

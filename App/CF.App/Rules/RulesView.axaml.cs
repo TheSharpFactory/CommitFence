@@ -109,6 +109,26 @@ internal sealed partial class RulesView : UserControl
         }
     }
 
+    public (double Top, double Bottom) LineTipVerticalBounds(Control viewport, double linkTop, double viewportHeight)
+    {
+        var top = StickyHeading.IsVisible
+            ? StickyHeading.TranslatePoint(new Point(0, StickyHeading.Bounds.Height), viewport)?.Y ?? 0
+            : 0;
+        var bottom = viewportHeight;
+        foreach(var heading in Rows.GetRealizedContainers().Where(container => container.DataContext is GroupHeadingViewModel))
+        {
+            if(heading.TranslatePoint(default, viewport) is not { } origin)
+                continue;
+
+            if(origin.Y <= linkTop)
+                top = Math.Max(top, origin.Y + heading.Bounds.Height);
+            else
+                bottom = Math.Min(bottom, origin.Y);
+        }
+
+        return (top + 4, bottom - 4);
+    }
+
     private static int CountBelow(Visual parent)
     {
         var count = 0;
@@ -254,7 +274,7 @@ internal sealed partial class RulesView : UserControl
         var view = new RulePageView { DataContext = page };
         PageHost.Children.Add(view);
         if(page.IsDraft)
-            Dispatcher.UIThread.Post(page.OpenFirstPicker, DispatcherPriority.Loaded);
+            Dispatcher.UIThread.Post(view.FocusId, DispatcherPriority.Loaded);
     }
 
     private void OnDataContextChanged(object? sender, EventArgs e)
@@ -266,6 +286,7 @@ internal sealed partial class RulesView : UserControl
             _model.PropertyChanged -= OnModelPropertyChanged;
             _model.Items.CollectionChanged -= OnItemsChanged;
             _model.FileRulesArrived -= WarmUp;
+            _model.DraftSaved -= OnDraftSaved;
         }
 
         _model = DataContext as RulesViewModel;
@@ -277,10 +298,20 @@ internal sealed partial class RulesView : UserControl
             _model.PropertyChanged += OnModelPropertyChanged;
             _model.Items.CollectionChanged += OnItemsChanged;
             _model.FileRulesArrived += WarmUp;
+            _model.DraftSaved += OnDraftSaved;
             _model.SettingsAppeared += OnSettingsAppeared;
             _windowWidth = Bounds.Width + _railWidth;
             ApplyLayout();
         }
+    }
+
+    private void OnDraftSaved(TeamRuleRowViewModel row)
+    {
+        Dispatcher.UIThread.Post(() =>
+        {
+            if(ReferenceEquals(Rows.SelectedItem, row))
+                Rows.Reveal(row);
+        }, DispatcherPriority.Loaded);
     }
 
     private void OnModelPropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
@@ -513,7 +544,7 @@ internal sealed partial class RulesView : UserControl
             StickyHeading.Content = owner;
         }
 
-        StickyHeading.Margin = new Thickness(8, Math.Min(0, nextTop - RuleListBox.HeadingHeight), 12, 0);
+        StickyHeading.Margin = new Thickness(8, Math.Min(0, nextTop - RuleListBox.HeadingHeight), 24, 0);
         StickyHeading.IsVisible = true;
     }
 

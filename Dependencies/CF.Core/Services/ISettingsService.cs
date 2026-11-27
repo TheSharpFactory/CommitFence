@@ -10,4 +10,7 @@ public interface ISettingsService
 
     /// <summary>Saves a named preset in the folder's settings file.</summary>
     Strictness SetStrictness(string folder, StrictnessPreset preset);
+
+    /// <summary>Changes strictness against the mapping on disk, optionally requiring a matching file revision.</summary>
+    StrictnessChange ChangeStrictness(string folder, Func<Strictness, Strictness> change, string? expectedRevision = null);
 }

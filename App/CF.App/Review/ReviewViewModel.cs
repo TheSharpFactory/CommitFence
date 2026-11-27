@@ -25,13 +25,14 @@ internal sealed partial class ReviewViewModel : ObservableObject
 {
     private const int _startOpenUpTo = 20;
     private const int _cleanFilesNamed = 8;
+    private const string _cleanLine = "No findings in the reviewed changes. Every file is in the Files panel.";
     private const int _recentFolders = 5;
     private const int _reasonsFirst = 5;
-    private const int _cleanPushFilesListed = 20;
     private const double _secondsWithDecimal = 10;
     private const int _shortCommit = 7;
     private const string _stagedNothingBlocks = "No blocking findings in the staged changes";
     private const int _mostStagedFilesListed = 8;
+    private const string _noFileGroup = "(no file)";
     private const string _noFolderYet = "No folder reviewed yet";
     private const string _noFolderLead = "It is read as the last commit holds it, old findings included.";
 
@@ -123,18 +124,11 @@ internal sealed partial class ReviewViewModel : ObservableObject
     public partial string ReasonsLine { get; set; } = string.Empty;
 
     /// <summary>
-    /// The files of a clean push, by path, as the main column lists them (there is no panel for a push with nothing in it).
+    /// The one line a review with no findings says in the main column; the files themselves are in the panel.
     /// </summary>
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(HasCleanPush))]
-    public partial IReadOnlyList<string> CleanPushFiles { get; set; } = new List<string>();
-
-    [ObservableProperty]
     public partial string CleanPushLine { get; set; } = string.Empty;
-
-    [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(HasCleanPushMore))]
-    public partial string CleanPushMore { get; set; } = string.Empty;
 
     /// <summary>
     /// What a push would meet in numbers: the rules that are on, as the filter of Rules counts them. Not set while the rules are not read.
@@ -155,8 +149,8 @@ internal sealed partial class ReviewViewModel : ObservableObject
     public partial string PanelHead { get; set; } = string.Empty;
 
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(HasCleanSummary), nameof(HasPanel))]
-    public partial string CleanFilesText { get; set; } = string.Empty;
+    [NotifyPropertyChangedFor(nameof(HasPanel))]
+    public partial CleanFilesViewModel? PanelClean { get; set; }
 
     [ObservableProperty]
     public partial string FilesLine { get; set; } = string.Empty;
@@ -169,15 +163,15 @@ internal sealed partial class ReviewViewModel : ObservableObject
     public partial int BlockingCount { get; set; }
 
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(PanelIsListed), nameof(PanelToggleText))]
+    [NotifyPropertyChangedFor(nameof(PanelIsListed), nameof(PanelToggleText), nameof(PanelToggleName))]
     public partial bool IsOnePane { get; set; }
 
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(PanelIsListed), nameof(PanelToggleText))]
+    [NotifyPropertyChangedFor(nameof(PanelIsListed), nameof(PanelToggleText), nameof(PanelToggleName))]
     public partial bool PanelShown { get; set; }
 
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(IsFolderChosen), nameof(HasPanel), nameof(HasRulePanel), nameof(RunText), nameof(RunName), nameof(RunIsMain), nameof(RunIsSecond), nameof(RunShowsIcon))]
+    [NotifyPropertyChangedFor(nameof(IsFolderChosen), nameof(HasPanel), nameof(HasRulePanel), nameof(PanelToggleName), nameof(RunText), nameof(RunName), nameof(RunIsMain), nameof(RunIsSecond), nameof(RunShowsIcon))]
     public partial ReviewChoiceViewModel SelectedChoice { get; set; }
 
     [ObservableProperty]
@@ -193,13 +187,6 @@ internal sealed partial class ReviewViewModel : ObservableObject
 
     [ObservableProperty]
     public partial string ShowAllText { get; set; } = string.Empty;
-
-    [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(HasFolderClean))]
-    public partial string FolderCleanLead { get; set; } = string.Empty;
-
-    [ObservableProperty]
-    public partial string FolderCleanNames { get; set; } = string.Empty;
 
     [ObservableProperty]
     public partial string FolderLabel { get; set; } = string.Empty;
@@ -444,15 +431,7 @@ internal sealed partial class ReviewViewModel : ObservableObject
     {
         get
         {
-            return CleanPushFiles.Count > 0;
-        }
-    }
-
-    public bool HasCleanPushMore
-    {
-        get
-        {
-            return CleanPushMore.Length > 0;
+            return CleanPushLine.Length > 0;
         }
     }
 
@@ -574,13 +553,13 @@ internal sealed partial class ReviewViewModel : ObservableObject
     }
 
     /// <summary>
-    /// The panel of a push: its files.
+    /// Whether the review has files to list in its panel.
     /// </summary>
     public bool HasPanel
     {
         get
         {
-            return !IsFolderChosen && (PanelFiles.Count > 0 || CleanFilesText.Length > 0);
+            return PanelFiles.Count > 0 || PanelClean != null;
         }
     }
 
@@ -600,22 +579,6 @@ internal sealed partial class ReviewViewModel : ObservableObject
         get
         {
             return ChosenRule != null;
-        }
-    }
-
-    public bool HasCleanSummary
-    {
-        get
-        {
-            return CleanFilesText.Length > 0;
-        }
-    }
-
-    public bool HasFolderClean
-    {
-        get
-        {
-            return FolderCleanLead.Length > 0;
         }
     }
 
@@ -647,6 +610,11 @@ internal sealed partial class ReviewViewModel : ObservableObject
         {
             return !IsOnePane || PanelShown;
         }
+    }
+
+    public string PanelToggleName
+    {
+        get { return $"{PanelToggleText} the files of {CleanFilesViewModel.ScopeName(KindOf(SelectedChoice), "this push")}"; }
     }
 
     public string PanelToggleText
@@ -1041,12 +1009,14 @@ internal sealed partial class ReviewViewModel : ObservableObject
 
         ChosenRule = null;
         ApplyRule();
+        RefreshPanelFiles();
     }
 
     private void ChooseRule(RuleRowViewModel row)
     {
         ChosenRule = ChosenRule == row.RuleId ? null : row.RuleId;
         ApplyRule();
+        RefreshPanelFiles();
     }
 
     private static VerdictViewModel Starting()
@@ -1102,15 +1072,13 @@ internal sealed partial class ReviewViewModel : ObservableObject
             FileGroups = FileGroups,
             PanelFiles = PanelFiles,
             PanelHead = PanelHead,
-            CleanFilesText = CleanFilesText,
+            PanelClean = PanelClean,
             FilesLine = FilesLine,
             OpenAllText = OpenAllText,
             RuleRows = RuleRows,
             RulesHead = RulesHead,
             ChosenRule = ChosenRule,
             ShowAllText = ShowAllText,
-            FolderCleanLead = FolderCleanLead,
-            FolderCleanNames = FolderCleanNames,
             Result = _result,
             RuleInfos = _ruleInfos,
             ResultTarget = _resultTarget,
@@ -1119,9 +1087,7 @@ internal sealed partial class ReviewViewModel : ObservableObject
             Reasons = Reasons,
             ReasonsLine = ReasonsLine,
             AllReasonsShown = AllReasonsShown,
-            CleanPushFiles = CleanPushFiles,
-            CleanPushLine = CleanPushLine,
-            CleanPushMore = CleanPushMore
+            CleanPushLine = CleanPushLine
         };
     }
 
@@ -1139,22 +1105,20 @@ internal sealed partial class ReviewViewModel : ObservableObject
         FileGroups = state.FileGroups;
         PanelFiles = state.PanelFiles;
         PanelHead = state.PanelHead;
-        CleanFilesText = state.CleanFilesText;
+        PanelClean = state.PanelClean;
         FilesLine = state.FilesLine;
         OpenAllText = state.OpenAllText;
         RuleRows = state.RuleRows;
         RulesHead = state.RulesHead;
         ChosenRule = state.ChosenRule;
         ShowAllText = state.ShowAllText;
-        FolderCleanLead = state.FolderCleanLead;
-        FolderCleanNames = state.FolderCleanNames;
         _result = state.Result;
         _ruleInfos = state.RuleInfos;
         _resultTarget = state.ResultTarget;
         _resultLabel = state.ResultLabel;
         _startsOpen = state.StartsOpen;
         SetReasons(state.Reasons, state.ReasonsLine, state.AllReasonsShown);
-        SetCleanPush(state.CleanPushFiles, state.CleanPushLine, state.CleanPushMore);
+        CleanPushLine = state.CleanPushLine;
         OnPropertyChanged(nameof(CanCopyAll));
     }
 
@@ -1172,21 +1136,19 @@ internal sealed partial class ReviewViewModel : ObservableObject
         FileGroups = new List<FileGroupViewModel>();
         PanelFiles = new List<PanelFileViewModel>();
         PanelHead = string.Empty;
-        CleanFilesText = string.Empty;
+        PanelClean = null;
         FilesLine = string.Empty;
         OpenAllText = "Open all";
         RuleRows = new List<RuleRowViewModel>();
         RulesHead = string.Empty;
         ChosenRule = null;
         ShowAllText = string.Empty;
-        FolderCleanLead = string.Empty;
-        FolderCleanNames = string.Empty;
         _result = null;
         _ruleInfos = new Dictionary<Finding, RuleInfo>();
         _resultTarget = string.Empty;
         _resultLabel = string.Empty;
         SetReasons(new List<ReasonViewModel>(), string.Empty, false);
-        SetCleanPush(new List<string>(), string.Empty, string.Empty);
+        CleanPushLine = string.Empty;
         OnPropertyChanged(nameof(CanCopyAll));
     }
 
@@ -1199,13 +1161,6 @@ internal sealed partial class ReviewViewModel : ObservableObject
         OnPropertyChanged(nameof(ReasonsShown));
         OnPropertyChanged(nameof(CanShowAllReasons));
         OnPropertyChanged(nameof(ShowAllReasonsText));
-    }
-
-    private void SetCleanPush(IReadOnlyList<string> files, string line, string more)
-    {
-        CleanPushFiles = files;
-        CleanPushLine = line;
-        CleanPushMore = more;
     }
 
     /// <summary>
@@ -1346,11 +1301,10 @@ internal sealed partial class ReviewViewModel : ObservableObject
         _startsOpen = result.Findings.Count <= _startOpenUpTo;
         var groups = BuildGroups(result, rules, null, ReviewKind.Push);
         SetFiles(groups);
-        BuildPanel(result, groups, ReviewKind.Push);
+        BuildFileLists(result, groups, ReviewKind.Push);
         BuildReasons(result);
-        BuildCleanPush(result, ReviewKind.Push);
-        FilesLine = groups.Count == 1 ? "1 file with findings" : $"{groups.Count} files with findings, most findings first";
-        Verdict = Describe(result, groups.Count);
+        FilesLine = FilesWithFindingsLine(groups);
+        Verdict = Describe(result, FilesOf(groups));
         BlockingCount = result.Findings.Count(finding => finding.Severity == Severity.Block);
         HasResult = true;
         UpdateOpenAllText();
@@ -1367,11 +1321,10 @@ internal sealed partial class ReviewViewModel : ObservableObject
         _startsOpen = result.Findings.Count <= _startOpenUpTo;
         var groups = BuildGroups(result, rules, null, ReviewKind.Staged);
         SetFiles(groups);
-        BuildPanel(result, groups, ReviewKind.Staged);
+        BuildFileLists(result, groups, ReviewKind.Staged);
         BuildReasons(result);
-        BuildCleanPush(result, ReviewKind.Staged);
-        FilesLine = groups.Count == 1 ? "1 file with findings" : $"{groups.Count} files with findings, most findings first";
-        Verdict = DescribeStaged(result, groups.Count, staged);
+        FilesLine = FilesWithFindingsLine(groups);
+        Verdict = DescribeStaged(result, FilesOf(groups), staged);
         BlockingCount = result.Findings.Count(finding => finding.Severity == Severity.Block);
         HasResult = true;
         UpdateOpenAllText();
@@ -1413,10 +1366,9 @@ internal sealed partial class ReviewViewModel : ObservableObject
         _startsOpen = result.Findings.Count <= _startOpenUpTo;
         ChosenRule = null;
         BuildRuleRows(result, rules);
-        BuildFolderClean(result);
         BuildReasons(result);
-        SetCleanPush(new List<string>(), string.Empty, string.Empty);
         ApplyRule();
+        BuildFileLists(result, FileGroups, ReviewKind.Folder);
         HasResult = true;
         NotifyRunButton();
     }
@@ -1443,7 +1395,7 @@ internal sealed partial class ReviewViewModel : ObservableObject
     private List<FileGroupViewModel> BuildGroups(ReviewResult result, Dictionary<Finding, RuleInfo> rules, string? onlyRule, ReviewKind kind)
     {
         var groups = new List<FileGroupViewModel>();
-        foreach(var byFile in result.Findings.GroupBy(finding => finding.File ?? "(no file)", StringComparer.Ordinal))
+        foreach(var byFile in result.Findings.GroupBy(finding => finding.File ?? _noFileGroup, StringComparer.Ordinal))
         {
             var models = byFile.Where(finding => onlyRule == null || finding.RuleId == onlyRule)
                 .Select(finding => FindingModel(result, finding, byFile, rules[finding], kind)).ToList();
@@ -1529,27 +1481,93 @@ internal sealed partial class ReviewViewModel : ObservableObject
             finding => _ruleInfos.GetValueOrDefault(finding)?.Prompt, _result?.Outcome == ReviewOutcome.Incomplete, _result?.Coverage);
     }
 
-    private void BuildPanel(ReviewResult result, List<FileGroupViewModel> groups, ReviewKind kind)
+    private void BuildFileLists(ReviewResult result, IReadOnlyList<FileGroupViewModel> groups, ReviewKind kind)
     {
-        var files = result.Coverage.Where(entry => entry.Kind == CoverageKind.File).GroupBy(entry => entry.What, StringComparer.Ordinal).ToList();
-        var byPath = groups.ToDictionary(group => group.Path, StringComparer.Ordinal);
-        var rows = new List<PanelFileViewModel>();
-        rows.AddRange(groups.Select(group => new PanelFileViewModel(group.Path, group, ShowFile, string.Empty)));
-        var others = files.Where(file => !byPath.ContainsKey(file.Key)).OrderBy(file => file.Key, StringComparer.Ordinal).ToList();
-        var failures = result.Coverage.Where(entry => entry.Status != CoverageStatus.Reviewed && entry.Kind != CoverageKind.Rule).GroupBy(entry => entry.What, StringComparer.Ordinal).ToDictionary(group => group.Key, group => group.First().Reason, StringComparer.Ordinal);
-        var clean = others.Where(file => !failures.ContainsKey(file.Key)).ToList();
-        var collapse = clean.Count > _cleanFilesNamed;
-        foreach(var file in others)
-        {
-            if(failures.TryGetValue(file.Key, out var reason))
-                rows.Add(new PanelFileViewModel(file.Key, null, null, reason));
-            else if(!collapse)
-                rows.Add(new PanelFileViewModel(file.Key, null, null, string.Empty));
-        }
+        var paths = FilePaths(result);
+        var files = PanelRows(result, paths, groups);
 
-        PanelFiles = rows;
-        CleanFilesText = collapse ? $"{clean.Count} files have no findings." : string.Empty;
-        PanelHead = kind == ReviewKind.Staged ? $"{files.Count} staged, {groups.Count} with findings" : $"{files.Count} in this push, {groups.Count} with findings";
+        var allClean = result.Outcome == ReviewOutcome.Clean && files.All(file => file.IsClean);
+        CleanPushLine = allClean && files.Count > 0 ? _cleanLine : string.Empty;
+        var clean = files.Where(file => file.IsClean).Select(file => file.Path).ToList();
+        var collapse = clean.Count > _cleanFilesNamed;
+        SetPanelRows(files, paths.Count, groups, kind, collapse);
+        PanelClean = collapse ? new CleanFilesViewModel(clean, clean.Count < paths.Count) : null;
+    }
+
+    /// <summary>
+    /// The files of a review: those it covered and those with findings that name a path. A finding with no file belongs to the
+    /// findings alone.
+    /// </summary>
+    private static List<string> FilePaths(ReviewResult result)
+    {
+        return result.Coverage.Where(entry => entry.Kind == CoverageKind.File).Select(entry => entry.What)
+            .Concat(result.Findings.Where(finding => finding.File != null).Select(finding => finding.File!))
+            .Distinct(StringComparer.Ordinal).Order(StringComparer.Ordinal).ToList();
+    }
+
+    /// <summary>
+    /// One row per file, the files with findings first in the order the page lists them (most findings first), then the others by
+    /// path. A file whose findings all belong to rules the list is not showing keeps its place, marked as such.
+    /// </summary>
+    private List<PanelFileViewModel> PanelRows(ReviewResult result, List<string> paths, IReadOnlyList<FileGroupViewModel> groups)
+    {
+        var byPath = groups.Where(group => group.Path != _noFileGroup).ToDictionary(group => group.Path, StringComparer.Ordinal);
+        var withFindings = result.Findings.Where(finding => finding.File != null).Select(finding => finding.File).ToHashSet(StringComparer.Ordinal);
+        var failures = result.Coverage.Where(entry => entry.Kind != CoverageKind.Rule && entry.Status != CoverageStatus.Reviewed)
+            .GroupBy(entry => entry.What, StringComparer.Ordinal).ToDictionary(group => group.Key, group => group.First().Reason, StringComparer.Ordinal);
+        var rank = groups.Select((group, index) => (group.Path, index)).Where(entry => entry.Path != _noFileGroup).ToDictionary(entry => entry.Path, entry => entry.index, StringComparer.Ordinal);
+        return paths.Select(path =>
+        {
+            byPath.TryGetValue(path, out var group);
+            return new PanelFileViewModel(path, group, ShowFile, failures.GetValueOrDefault(path), group == null && withFindings.Contains(path));
+        }).OrderBy(file => file.Group == null ? int.MaxValue : rank[file.Path]).ToList();
+    }
+
+    /// <summary>
+    /// The rows of the panel and its head. A folder review shows its files with findings in the main list, so the panel leaves
+    /// those out; the others stay, and the clean ones go into the disclosure when it has them.
+    /// </summary>
+    private void SetPanelRows(List<PanelFileViewModel> files, int total, IReadOnlyList<FileGroupViewModel> groups, ReviewKind kind, bool collapse)
+    {
+        PanelFiles = files.Where(file => (!collapse || !file.IsClean) && (kind != ReviewKind.Folder || !file.HasFindings)).ToList();
+        var count = FilesOf(groups);
+        var withFindings = count == 0 ? "none with findings" : $"{count} with findings";
+        PanelHead = kind switch
+        {
+            ReviewKind.Staged => $"{total} staged, {withFindings}",
+            ReviewKind.Folder when ChosenRule != null => $"{total} in this folder, {count} with findings of {ChosenRule}",
+            ReviewKind.Folder => $"{total} in this folder, {withFindings}",
+            ReviewKind.Push => $"{total} in this push, {withFindings}",
+            _ => throw new ArgumentOutOfRangeException(nameof(kind))
+        };
+    }
+
+    /// <summary>
+    /// Puts the panel of a folder review in step with the rule chosen: every file stays listed, here or in the main list.
+    /// </summary>
+    private void RefreshPanelFiles()
+    {
+        if(_result == null)
+            return;
+
+        var paths = FilePaths(_result);
+        var files = PanelRows(_result, paths, FileGroups);
+        SetPanelRows(files, paths.Count, FileGroups, ReviewKind.Folder, PanelClean != null);
+    }
+
+    private static int FilesOf(IReadOnlyList<FileGroupViewModel> groups)
+    {
+        return groups.Count(group => group.Path != _noFileGroup);
+    }
+
+    private static string FilesWithFindingsLine(List<FileGroupViewModel> groups)
+    {
+        var files = FilesOf(groups);
+        var fileLine = files == 1 ? "1 file with findings" : $"{files} files with findings, most findings first";
+        if(files == groups.Count)
+            return fileLine;
+
+        return files == 0 ? "Findings with no file" : fileLine + ", and findings with no file";
     }
 
     /// <summary>
@@ -1562,28 +1580,6 @@ internal sealed partial class ReviewViewModel : ObservableObject
         var hasBuild = entries.Any(entry => entry.Kind == CoverageKind.Build);
         var line = reasons.Count == 0 ? string.Empty : (reasons.Count == 1 ? "1 reason" : $"{reasons.Count} reasons") + (hasBuild ? ", the build first" : string.Empty);
         SetReasons(reasons, line, false);
-    }
-
-    /// <summary>
-    /// A clean push has no panel: it names the same files, so the main column lists them, each with its tick.
-    /// </summary>
-    private void BuildCleanPush(ReviewResult result, ReviewKind kind)
-    {
-        if(result.Outcome != ReviewOutcome.Clean)
-        {
-            SetCleanPush(new List<string>(), string.Empty, string.Empty);
-            return;
-        }
-
-        var files = result.Coverage.Where(entry => entry.Kind == CoverageKind.File).Select(entry => entry.What).Distinct(StringComparer.Ordinal).Order(StringComparer.Ordinal).ToList();
-        var line = files.Count == 1 ? "1 file reviewed, without findings" : $"{files.Count} files reviewed, none with findings";
-        if(kind == ReviewKind.Staged)
-            line = files.Count == 1 ? "1 file staged, without findings" : $"{files.Count} files staged, none with findings";
-        var more = files.Count > _cleanPushFilesListed ? $"and {files.Count - _cleanPushFilesListed} more, none with findings." : string.Empty;
-        SetCleanPush(files.Take(_cleanPushFilesListed).ToList(), files.Count == 0 ? string.Empty : line, more);
-        PanelFiles = new List<PanelFileViewModel>();
-        CleanFilesText = string.Empty;
-        PanelHead = string.Empty;
     }
 
     private void BuildRuleRows(ReviewResult result, Dictionary<Finding, RuleInfo> rules)
@@ -1601,28 +1597,6 @@ internal sealed partial class ReviewViewModel : ObservableObject
         }
 
         RuleRows = rows;
-    }
-
-    private void BuildFolderClean(ReviewResult result)
-    {
-        var withFindings = result.Findings.Select(finding => finding.File).Where(file => file != null).ToHashSet(StringComparer.Ordinal);
-        var failed = result.Coverage.Where(entry => entry.Status != CoverageStatus.Reviewed && entry.Kind != CoverageKind.Rule).Select(entry => entry.What).ToHashSet(StringComparer.Ordinal);
-        var clean = result.Coverage.Where(entry => entry.Kind == CoverageKind.File && entry.Status == CoverageStatus.Reviewed).Select(entry => entry.What).Distinct(StringComparer.Ordinal).Where(file => !withFindings.Contains(file) && !failed.Contains(file)).Order(StringComparer.Ordinal).ToList();
-        if(clean.Count == 0)
-        {
-            FolderCleanLead = string.Empty;
-            FolderCleanNames = string.Empty;
-        }
-        else if(clean.Count <= _cleanFilesNamed)
-        {
-            FolderCleanLead = clean.Count == 1 ? "1 file has no findings:" : $"{clean.Count} files have no findings:";
-            FolderCleanNames = string.Join(", ", clean);
-        }
-        else
-        {
-            FolderCleanLead = $"{clean.Count} files have no findings.";
-            FolderCleanNames = string.Empty;
-        }
     }
 
     /// <summary>
@@ -1646,11 +1620,11 @@ internal sealed partial class ReviewViewModel : ObservableObject
         ShowAllText = $"Show all {total}";
         RulesHead = ChosenRule == null ? (RuleRows.Count == 1 ? "1 rule has findings" : $"{RuleRows.Count} rules have findings") : $"1 of {RuleRows.Count} rules shown";
         if(ChosenRule == null)
-            FilesLine = groups.Count == 1 ? "1 file with findings" : $"{groups.Count} files with findings, most findings first";
+            FilesLine = FilesWithFindingsLine(groups);
         else
-            FilesLine = $"{groups.Count} {(groups.Count == 1 ? "file" : "files")} with findings of {ChosenRule}, most findings first";
+            FilesLine = $"{FilesOf(groups)} {(FilesOf(groups) == 1 ? "file" : "files")} with findings of {ChosenRule}, most findings first";
 
-        Verdict = DescribeFolder(_result, groups.Count);
+        Verdict = DescribeFolder(_result, FilesOf(groups));
     }
 
     private void ShowFile(FileGroupViewModel group)
@@ -1667,6 +1641,16 @@ internal sealed partial class ReviewViewModel : ObservableObject
     /// <summary>
     /// Makes the list the page shows match the files: the rows that stay are kept (and so are their controls), the others come and go.
     /// </summary>
+    partial void OnIsOnePaneChanged(bool value)
+    {
+        SyncItems();
+    }
+
+    partial void OnPanelShownChanged(bool value)
+    {
+        SyncItems();
+    }
+
     private void SyncItems()
     {
         var desired = new List<ReviewListItemViewModel>(FileGroups.Count + 2) { _head };
@@ -1678,6 +1662,7 @@ internal sealed partial class ReviewViewModel : ObservableObject
         }
 
         desired.Add(_tail);
+
         for(var index = 0; index < desired.Count; index++)
         {
             if(index < Items.Count && ReferenceEquals(Items[index], desired[index]))

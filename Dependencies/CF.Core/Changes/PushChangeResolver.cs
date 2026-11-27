@@ -64,7 +64,7 @@ internal sealed class PushChangeResolver
         var tree = _git.ResolveTree(_repository, tip)
             ?? throw new ScopeException($"{pushedRef.LocalRef} has no tree");
 
-        var changeSet = _builder.Build(label, before, tree);
+        var changeSet = _builder.Build(label, before, tree).WithCommit(tip);
         if(remoteCommit != null || pushedRef.IsNewOnRemote)
             return changeSet;
 

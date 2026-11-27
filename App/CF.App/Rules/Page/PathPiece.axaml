@@ -25,7 +25,7 @@
     <Panel>
       <Button Name="PathButton" Classes="token for" Classes.empty="{Binding IsNew}" Classes.invalid="{Binding ShowsRefused}"
               Classes.open="{Binding IsOpen}" VerticalAlignment="Top" HorizontalAlignment="Left" Command="{Binding OpenPickerCommand}"
-              ToolTip.Tip="Files the rule applies to" ToolTip.ShowDelay="500" ToolTip.Placement="Top" ToolTip.VerticalOffset="-8" local:TipPlacement.AvoidsHead="True" AutomationProperties.Name="{Binding SpokenName}"
+              ToolTip.Tip="Files the rule applies to" local:TipPlacement.AvoidsHead="True" AutomationProperties.Name="{Binding SpokenName}"
               AutomationProperties.HelpText="{Binding InvalidReasonSpoken}">
         <DockPanel>
           <parts:Icon DockPanel.Dock="Right" Data="{StaticResource i-down}" Width="13" Height="13" StrokeThickness="1.8"

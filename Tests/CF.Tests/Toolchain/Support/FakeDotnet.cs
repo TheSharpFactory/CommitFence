@@ -1,5 +1,6 @@
 using System.Text.Json;
 using CF.Core.Ports;
+using CF.Tests.Wire;
 
 namespace CF.Tests.Toolchain.Support;
 
@@ -223,20 +224,32 @@ internal sealed class FakeDotnet : IProcessRunner
     {
         var frameworks = project.Units.Select(unit => unit.Framework).ToList();
         var single = frameworks.Count == 1 ? frameworks[0] : string.Empty;
-        return JsonSerializer.Serialize(new { Properties = new { TargetFramework = single, TargetFrameworks = string.Join(";", frameworks) } });
+        var properties = new Dictionary<string, string>
+        {
+            ["TargetFramework"] = single,
+            ["TargetFrameworks"] = string.Join(";", frameworks)
+        };
+        var answer = new MsBuildWire(properties);
+        return JsonSerializer.Serialize(answer, WireJsonContext.Default.MsBuildWire);
     }
 
     private string DescribeUnit(FakeUnit unit)
     {
         var assembly = unit.IntermediateAssembly ?? "obj/Debug/" + unit.Framework + "/fake.dll";
-        var items = new
+        var properties = new Dictionary<string, string>
         {
-            Compile = unit.Compiles.Select(path => new { FullPath = FullPath(path) }).ToList(),
-            ProjectReference = unit.References.Select(path => new { FullPath = FullPath(path) }).ToList(),
-            IntermediateAssembly = new[] { new { FullPath = FullPath(assembly) } }
+            ["DefineConstants"] = string.Join(SymbolSeparator, unit.Defines),
+            ["CustomAfterDirectoryBuildTargets"] = string.Empty
         };
+        var items = new Dictionary<string, List<MsBuildItemWire>>
+        {
+            ["Compile"] = unit.Compiles.Select(path => new MsBuildItemWire(FullPath(path))).ToList(),
+            ["ProjectReference"] = unit.References.Select(path => new MsBuildItemWire(FullPath(path))).ToList(),
+            ["IntermediateAssembly"] = [new MsBuildItemWire(FullPath(assembly))]
+        };
+        var answer = new MsBuildWire(properties, items);
 
-        return JsonSerializer.Serialize(new { Items = items, Properties = new { DefineConstants = string.Join(SymbolSeparator, unit.Defines), CustomAfterDirectoryBuildTargets = string.Empty } });
+        return JsonSerializer.Serialize(answer, WireJsonContext.Default.MsBuildWire);
     }
 
     private static string? FindValue(IReadOnlyList<string> arguments, string prefix)

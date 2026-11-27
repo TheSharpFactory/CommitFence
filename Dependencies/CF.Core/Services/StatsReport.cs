@@ -1,4 +1,5 @@
 using System.Globalization;
+using CF.Core.Ports;
 
 namespace CF.Core.Services;
 
@@ -11,6 +12,9 @@ public sealed record StatsReport(IReadOnlyList<StatsDay> Days, DateOnly? Oldest,
 
     /// <summary>The heading shown when the history is empty.</summary>
     public const string EmptyHeading = "No reviews yet";
+
+    /// <summary>Review counts by source for the same period as the daily totals.</summary>
+    public IReadOnlyList<StatsSourceCount> Sources { get; init; } = [];
 
     /// <summary>
     /// The notice for a history that could not be read: in full when some of it was read, since the numbers may then leave reviews
@@ -76,3 +80,6 @@ public sealed record StatsReport(IReadOnlyList<StatsDay> Days, DateOnly? Oldest,
         }
     }
 }
+
+/// <summary>The number of push reviews, and the number blocked, from one entry point.</summary>
+public sealed record StatsSourceCount(ReviewSource Source, int Total, int Blocked);
